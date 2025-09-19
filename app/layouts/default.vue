@@ -7,59 +7,68 @@ const toast = useToast()
 const open = ref(false)
 
 const links = [[{
-	label: "Home",
-	icon: "i-lucide-house",
+	label: "Overview",
+	icon: "i-lucide-layout-dashboard",
 	to: "/",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
-	label: "Inbox",
-	icon: "i-lucide-inbox",
+	label: "Statistics",
+	icon: "i-lucide-chart-no-axes-combined",
 	to: "/inbox",
-	badge: "4",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
-	label: "Customers",
-	icon: "i-lucide-users",
+	label: "Rewind",
+	icon: "i-lucide-rewind",
+	to: "/inbox",
+	onSelect: () => {
+		open.value = false
+	}
+}, {
+	label: "Tierlist",
+	icon: "i-lucide-rows-3",
+	to: "/inbox",
+	onSelect: () => {
+		open.value = false
+	}
+}, {
+	label: "Create",
+	icon: "i-lucide-circle-fading-plus",
 	to: "/customers",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
-	label: "Settings",
-	to: "/settings",
-	icon: "i-lucide-settings",
-	defaultOpen: true,
-	type: "trigger",
-	children: [{
-		label: "General",
-		to: "/settings",
-		exact: true,
-		onSelect: () => {
-			open.value = false
-		}
-	}, {
-		label: "Members",
-		to: "/settings/members",
-		onSelect: () => {
-			open.value = false
-		}
-	}, {
-		label: "Notifications",
-		to: "/settings/notifications",
-		onSelect: () => {
-			open.value = false
-		}
-	}, {
-		label: "Security",
-		to: "/settings/security",
-		onSelect: () => {
-			open.value = false
-		}
-	}]
+	label: "Calendar",
+	icon: "i-lucide-calendar-days",
+	to: "/customers",
+	onSelect: () => {
+		open.value = false
+	}
+}, {
+	label: "Explore",
+	icon: "i-lucide-telescope",
+	to: "/customers",
+	onSelect: () => {
+		open.value = false
+	}
+}, {
+	label: "Podium",
+	icon: "i-lucide-trophy",
+	to: "/customers",
+	onSelect: () => {
+		open.value = false
+	}
+}, {
+	label: "Timeline",
+	icon: "i-lucide-chart-no-axes-gantt",
+	to: "/customers",
+	onSelect: () => {
+		open.value = false
+	}
 }], [{
 	label: "Feedback",
 	icon: "i-lucide-message-circle",
@@ -121,27 +130,29 @@ onMounted(async () => {
 			v-model:open="open"
 			collapsible
 			resizable
-			class="bg-elevated/25"
-			:ui="{ footer: 'lg:border-t lg:border-default' }">
+			:ui="{ footer: 'lg:border-t lg:border-default', body: 'px-3'}">
 			<template #header="{ collapsed }">
-				<TeamsMenu :collapsed="collapsed" />
+				<UDashboardSidebarCollapse :class="collapsed ? 'w-full' : 'w-fit'" :ui="{ base: 'rounded-full cursor-pointer'}" />
+				<UHeader v-if="!collapsed" title="AniTools" />
 			</template>
 
 			<template #default="{ collapsed }">
-				<UDashboardSearchButton :collapsed="collapsed" class="ring-default bg-transparent" />
+				<UDashboardSearchButton :collapsed="collapsed" variant="ghost" :ui="{ base: 'bg-elevated/50 rounded-3xl cursor-pointer', leadingIcon: 'ms-1'}" />
 
 				<UNavigationMenu
 					:collapsed="collapsed"
 					:items="links[0]"
 					orientation="vertical"
 					tooltip
-					popover />
+					popover
+					/>
 
 				<UNavigationMenu
 					:collapsed="collapsed"
 					:items="links[1]"
 					orientation="vertical"
 					tooltip
+					variant="link"
 					class="mt-auto" />
 			</template>
 
