@@ -16,56 +16,56 @@ const links = [[{
 }, {
 	label: "Statistics",
 	icon: "i-lucide-chart-no-axes-combined",
-	to: "/inbox",
+	to: "/statistics",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Rewind",
 	icon: "i-lucide-rewind",
-	to: "/inbox",
+	to: `/rewind/${new Date().getFullYear()}`,
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Tierlist",
 	icon: "i-lucide-rows-3",
-	to: "/inbox",
+	to: "/tierlist",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Create",
 	icon: "i-lucide-circle-fading-plus",
-	to: "/customers",
+	to: "/create",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Calendar",
 	icon: "i-lucide-calendar-days",
-	to: "/customers",
+	to: "/calendar",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Explore",
 	icon: "i-lucide-telescope",
-	to: "/customers",
+	to: "/explore",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Podium",
 	icon: "i-lucide-trophy",
-	to: "/customers",
+	to: "/podium",
 	onSelect: () => {
 		open.value = false
 	}
 }, {
 	label: "Timeline",
 	icon: "i-lucide-chart-no-axes-gantt",
-	to: "/customers",
+	to: "/timeline",
 	onSelect: () => {
 		open.value = false
 	}

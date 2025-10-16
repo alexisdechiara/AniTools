@@ -3,7 +3,14 @@ export default defineNuxtConfig({
 	modules: [
 		"@nuxt/eslint",
 		"@nuxt/ui",
-		"@vueuse/nuxt"
+		"@vueuse/nuxt",
+		"nuxt-charts"
+	],
+
+	components: [
+		{
+			path: "~/components",
+			pathPrefix: false }
 	],
 
 	devtools: {

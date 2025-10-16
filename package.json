@@ -8,7 +8,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-		"lint:fix": "eslint . --fix",
+    "lint:fix": "eslint . --fix",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@vueuse/nuxt": "^13.9.0",
     "date-fns": "^4.1.0",
     "nuxt": "^4.0.3",
+    "nuxt-charts": "^0.2.4",
     "zod": "^4.1.9"
   },
   "devDependencies": {

@@ -22,13 +22,39 @@ export default defineAppConfig({
 				}
 			}
 		},
+		pageHero: {
+			slots: {
+				title: "text-4xl sm:text-6xl",
+				headline: "mb-2"
+			},
+			variants: {
+				title: {
+					true: {
+						description: "mt-2"
+					}
+				}
+			}
+		},
+		pageCard: {
+			slots: {
+				root: "bg-white dark:bg-black rounded-md"
+			}
+		},
 		dashboardSidebar: {
+			slots: {
+				root: "mx-6 py-6"
+			},
 			variants: {
 				side: {
 					left: {
 						root: "border-none"
 					}
 				}
+			}
+		},
+		header: {
+			slots: {
+				root: "border-none"
 			}
 		}
 	}

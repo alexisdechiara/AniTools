@@ -40,6 +40,10 @@
   --ui-border-inverted: var(--ui-color-primary-900);
 
 	--ui-radius: 0.5rem;
+	--ui-container: var(--container-6xl);
+
+	--vis-tooltip-padding: 0 !important;
+	--vis-donut-background-color: transparent !important;
 }
 
 .dark {
