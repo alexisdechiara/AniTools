@@ -9,7 +9,6 @@ export default withNuxt({
 		"@typescript-eslint/no-unused-vars": "warn",
 		"vue/no-multiple-template-root": "off",
 		"vue/multi-word-component-names": "off",
-		"allowSyntheticDefaultImports": "on",
 		"vue/max-attributes-per-line": ["warn", {
 			singleline: {
 				max: 10

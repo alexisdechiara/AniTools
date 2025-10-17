@@ -4,7 +4,7 @@
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 
-  --color-indigo-50: oklch(0.984 0.007 286.46);
+	--color-indigo-50: oklch(0.984 0.007 286.46);
   --color-indigo-100: oklch(0.94 0.025 288.37);
   --color-indigo-200: oklch(0.85 0.068 285.81);
   --color-indigo-300: oklch(0.765 0.108 284.76);
@@ -42,8 +42,10 @@
 	--ui-radius: 0.5rem;
 	--ui-container: var(--container-6xl);
 
-	--vis-tooltip-padding: 0 !important;
-	--vis-donut-background-color: transparent !important;
+	--color-completed: oklch(from var(--ui-color-primary-400) l c h);
+	--color-planning: oklch(from var(--ui-color-warning-400) l c h );
+	--color-dropped: oklch(from var(--ui-color-error-400) l c h );
+	--color-watching: oklch(from var(--ui-color-neutral-200) l c h );
 }
 
 .dark {

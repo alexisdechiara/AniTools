@@ -10,7 +10,7 @@ const year = useRoute().params.year as string
 				<MetricsCard title="Watch time" value="1d 23h 18m" :change="11.01" />
 				<MetricsCard title="Animes watched" value="42" :change="-7.98" />
 				<MetricsCard title="Episodes watched" value="438" :change="17.96" />
-				<StatusCard class="row-span-3" />
+				<StatusCard title="Status" class="row-span-3" />
 				<MeanScoreCard class="col-span-3 row-span-2" />
 			</div>
 	</UContainer>
