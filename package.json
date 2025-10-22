@@ -14,6 +14,8 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.68",
     "@iconify-json/simple-icons": "^1.2.52",
+    "@midudev/tailwind-animations": "^0.2.0",
+    "@nuxt/image": "1.11.0",
     "@nuxt/ui": "^4.0.0-alpha.2",
     "@unovis/ts": "^1.6.1",
     "@unovis/vue": "^1.6.1",

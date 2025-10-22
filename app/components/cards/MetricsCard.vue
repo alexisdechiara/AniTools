@@ -1,7 +1,11 @@
 <template>
   <UPageCard
     :title="title"
-    :ui="{ title: 'text-xs capitalize text-toned font-medium', container: 'gap-y-2' }"
+    :ui="{
+      title: 'text-xs capitalize text-toned font-medium',
+      container: 'gap-y-2',
+      root: 'bg-white dark:bg-black',
+    }"
   >
     <div v-if="value" class="flex h-fit items-center">
       <span class="text-2xl font-semibold text-highlighted text-ellipsis">

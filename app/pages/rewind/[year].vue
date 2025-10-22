@@ -20,6 +20,8 @@ const year = useRoute().params.year as string;
     <div class="grid grid-cols-4 gap-4 my-8">
       <ListCard class="col-span-1 row-span-2" title="Genres" />
       <ListCard class="col-span-1 row-span-2" title="Genres" />
+      <HighlightCard class="col-span-2 row-span-2" />
+      <ActivityOverviewCard class="col-span-full" />
     </div>
   </UContainer>
 </template>

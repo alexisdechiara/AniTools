@@ -103,7 +103,7 @@ const triggers = {
 /* Style des barres non survolées quand une barre est survolée */
 :deep(g[class*="barGroup"]:hover ~ g[class*="barGroup"]:not(:hover) path[class*="bar"]),
 :deep(g[class*="barGroup"]:has(~ g[class*="barGroup"]:hover) path[class*="bar"]) {
-  fill: var(--color-watching) !important;
+  fill: var(--ui-bg-elevated) !important;
 }
 
 /* Style de la barre survolée */

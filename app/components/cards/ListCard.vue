@@ -12,7 +12,6 @@
         <div class="flex flex-col w-full gap-y-1">
           <div class="flex justify-between w-full">
             <span class="text-xs font-medium">{{ genre.name }}</span>
-            <span class="text-xs text-dimmed">{{ genre.count }}</span>
           </div>
           <UProgress
             v-model="progressValues[genre.name]"
