@@ -1,12 +1,12 @@
 <template>
-  <MetricsCard title="Mean Score" value="70%" v-bind="$attrs">
+  <MetricsCard title="Mean Score" value="70 %" v-bind="$attrs">
     <UTabs
       :items="items"
       class="w-fit absolute top-6 right-6"
       :ui="{ trigger: 'cursor-pointer' }"
       v-model="selectedTab"
     />
-    <VisXYContainer :data="scoring">
+    <VisXYContainer :data="scoring" :height="250">
       <VisStackedBar
         :x="(d: ScoringData, i: number) => i"
         :y="(d: ScoringData) => d.score"

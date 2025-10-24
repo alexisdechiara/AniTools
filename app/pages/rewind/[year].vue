@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const year = useRoute().params.year as string;
+const yearNumber = parseInt(year, 10);
 </script>
 
 <template>
@@ -14,14 +15,14 @@ const year = useRoute().params.year as string;
       <MetricsCard title="Watch time" value="1d 23h 18m" :change="11.01" />
       <MetricsCard title="Animes watched" value="42" :change="-7.98" />
       <MetricsCard title="Episodes watched" value="438" :change="17.96" />
-      <StatusCard title="Status" class="row-span-3" />
-      <MeanScoreCard class="col-span-3 row-span-2" />
+      <StatusDonutCard title="Status" class="row-span-3" />
+      <MeanScoreBarCard class="col-span-3 row-span-2" />
     </div>
     <div class="grid grid-cols-4 gap-4 my-8">
       <ListCard class="col-span-1 row-span-2" title="Genres" />
       <ListCard class="col-span-1 row-span-2" title="Genres" />
       <HighlightCard class="col-span-2 row-span-2" />
-      <ActivityOverviewCard class="col-span-full" />
+      <ActivityOverviewCard :year="yearNumber" class="col-span-full" />
     </div>
   </UContainer>
 </template>
