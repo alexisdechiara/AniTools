@@ -14,7 +14,6 @@
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import DonutChart from "~/components/charts/DonutChart.vue";
 
 export interface DonutStatus {
   color: string;
