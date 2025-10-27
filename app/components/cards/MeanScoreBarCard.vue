@@ -6,7 +6,7 @@
       :ui="{ trigger: 'cursor-pointer' }"
       v-model="selectedTab"
     />
-    <VisXYContainer :data="scoring" :height="250">
+    <VisXYContainer :data="scoring" :height="200" class="mt-auto">
       <VisStackedBar
         :x="(d: ScoringData, i: number) => i"
         :y="(d: ScoringData) => d.score"

@@ -21,6 +21,7 @@
     "@unovis/vue": "^1.6.1",
     "@vueuse/nuxt": "^13.9.0",
     "date-fns": "^4.1.0",
+    "grid-layout-plus": "^1.1.1",
     "nuxt": "^4.0.3",
     "nuxt-charts": "^0.2.4",
     "zod": "^4.1.9"

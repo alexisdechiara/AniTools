@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard v-bind="$attrs">
+  <MetricsCard title="Status" v-bind="$attrs">
     <DonutChart
       :data="chartData"
       :max-items="maxItems"

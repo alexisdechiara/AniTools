@@ -41,15 +41,17 @@ export default defineAppConfig({
 			}
 		},
 		dashboardSidebar: {
-			slots: {
-				root: "mx-6 py-6"
-			},
 			variants: {
 				side: {
 					left: {
 						root: "border-none"
 					}
 				}
+			}
+		},
+		dashboardPanel: {
+			slots: {
+				root: "overflow-y-auto"
 			}
 		},
 		header: {

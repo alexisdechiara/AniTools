@@ -3,10 +3,18 @@
     :title="title"
     :ui="{
       title: 'text-xs capitalize text-toned font-medium',
-      container: 'gap-y-2',
+      container: 'gap-y-2 group/grab',
       root: 'bg-white dark:bg-black',
     }"
+    :class="{ 'cursor-grabbing': isDragging }"
   >
+    <Icon
+      v-if="draggable"
+      name="i-lucide-grip-vertical"
+      class="draggable-grip absolute top-6 right-6 z-999 group-hover/grab:opacity-50 hover:!opacity-100 opacity-0 cursor-grab transition-opacity duration-75 ease-in"
+      :class="{ 'cursor-grabbing': isDragging }"
+      @mousedown="onMouseDown"
+    />
     <div v-if="value" class="flex h-fit items-center">
       <span class="text-2xl font-semibold text-highlighted text-ellipsis">
         {{ value }}
@@ -39,10 +47,25 @@ const props = withDefaults(
     change?: number;
     changeUnit?: string | "%";
     showChangeIcon?: boolean;
+    draggable?: boolean;
   }>(),
   {
     changeUnit: "%",
     showChangeIcon: true,
+    draggable: false,
   }
 );
+
+const isDragging = ref(false);
+
+const onMouseDown = () => {
+  isDragging.value = true;
+
+  const onMouseUp = () => {
+    isDragging.value = false;
+    document.removeEventListener("mouseup", onMouseUp);
+  };
+
+  document.addEventListener("mouseup", onMouseUp, { once: true });
+};
 </script>
