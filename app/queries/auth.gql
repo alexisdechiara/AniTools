@@ -1,0 +1,20 @@
+query auth($username: String) {
+	User(name: $username) {
+		id
+		avatar {
+			large
+			medium
+		}
+		updatedAt
+		siteUrl
+		options {
+			titleLanguage
+			displayAdultContent
+			profileColor
+		}
+		mediaListOptions {
+			scoreFormat
+			rowOrder
+		}
+	}
+}

@@ -1,39 +1,43 @@
 {
-  "name": "AniTools",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "typecheck": "nuxt typecheck"
-  },
-  "dependencies": {
-    "@iconify-json/lucide": "^1.2.71",
-    "@iconify-json/simple-icons": "^1.2.55",
-    "@midudev/tailwind-animations": "^0.2.0",
-    "@nuxt/image": "1.11.0",
-    "@nuxt/ui": "^4.1.0",
-    "@unovis/ts": "^1.6.1",
-    "@unovis/vue": "^1.6.1",
-    "@vueuse/nuxt": "^14.0.0",
-    "date-fns": "^4.1.0",
-    "grid-layout-plus": "^1.1.1",
-    "nuxt": "^4.2.0",
-    "nuxt-charts": "^1.0.2",
-    "zod": "^4.1.12"
-  },
-  "devDependencies": {
-    "@nuxt/eslint": "^1.9.0",
-    "eslint": "^9.38.0",
-    "eslint-plugin-tailwindcss": "^4.0.0-beta.0",
-    "typescript": "^5.9.3",
-    "vue-tsc": "^3.1.2"
-  },
-  "resolutions": {
-    "unimport": "4.1.1"
-  }
+	"name": "ani-tools",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "nuxt build",
+		"dev": "nuxt dev",
+		"preview": "nuxt preview",
+		"postinstall": "nuxt prepare",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"typecheck": "nuxt typecheck"
+	},
+	"dependencies": {
+		"@iconify-json/lucide": "^1.2.71",
+		"@iconify-json/simple-icons": "^1.2.55",
+		"@midudev/tailwind-animations": "^0.2.0",
+		"@nuxt/image": "1.11.0",
+		"@nuxt/ui": "^4.1.0",
+		"@pinia/nuxt": "0.11.2",
+		"@unovis/ts": "^1.6.1",
+		"@unovis/vue": "^1.6.1",
+		"@vueuse/nuxt": "^14.0.0",
+		"date-fns": "^4.1.0",
+		"grid-layout-plus": "^1.1.1",
+		"nuxt": "^4.2.0",
+		"nuxt-charts": "^1.0.2",
+		"nuxt-graphql-client": "0.2.46",
+		"pinia": "^3.0.3",
+		"pinia-plugin-persistedstate": "^4.7.1",
+		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@nuxt/eslint": "^1.9.0",
+		"eslint": "^9.38.0",
+		"eslint-plugin-tailwindcss": "^4.0.0-beta.0",
+		"typescript": "^5.9.3",
+		"vue-tsc": "^3.1.2"
+	},
+	"resolutions": {
+		"unimport": "4.1.1"
+	}
 }

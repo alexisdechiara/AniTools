@@ -29,20 +29,14 @@ const colors = [
 ];
 const neutrals = ["slate", "gray", "zinc", "neutral", "stone"];
 
-const user = ref({
-  name: "Benjamin Canac",
-  avatar: {
-    src: "https://github.com/benjamincanac.png",
-    alt: "Benjamin Canac",
-  },
-});
+const user = useUserStore();
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
       type: "label",
-      label: user.value.name,
-      avatar: user.value.avatar,
+      label: user.username || "Guest",
+      avatar: user.avatar,
     },
   ],
   [
@@ -217,8 +211,8 @@ const items = computed<DropdownMenuItem[][]>(() => [
   >
     <UButton
       v-bind="{
-        ...user,
-        label: collapsed ? undefined : user?.name,
+        avatar: user.avatar,
+        label: collapsed ? undefined : user.username || 'Guest',
         trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down',
       }"
       color="neutral"
