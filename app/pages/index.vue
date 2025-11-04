@@ -4,6 +4,13 @@ import { GridLayout, GridItem, type LayoutItem } from "grid-layout-plus"
 import { ComponentType, getComponentById } from "~/config/components"
 
 const user = useUserStore()
+const statisticsStore = useStatisticsStore()
+
+onMounted(async () => {
+	if (user.id) {
+		await statisticsStore.fetchStatistics(user.id)
+	}
+})
 
 interface CardItem extends LayoutItem {
 	componentId: number
@@ -12,9 +19,9 @@ interface CardItem extends LayoutItem {
 
 // Configuration du layout avec les composants
 const layout = ref<Array<CardItem>>([
-	{ x: 0, y: 0, w: 3, h: 1, i: '1', componentId: ComponentType.MetricsCard, componentProps: { title: 'Watch Time', value: '1d 23h 18m', change: 11.01 } },
-	{ x: 3, y: 0, w: 3, h: 1, i: '2', componentId: ComponentType.MetricsCard, componentProps: { title: 'Episodes', value: '42', change: 5.5 } },
-	{ x: 6, y: 0, w: 3, h: 1, i: '3', componentId: ComponentType.MetricsCard, componentProps: { title: 'Shows', value: '12', change: -2.3 } },
+	{ x: 0, y: 0, w: 3, h: 1, i: '1', componentId: ComponentType.WatchTimeCard, componentProps: { title: 'Watch Time' } },
+	{ x: 3, y: 0, w: 3, h: 1, i: '2', componentId: ComponentType.AnimesWatchedCard, componentProps: { title: 'Animes Watched' } },
+	{ x: 6, y: 0, w: 3, h: 1, i: '3', componentId: ComponentType.EpisodesWatchedCard, componentProps: { title: 'Episodes Watched' } },
 	{ x: 0, y: 2, w: 9, h: 3, i: '4', componentId: ComponentType.MeanScoreBarCard },
 	{ x: 9, y: 0, w: 3, h: 4, i: '5', componentId: ComponentType.StatusDonutCard },
 	{ x: 0, y: 5, w: 12, h: 2, i: '6', componentId: ComponentType.ActivityOverviewCard, componentProps: { year: new Date().getFullYear() } },

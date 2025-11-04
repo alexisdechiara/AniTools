@@ -11,6 +11,7 @@ query auth($username: String) {
 			titleLanguage
 			displayAdultContent
 			profileColor
+			timezone
 		}
 		mediaListOptions {
 			scoreFormat

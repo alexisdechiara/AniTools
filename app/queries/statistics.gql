@@ -1,0 +1,32 @@
+query statisticsQuery($userId: Int!, $limit: Int) {
+  User(id: $userId) {
+		id
+    statistics {
+      anime {
+        meanScore
+        minutesWatched
+        episodesWatched
+        count
+        statuses {
+          status
+          meanScore
+          minutesWatched
+          count
+        }
+        scores {
+          score
+          meanScore
+          minutesWatched
+          count
+        }
+        genres(limit: $limit) {
+          genre
+          meanScore
+          minutesWatched
+          count
+          mediaIds
+        }
+      }
+    }
+  }
+}

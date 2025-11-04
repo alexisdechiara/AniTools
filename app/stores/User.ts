@@ -6,6 +6,7 @@ interface UserOptions {
 	titleLanguage?: UserTitleLanguage | null
 	displayAdultContent?: boolean | null
 	profileColor?: string | null
+	timezone?: string | null
 }
 
 interface MediaListOptions {
@@ -27,7 +28,8 @@ export const useUserStore = defineStore("user", () => {
 	const options = ref<UserOptions>({
 		titleLanguage: UserTitleLanguage.ENGLISH,
 		displayAdultContent: false,
-		profileColor: "#000000"
+		profileColor: "#000000",
+		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 	})
 	const mediaListOptions = ref<MediaListOptions>({
 		scoreFormat: ScoreFormat.POINT_100,

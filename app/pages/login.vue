@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed inset-y-32 inset-x-64">
+  <div class="fixed inset-y-24 inset-x-48">
     <div class="size-full flex flex-col p-24 bg-neutral-900 rounded-2xl">
       <h1 class="text-6xl font-bold text-white dark:text-neutral-300 mb-4">
         <span class="text-primary-400 me-1">Ani</span>Tools
@@ -26,7 +26,6 @@
         </UInput>
       </div>
     </div>
-    <UNotifications />
   </div>
 </template>
 
