@@ -2,23 +2,49 @@
   <MetricsCard title="Genres" v-bind="$attrs">
     <ol class="flex flex-col group">
       <li
-        v-for="(genre, index) in genres"
-        :key="genre.name"
-        class="flex items-center gap-2 cursor-pointer transition-colors duration-200 py-1.5"
-        @mouseover="handleMouseOver(genre.name)"
+        v-for="(item, index) in list"
+        :key="item.name"
+        class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
+        @mouseover="handleMouseOver(item.name)"
         @mouseleave="handleMouseLeave()"
       >
-        <div class="size-10 bg-elevated rounded-sm aspect-square" />
+        <NuxtImg
+          v-if="item.entries && item.entries.length > 0"
+          :src="
+            item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.coverImage
+              ?.large ||
+            item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.coverImage
+              ?.medium ||
+            ''
+          "
+          :alt="
+            item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
+              ?.english ||
+            item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
+              ?.romaji ||
+            ''
+          "
+          class="size-10 rounded-sm aspect-square object-cover"
+        />
+        <div
+          v-else
+          class="size-10 bg-elevated rounded-sm aspect-square relative overflow-hidden"
+        >
+          <Icon
+            :name="item.icon"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-primary-400"
+          />
+        </div>
         <div class="flex flex-col w-full gap-y-1">
           <div class="flex justify-between w-full">
-            <span class="text-xs font-medium">{{ genre.name }}</span>
+            <span class="text-xs font-medium">{{ item.name }}</span>
           </div>
           <UProgress
-            v-model="progressValues[genre.name]"
+            v-model="progressValues[item.name]"
             :ui="{
               base: 'bg-transparent',
               indicator: `transition-colors group-hover:bg-elevated duration-200 ${
-                hoveredGenre === genre.name || (index === 0 && hoveredGenre === null)
+                hoveredItem === item.name || (index === 0 && hoveredItem === null)
                   ? '!bg-primary'
                   : 'bg-elevated'
               }`,
@@ -32,71 +58,42 @@
 </template>
 
 <script lang="ts" setup>
-const hoveredGenre = ref<string | null>(null);
+const hoveredItem = ref<string | null>(null);
+// Pour stocker l'index aléatoire de l'image affichée pour chaque élément de la liste
+const currentEntryIndex = ref<Record<string, number>>({});
 
-const handleMouseOver = (genreName: string) => {
-  hoveredGenre.value = genreName;
+const handleMouseOver = (name: string) => {
+  hoveredItem.value = name;
 };
 
 const handleMouseLeave = () => {
-  hoveredGenre.value = null;
+  hoveredItem.value = null;
 };
 
-type genre = {
+// Fonction pour obtenir un index aléatoire unique pour chaque nom
+const getRandomEntryIndex = (name: string, entries: any[]): number => {
+  // Si c'est la première fois qu'on traite ce nom ou si l'index n'est pas défini
+  if (currentEntryIndex.value[name] === undefined && entries.length > 0) {
+    // Génère un index aléatoire entre 0 et le nombre d'entrées - 1
+    currentEntryIndex.value[name] = Math.floor(Math.random() * entries.length);
+  }
+  return currentEntryIndex.value[name] || 0;
+};
+
+export type listType = {
   name: string;
-  count: number;
-  meanScore: number;
-  timeWatched: Date | string;
-  animes?: {
-    id: string;
-    name: string;
-    score: number;
-  }[];
+  count?: number;
+  meanScore?: number;
+  timeWatched?: Date | string;
+  entries?: any[];
+  icon?: string;
 };
 
-const genres = ref<genre[]>(
-  [
-    {
-      name: "Action",
-      count: 209,
-      meanScore: 80.68,
-      timeWatched: "2025-10-20",
-      animes: undefined,
-    },
-    {
-      name: "Adventure",
-      count: 137,
-      meanScore: 80.68,
-      timeWatched: "2025-10-20",
-      animes: undefined,
-    },
-    {
-      name: "Comedy",
-      count: 209,
-      meanScore: 80.68,
-      timeWatched: "2025-10-20",
-      animes: undefined,
-    },
-    {
-      name: "Drama",
-      count: 174,
-      meanScore: 80.68,
-      timeWatched: "2025-10-20",
-      animes: undefined,
-    },
-    {
-      name: "Fantasy",
-      count: 159,
-      meanScore: 80.68,
-      timeWatched: "2025-10-20",
-      animes: undefined,
-    },
-  ].sort((a, b) => b.count - a.count)
-);
+const props = defineProps<{ list: listType[] | any }>();
 
 const maxCount = computed(() => {
-  if (!genres.value.length) return 0;
-  return Math.max(...genres.value.map((g: genre) => g.count));
+  if (!props.list.length) return 0;
+  return Math.max(...props.list.map((item: listType) => item.count));
 });
 
 function calculatePercentage(count: number): number {
@@ -108,9 +105,9 @@ const progressValues = ref<Record<string, number>>({});
 
 // Initialisation des valeurs de progression
 watchEffect(() => {
-  if (genres.value) {
-    genres.value.forEach((genre) => {
-      progressValues.value[genre.name] = calculatePercentage(genre.count);
+  if (props.list) {
+    props.list.forEach((item: listType) => {
+      progressValues.value[item.name] = calculatePercentage(item.count);
     });
   }
 });

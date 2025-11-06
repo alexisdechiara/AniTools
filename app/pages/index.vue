@@ -3,14 +3,7 @@ import { ref } from "vue"
 import { GridLayout, GridItem, type LayoutItem } from "grid-layout-plus"
 import { ComponentType, getComponentById } from "~/config/components"
 
-const user = useUserStore()
-const statisticsStore = useStatisticsStore()
-
-onMounted(async () => {
-	if (user.id) {
-		await statisticsStore.fetchStatistics(user.id)
-	}
-})
+const { getUsername } = useUserStore()
 
 interface CardItem extends LayoutItem {
 	componentId: number
@@ -32,7 +25,7 @@ const layout = ref<Array<CardItem>>([
   <UDashboardPanel id="home">
     <div class="flex flex-col px-4 sm:px-6 pt-4 sm:pt-6">
       <span class="font-semibold text-highlighted text-4xl"
-        >Hey {{ user.username }} 👋</span
+        >Hey {{ getUsername }} 👋</span
       >
       <span class="text-dimmed font-light text-2xl">Here all your summary</span>
     </div>

@@ -8,10 +8,18 @@ export default defineNuxtRouteMiddleware(async (to) => {
 	}
 
 	const userStore = useUserStore()
+	const statisticsStore = useStatisticsStore()
+	const entriesStore = useEntriesStore()
 
 	try {
 		// Si l'utilisateur est chargé dans le store (grâce à pinia-plugin-persistedstate)
 		if (userStore.isAuthenticated) {
+			if (!statisticsStore.anime) {
+				await statisticsStore.fetchStatistics(userStore.getId!)
+			}
+			if (!entriesStore.animes) {
+				await entriesStore.fetchAllAnimes(userStore.getId!)
+			}
 			return
 		}
 

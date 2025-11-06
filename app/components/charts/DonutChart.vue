@@ -223,4 +223,7 @@ const events = {
 .unovis-single-container :deep(path[style*="--color-watching"]:hover) {
   fill: var(--color-watching-hover) !important;
 }
+.unovis-single-container :deep(path[style*="--color-paused"]:hover) {
+  fill: var(--color-paused-hover) !important;
+}
 </style>

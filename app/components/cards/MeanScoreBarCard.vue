@@ -1,5 +1,9 @@
 <template>
-  <MetricsCard title="Mean Score" value="70 %" v-bind="$attrs">
+  <MetricsCard
+    title="Mean Score"
+    :value="anime?.meanScore.toFixed(2) + ' %'"
+    v-bind="$attrs"
+  >
     <UTabs
       :items="items"
       class="w-fit absolute top-6 right-6"
@@ -9,7 +13,7 @@
     <VisXYContainer :data="scoring" :height="200" class="mt-auto">
       <VisStackedBar
         :x="(d: ScoringData, i: number) => i"
-        :y="(d: ScoringData) => d.score"
+        :y="(d: ScoringData) => d.y"
         :roundedCorners="8"
         :bar-padding="0.2"
       />
@@ -19,8 +23,8 @@
         :domainLine="false"
         :tickLine="false"
         tickTextAlign="center"
-        :tickFormat="(d: ScoringData, i: number) => scoring[i]?.month"
-        :numTicks="scoring.length"
+        :tickFormat="(d: ScoringData, i: number) => scoring[i]?.x"
+        :numTicks="5"
       />
       <VisTooltip :triggers="triggers" />
     </VisXYContainer>
@@ -31,57 +35,54 @@
 import { VisXYContainer, VisStackedBar, VisTooltip, VisAxis } from "@unovis/vue";
 import { StackedBar } from "@unovis/ts";
 import type { TabsItem } from "@nuxt/ui";
-import { computed, ref } from "vue";
-import {
-  generateRandomScores,
-  calculateMonthlyScores,
-  calculateScoreRanges,
-} from "../../../utils/factories/score.factory";
 
 const items = ref<TabsItem[]>([
   {
-    label: "Date",
-    value: "date",
-    icon: "i-lucide-calendar",
+    label: "Count",
+    value: "count",
+    icon: "i-lucide-list-ordered",
   },
   {
-    label: "Rating",
-    value: "rating",
-    icon: "i-lucide-star",
+    label: "Watch time",
+    value: "minutesWatched",
+    icon: "i-lucide-clock",
   },
 ]);
 
-const selectedTab = ref("date");
+const selectedTab = ref("count");
 
-// Générer les scores aléatoires en utilisant la factory
-const allScores = ref<ScoreEntry[]>(generateRandomScores(100));
-
+const { anime } = useStatisticsStore();
 // Computed property pour gérer l'affichage en fonction de l'onglet sélectionné
-const scoring = computed<ScoringData[]>(() => {
-  return selectedTab.value === "date"
-    ? calculateMonthlyScores(allScores.value)
-    : calculateScoreRanges(allScores.value);
-});
-
-interface ScoreEntry {
-  month: string;
-  score: number;
-}
+const scoring = computed(
+  () =>
+    anime?.scores
+      ?.map((score) => ({
+        x: score?.score ?? 0,
+        y: selectedTab.value === "count" ? score?.count : score?.minutesWatched,
+        label: score?.meanScore || undefined,
+      }))
+      .sort((a, b) => a.x - b.x) || ([] as ScoringData[])
+);
 
 type ScoringData = {
-  month: string;
-  score: number | string;
+  x: number;
+  y: number;
+  label?: number;
 };
 
 const triggers = {
   [StackedBar.selectors.bar]: (data: ScoringData) => {
     return `
       <div class='flex flex-col'>
-        <span class='font-semibold'>${data.month}</span>
-        <span>${data.score} %</span>
+        <span class='font-semibold'>${data.label ? data.label : data.x} %</span>
+        <span>${formatValue(data.y)}</span>
       </div>
     `;
   },
+};
+
+const formatValue = (value: number) => {
+  return selectedTab.value === "count" ? `${value} animes` : formatWatchTime(value);
 };
 </script>
 

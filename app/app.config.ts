@@ -51,7 +51,8 @@ export default defineAppConfig({
 		},
 		dashboardPanel: {
 			slots: {
-				root: "overflow-y-auto"
+				root: "overflow-y-auto",
+				body: "pt-12 sm:pt-16"
 			}
 		},
 		header: {

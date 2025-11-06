@@ -1,0 +1,94 @@
+query getAllEntries($userId: Int, $format: ScoreFormat, $type: MediaType = ANIME) {
+  MediaListCollection(type: $type, userId: $userId, forceSingleCompletedList: true) {
+    lists {
+      name
+      status
+      entries {
+        status
+        score(format: $format)
+        updatedAt
+        completedAt {
+          year
+          month
+          day
+        }
+        media {
+          id
+          title {
+            romaji
+            english
+            native
+            userPreferred
+          }
+          siteUrl
+          description
+          format
+          status
+          season
+          seasonYear
+          startDate {
+            year
+            month
+            day
+          }
+          endDate {
+            year
+            month
+            day
+          }
+          episodes
+          duration
+          bannerImage
+          coverImage {
+            medium
+            large
+            extraLarge
+            color
+          }
+          averageScore
+          meanScore
+          favourites
+          isFavourite
+          genres
+          tags {
+            name
+            category
+            description
+            isAdult
+            isGeneralSpoiler
+            isMediaSpoiler
+          }
+          studios(isMain: true) {
+            edges {
+              isMain
+              node {
+                name
+                siteUrl
+              }
+            }
+          }
+          externalLinks {
+            site
+            url
+            language
+            color
+          }
+          trailer {
+            id
+            site
+            thumbnail
+          }
+          relations {
+            edges {
+              relationType
+              node {
+                id
+                format
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

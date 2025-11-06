@@ -10,7 +10,9 @@ const COMPONENTS = [
 	{ id: 6, name: "StatusDonutCard" },
 	{ id: 7, name: "WatchTimeCard" },
 	{ id: 8, name: "AnimesWatchedCard" },
-	{ id: 9, name: "EpisodesWatchedCard" }
+	{ id: 9, name: "EpisodesWatchedCard" },
+	{ id: 10, name: "GenresCard" },
+	{ id: 11, name: "TagsCard" }
 ] as const
 
 type ComponentName = typeof COMPONENTS[number]["name"]

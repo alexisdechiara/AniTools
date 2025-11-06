@@ -19,7 +19,7 @@ interface userAvatar {
 	alt?: string
 }
 
-export const useUserStore = defineStore("user", () => {
+export const useUserStore = defineStore("User", () => {
 	// State
 	const id = ref<number>()
 	const username = ref<string>("Not logged in")
@@ -40,58 +40,74 @@ export const useUserStore = defineStore("user", () => {
 	const isAuthenticated = computed(() => !!id.value)
 
 	// Actions
-	async function fetchUserData(userName: string): Promise<boolean> {
+	async function fetchUserData(userName: string) {
 		try {
 			const { data } = await useAsyncGql({
 				operation: "auth",
 				variables: { username: userName }
 			})
 
-			if (data?.value?.User) {
-				const user = data.value.User
-				id.value = user.id
-				username.value = userName
-				avatar.value = {
-					src: user.avatar?.large || user.avatar?.medium || undefined,
-					alt: userName
-				}
-				updatedAt.value = user.updatedAt || undefined
-
-				if (user.options) {
-					options.value = {
-						...options.value,
-						...user.options
-					}
-				}
-
-				if (user.mediaListOptions) {
-					mediaListOptions.value = {
-						...mediaListOptions.value,
-						...user.mediaListOptions
-					}
-				}
-
-				return true
+			if (!data?.value?.User) {
+				throw new Error("User not found")
 			}
 
-			return false
+			const user = data.value.User
+
+			// Mettre à jour le store
+			id.value = user.id
+			username.value = userName
+			avatar.value = {
+				src: user.avatar?.large || user.avatar?.medium || undefined,
+				alt: userName
+			}
+			updatedAt.value = user.updatedAt || undefined
+
+			if (user.options) {
+				options.value = {
+					...options.value,
+					...user.options
+				}
+			}
+
+			if (user.mediaListOptions) {
+				mediaListOptions.value = {
+					...mediaListOptions.value,
+					...user.mediaListOptions
+				}
+			}
+
+			// Retourner les références du store pour un traitement immédiat
+			return {
+				id: id.value,
+				username: username.value,
+				avatar: avatar.value,
+				updatedAt: updatedAt.value,
+				options: options.value,
+				mediaListOptions: mediaListOptions.value
+			}
 		} catch (error) {
 			console.error("Error fetching user data:", error)
-			return false
+			throw error
 		}
 	}
 
 	return {
 		// State
-		id: readonly(id),
-		username: readonly(username),
-		avatar: readonly(avatar),
-		updatedAt: readonly(updatedAt),
-		options: options,
-		mediaListOptions: mediaListOptions,
+		id,
+		username,
+		avatar,
+		updatedAt,
+		options,
+		mediaListOptions,
 
 		// Getters
 		isAuthenticated,
+		getId: computed(() => id.value),
+		getUsername: computed(() => username.value),
+		getAvatar: computed(() => avatar.value),
+		getUpdatedAt: computed(() => updatedAt.value),
+		getOptions: computed(() => options.value),
+		getMediaListOptions: computed(() => mediaListOptions.value),
 
 		// Actions
 		fetchUserData

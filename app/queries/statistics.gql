@@ -19,12 +19,33 @@ query statisticsQuery($userId: Int!, $limit: Int) {
           minutesWatched
           count
         }
-        genres(limit: $limit) {
+				startYears {
+          startYear
+          meanScore
+          minutesWatched
+          count
+        }
+        genres(limit: $limit, sort: [COUNT_DESC]) {
           genre
           meanScore
           minutesWatched
           count
           mediaIds
+        }
+				tags(limit: $limit, sort: [COUNT_DESC]) {
+          count
+          meanScore
+          mediaIds
+          minutesWatched
+          tag {
+            category
+            description
+            isAdult
+            isGeneralSpoiler
+            isMediaSpoiler
+            name
+            rank
+          }
         }
       }
     }

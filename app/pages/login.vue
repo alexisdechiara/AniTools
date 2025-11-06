@@ -15,6 +15,7 @@
           <template #trailing>
             <UButton
               @click="login"
+              :loading="isLoading"
               :ui="{
                 base:
                   'size-full cursor-pointer rounded-full px-8 hover:bg-primary-400 active:bg-primary-400',
@@ -30,6 +31,8 @@
 </template>
 
 <script lang="ts" setup>
+import { ScoreFormat } from "#gql/default";
+
 definePageMeta({
   layout: "none",
 });
@@ -38,6 +41,10 @@ const route = useRoute();
 const toast = useToast();
 const username = ref("");
 const isLoading = ref(false);
+
+const { fetchUserData } = useUserStore();
+const { fetchStatistics } = useStatisticsStore();
+const { fetchAllAnimes } = useEntriesStore();
 
 const login = async () => {
   if (!username.value.trim()) {
@@ -53,15 +60,19 @@ const login = async () => {
   isLoading.value = true;
 
   try {
-    const success = await useUserStore().fetchUserData(username.value);
+    // Récupérer les données de l'utilisateur
+    const userData = await fetchUserData(username.value);
 
-    if (success) {
-      // Get redirect URL from query parameters or use home page as default
-      const redirectTo = route.query.redirect?.toString() || "/";
-      await navigateTo(redirectTo, { replace: true });
-    } else {
-      throw new Error("Invalid username or user not found");
-    }
+    // Utiliser l'ID de l'utilisateur pour charger les statistiques
+    await fetchStatistics(userData.id);
+    await fetchAllAnimes(
+      userData.id,
+      userData.mediaListOptions?.scoreFormat || ScoreFormat.POINT_100
+    );
+
+    // Rediriger vers la page d'accueil ou l'URL de redirection
+    const redirectTo = route.query.redirect?.toString() || "/";
+    await navigateTo(redirectTo, { replace: true });
   } catch (error: any) {
     console.error("Login error:", error);
 

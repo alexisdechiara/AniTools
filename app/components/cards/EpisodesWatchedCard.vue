@@ -3,12 +3,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
-import { useStatisticsStore } from "~/stores/Statistics";
-
-const statisticsStore = useStatisticsStore();
+const { anime } = useStatisticsStore();
 
 const formattedEpisodeCount = computed(() => {
-  return statisticsStore.totalEpisodesWatched.toLocaleString();
+  return anime?.episodesWatched.toLocaleString();
 });
 </script>

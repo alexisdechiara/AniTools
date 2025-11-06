@@ -1,0 +1,17 @@
+query getMediasByGenre($ids: [Int]) {
+  Page(perPage: 100) {
+    media(id_in: $ids) {
+      id
+      title {
+        romaji
+        english
+				userPreferred
+      }
+      coverImage {
+        large
+        medium
+				color
+      }
+    }
+  }
+}
