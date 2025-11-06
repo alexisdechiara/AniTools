@@ -1,4 +1,4 @@
-query statisticsQuery($userId: Int!, $limit: Int) {
+query statisticsQuery($userId: Int!, $limit: Int, $genresSort: [UserStatisticsSort] = [COUNT_DESC], $tagsSort: [UserStatisticsSort] = [COUNT_DESC]) {
   User(id: $userId) {
 		id
     statistics {
@@ -25,14 +25,54 @@ query statisticsQuery($userId: Int!, $limit: Int) {
           minutesWatched
           count
         }
-        genres(limit: $limit, sort: [COUNT_DESC]) {
+        genres(limit: $limit, sort: $genresSort) {
           genre
           meanScore
           minutesWatched
           count
           mediaIds
         }
-				tags(limit: $limit, sort: [COUNT_DESC]) {
+				tags(limit: $limit, sort: $tagsSort) {
+          count
+          meanScore
+          mediaIds
+          minutesWatched
+          tag {
+            category
+            description
+            isAdult
+            isGeneralSpoiler
+            isMediaSpoiler
+            name
+            rank
+          }
+        }
+      }
+    }
+  }
+}
+
+query getGenresStatistics($userId: Int!, $limit: Int, $sort: [UserStatisticsSort] = [COUNT_DESC]) {
+  User(id: $userId) {
+    statistics {
+      anime {
+        genres(limit: $limit, sort: $sort) {
+          genre
+          meanScore
+          minutesWatched
+          count
+          mediaIds
+        }
+      }
+    }
+  }
+}
+
+query getTagsStatistics($userId: Int!, $limit: Int, $sort: [UserStatisticsSort] = [COUNT_DESC]) {
+  User(id: $userId) {
+    statistics {
+      anime {
+					tags(limit: $limit, sort: $sort) {
           count
           meanScore
           mediaIds

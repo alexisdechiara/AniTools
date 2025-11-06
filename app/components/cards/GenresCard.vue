@@ -1,10 +1,16 @@
 <template>
-  <ListCard title="Genres" :list="genres" />
+  <ListCard title="Genres" :list="genres" @update:sort="updateSort" />
 </template>
 
 <script lang="ts" setup>
-const { anime } = storeToRefs(useStatisticsStore());
+import type { UserStatisticsSort } from "#gql/default";
+
+const { anime, genresSort } = storeToRefs(useStatisticsStore());
 const { getAnimesByMediaIds } = useEntriesStore();
+
+function updateSort(sort: UserStatisticsSort[]) {
+  genresSort.value = sort;
+}
 
 const genres = computed(() => {
   if (!anime.value) return [];

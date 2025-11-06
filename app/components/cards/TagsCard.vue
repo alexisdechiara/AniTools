@@ -1,9 +1,11 @@
 <template>
-  <ListCard title="Tags" :list="list" />
+  <ListCard title="Tags" :list="list" @update:sort="updateSort" />
 </template>
 
 <script lang="ts" setup>
-const { anime } = storeToRefs(useStatisticsStore());
+import { UserStatisticsSort } from "#gql/default";
+
+const { anime, tagsSort } = storeToRefs(useStatisticsStore());
 const { getAnimesByMediaIds } = useEntriesStore();
 
 const list = computed(() => {
@@ -18,4 +20,8 @@ const list = computed(() => {
     ),
   }));
 });
+
+function updateSort(sort: string) {
+  tagsSort.value = [sort as UserStatisticsSort];
+}
 </script>

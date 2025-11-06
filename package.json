@@ -22,6 +22,7 @@
 		"@unovis/vue": "^1.6.1",
 		"@vueuse/nuxt": "^14.0.0",
 		"date-fns": "^4.1.0",
+		"embla-carousel-wheel-gestures": "^8.1.0",
 		"grid-layout-plus": "^1.1.1",
 		"nuxt": "^4.2.0",
 		"nuxt-charts": "^1.0.2",
