@@ -3,9 +3,9 @@
 </template>
 
 <script lang="ts" setup>
-const { anime } = useStatisticsStore();
+const { count } = storeToRefs(useStatisticsStore());
 
 const formattedAnimeCount = computed(() => {
-  return anime?.count.toLocaleString();
+  return count.value ? count.value.toLocaleString() : "-";
 });
 </script>

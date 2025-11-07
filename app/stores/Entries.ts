@@ -6,9 +6,9 @@ export type AnimesType = NonNullable<GetAllEntriesQuery["MediaListCollection"]>[
 
 export const useEntriesStore = defineStore("Entries", () => {
 	const user = useUserStore()
-	let lists: AnimesType = []
+	const lists = ref<AnimesType>([])
 
-	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists> {
+	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists.value> {
 		return new Promise((resolve) => {
 			useAsyncGql({
 				operation: "getAllEntries",
@@ -20,28 +20,28 @@ export const useEntriesStore = defineStore("Entries", () => {
 			})
 				.then(({ data }) => {
 					if (data.value?.MediaListCollection?.lists) {
-						lists = data.value.MediaListCollection.lists
+						lists.value = data.value.MediaListCollection.lists
 					} else {
 						console.warn("Aucun anime trouvé pour cet utilisateur")
-						lists = []
+						lists.value = []
 					}
-					resolve(lists)
+					resolve(lists.value)
 				})
 				.catch((error) => {
 					console.error("Erreur lors de la récupération des lists:", error)
-					lists = []
-					resolve(lists)
+					lists.value = []
+					resolve(lists.value)
 				})
 		})
 	}
 
 	function getAllAnimes() {
-		if (!lists) return []
-		return lists.flatMap(list => list?.entries || []).sort((a, b) => (b?.score || 0) - (a?.score || 0))
+		if (!lists.value) return []
+		return lists.value.flatMap(list => list?.entries || []).sort((a, b) => (b?.score || 0) - (a?.score || 0))
 	}
 
 	function getAnimesByStatus(status: string[], limit?: number) {
-		return lists?.filter(list => status.includes(list!.status!))?.flatMap(list => list?.entries || []).slice(0, limit) ?? []
+		return lists.value?.filter(list => status.includes(list!.status!))?.flatMap(list => list?.entries || []).slice(0, limit) ?? []
 	}
 
 	function getAnimesByGenres(genres: string[], limit?: number) {

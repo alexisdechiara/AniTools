@@ -14,9 +14,9 @@
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useStatisticsStore } from "~/stores/Statistics";
+import { storeToRefs } from "pinia";
 
-const statisticsStore = useStatisticsStore();
+const { statuses: statusesRef } = storeToRefs(useStatisticsStore());
 
 export interface DonutStatus {
   color: string;
@@ -64,7 +64,7 @@ interface AnimeStatus {
 
 // Transforme les données pour le composant DonutChart
 const chartData = computed<DonutStatus[]>(() => {
-  const statuses = (statisticsStore.anime?.statuses as AnimeStatus[] | undefined) || [];
+  const statuses = (statusesRef.value || []) as AnimeStatus[];
 
   // Calcule le nombre total d'éléments pour les pourcentages
   const total = statuses.reduce((sum, status) => sum + (status.count || 0), 0);
@@ -72,7 +72,7 @@ const chartData = computed<DonutStatus[]>(() => {
 
   return statuses
     .filter(
-      (status): status is AnimeStatus => status?.status != null && status.count != null
+      (status): status is AnimeStatus => status.status != null && status.count != null
     )
     .map((status) => {
       // Calcule le pourcentage avec 2 décimales

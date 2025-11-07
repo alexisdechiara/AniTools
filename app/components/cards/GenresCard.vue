@@ -1,24 +1,19 @@
 <template>
-  <ListCard title="Genres" :list="genres" @update:sort="updateSort" />
+  <ListCard title="Genres" :list="list" v-model:sort="genresSort" />
 </template>
 
 <script lang="ts" setup>
-import type { UserStatisticsSort } from "#gql/default";
-
-const { anime, genresSort } = storeToRefs(useStatisticsStore());
+const statisticsStore = useStatisticsStore();
+const { genresSort } = storeToRefs(statisticsStore);
 const { getAnimesByMediaIds } = useEntriesStore();
 
-function updateSort(sort: UserStatisticsSort[]) {
-  genresSort.value = sort;
-}
-
-const genres = computed(() => {
-  if (!anime.value) return [];
-  return anime.value.genres?.map((genre) => ({
+const list = computed(() => {
+  if (!statisticsStore.getSortedGenres(genresSort.value)) return [];
+  return statisticsStore.getSortedGenres(genresSort.value).map((genre) => ({
     name: genre?.genre,
     count: genre?.count,
     meanScore: genre?.meanScore,
-    timeWatched: genre?.minutesWatched,
+    minutesWatched: genre?.minutesWatched,
     icon: genre?.genre ? icons[genre.genre as keyof typeof icons] : undefined,
     entries: getAnimesByMediaIds(
       genre?.mediaIds?.filter((id): id is number => id !== null) || []

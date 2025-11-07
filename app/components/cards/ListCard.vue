@@ -5,64 +5,65 @@
       :items="sortItems"
       size="xs"
       variant="soft"
-      class="absolute top-6 right-6 z-10"
-      :ui="{ content: 'min-w-fit', item: 'px-2' }"
+      class="absolute top-6 right-6 z-10 cursor-pointer"
+      :ui="{ content: 'min-w-fit', item: 'px-2 cursor-pointer' }"
       aria-label="Sort"
-      @update:model-value="emit('update:sort', $event)"
     />
     <ol class="flex flex-col group mt-2">
-      <GenresAndTagsPopover v-bind="item" v-for="(item, index) in list" :key="item.name">
-        <li
-          class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
-          @mouseover="handleMouseOver(item.name)"
-          @mouseleave="handleMouseLeave()"
-        >
-          <NuxtImg
-            v-if="item.entries && item.entries.length > 0"
-            :src="
-              item.entries[getRandomEntryIndex(item.name, item.entries)]?.media
-                ?.coverImage?.large ||
-              item.entries[getRandomEntryIndex(item.name, item.entries)]?.media
-                ?.coverImage?.medium ||
-              ''
-            "
-            :alt="
-              item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
-                ?.english ||
-              item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
-                ?.romaji ||
-              ''
-            "
-            class="size-10 rounded-sm aspect-square object-cover"
-          />
-          <div
-            v-else
-            class="size-10 bg-elevated rounded-sm aspect-square relative overflow-hidden"
+      <template v-for="(item, index) in list" :key="item.name">
+        <GenresAndTagsPopover v-if="index < 5" v-bind="item">
+          <li
+            class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
+            @mouseover="handleMouseOver(item.name)"
+            @mouseleave="handleMouseLeave()"
           >
-            <Icon
-              :name="item.icon"
-              class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-primary-400"
+            <NuxtImg
+              v-if="item.entries && item.entries.length > 0"
+              :src="
+                item.entries[getRandomEntryIndex(item.name, item.entries)]?.media
+                  ?.coverImage?.large ||
+                item.entries[getRandomEntryIndex(item.name, item.entries)]?.media
+                  ?.coverImage?.medium ||
+                ''
+              "
+              :alt="
+                item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
+                  ?.english ||
+                item.entries[getRandomEntryIndex(item.name, item.entries)]?.media?.title
+                  ?.romaji ||
+                ''
+              "
+              class="size-10 rounded-sm aspect-square object-cover"
             />
-          </div>
-          <div class="flex flex-col w-full gap-y-1">
-            <div class="flex justify-between w-full">
-              <span class="text-xs font-medium">{{ item.name }}</span>
+            <div
+              v-else
+              class="size-10 bg-elevated rounded-sm aspect-square relative overflow-hidden"
+            >
+              <Icon
+                :name="item.icon"
+                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-primary-400"
+              />
             </div>
-            <UProgress
-              v-model="progressValues[item.name]"
-              :ui="{
-                base: 'bg-transparent',
-                indicator: `transition-colors group-hover:bg-elevated duration-200 ${
-                  hoveredItem === item.name || (index === 0 && hoveredItem === null)
-                    ? '!bg-primary'
-                    : 'bg-elevated'
-                }`,
-              }"
-              size="lg"
-            />
-          </div>
-        </li>
-      </GenresAndTagsPopover>
+            <div class="flex flex-col w-full gap-y-1">
+              <div class="flex justify-between w-full">
+                <span class="text-xs font-medium">{{ item.name }}</span>
+              </div>
+              <UProgress
+                v-model="progressValues[item.name]"
+                :ui="{
+                  base: 'bg-transparent',
+                  indicator: `transition-colors group-hover:bg-elevated duration-200 ${
+                    hoveredItem === item.name || (index === 0 && hoveredItem === null)
+                      ? '!bg-primary'
+                      : 'bg-elevated'
+                  }`,
+                }"
+                size="lg"
+              />
+            </div>
+          </li>
+        </GenresAndTagsPopover>
+      </template>
     </ol>
   </MetricsCard>
 </template>
@@ -73,13 +74,12 @@ const hoveredItem = ref<string | null>(null);
 const currentEntryIndex = ref<Record<string, number>>({});
 
 const sortItems = [
-  { value: "COUNT_DESC", label: "Count" },
-  { value: "MEAN_SCORE_DESC", label: "Mean Score" },
+  { value: "count", label: "Count" },
+  { value: "meanScore", label: "Mean Score" },
+  { value: "minutesWatched", label: "Watch Time" },
 ];
 
-const selectedSort = ref("COUNT_DESC");
-
-const emit = defineEmits(["update:sort"]);
+const selectedSort = defineModel<string>("sort", { default: "count", required: true });
 
 const handleMouseOver = (name: string) => {
   hoveredItem.value = name;
@@ -103,7 +103,7 @@ export type listType = {
   name: string;
   count?: number;
   meanScore?: number;
-  timeWatched?: number;
+  minutesWatched?: number;
   entries?: any[];
   icon?: string;
 };
@@ -125,11 +125,13 @@ const maxValue = computed(() => {
   if (!props.list.length) return 0;
   return Math.max(
     ...props.list.map((item: listType) =>
-      selectedSort.value === "COUNT_DESC"
+      selectedSort.value === "count"
         ? item.count ?? 0
-        : isMeanScoreOutOfTen.value
-        ? (item.meanScore ?? 0) * 10
-        : item.meanScore ?? 0
+        : selectedSort.value === "meanScore"
+        ? item.meanScore ?? 0
+        : selectedSort.value === "minutesWatched"
+        ? item.minutesWatched ?? 0
+        : 0
     )
   );
 });
@@ -138,9 +140,7 @@ function calculatePercentage(value: number): number {
   if (maxValue.value === 0) return 0;
   // Si c'est un meanScore et que c'est sur 10, on convertit en échelle 0-100
   const normalizedValue =
-    selectedSort.value === "MEAN_SCORE_DESC" && isMeanScoreOutOfTen.value
-      ? value * 10
-      : value;
+    selectedSort.value === "meanScore" && isMeanScoreOutOfTen.value ? value * 10 : value;
 
   return Math.min(100, Math.max(0, Math.floor((normalizedValue / maxValue.value) * 100)));
 }
@@ -152,7 +152,13 @@ watchEffect(() => {
   if (props.list) {
     props.list.forEach((item: listType) => {
       progressValues.value[item.name] = calculatePercentage(
-        selectedSort.value === "COUNT_DESC" ? item.count ?? 0 : item.meanScore ?? 0
+        selectedSort.value === "count"
+          ? item.count ?? 0
+          : selectedSort.value === "meanScore"
+          ? item.meanScore ?? 0
+          : selectedSort.value === "minutesWatched"
+          ? item.minutesWatched ?? 0
+          : 0
       );
     });
   }

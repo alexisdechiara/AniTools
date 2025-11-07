@@ -1,7 +1,7 @@
 <template>
   <MetricsCard
     title="Mean Score"
-    :value="anime?.meanScore.toFixed(2) + ' %'"
+    :value="meanScore ? meanScore.toFixed(2) + ' %' : ''"
     v-bind="$attrs"
   >
     <UTabs
@@ -51,11 +51,11 @@ const items = ref<TabsItem[]>([
 
 const selectedTab = ref("count");
 
-const { anime } = useStatisticsStore();
+const { scores, meanScore } = storeToRefs(useStatisticsStore());
 // Computed property pour gérer l'affichage en fonction de l'onglet sélectionné
 const scoring = computed(
   () =>
-    anime?.scores
+    scores.value
       ?.map((score) => ({
         x: score?.score ?? 0,
         y: selectedTab.value === "count" ? score?.count : score?.minutesWatched,

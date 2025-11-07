@@ -1,91 +1,93 @@
-query statisticsQuery($userId: Int!, $limit: Int, $genresSort: [UserStatisticsSort] = [COUNT_DESC], $tagsSort: [UserStatisticsSort] = [COUNT_DESC]) {
+query userStatistics($userId: Int!) {
   User(id: $userId) {
 		id
     statistics {
       anime {
+        count
         meanScore
         minutesWatched
         episodesWatched
-        count
-        statuses {
-          status
-          meanScore
-          minutesWatched
-          count
-        }
         scores {
           score
+          count
           meanScore
           minutesWatched
+        }
+        genres {
+          genre
           count
+          meanScore
+          minutesWatched
+          mediaIds
+        }
+				tags {
+          count
+          meanScore
+          minutesWatched
+          tag {
+            name
+            category
+            description
+            rank
+            isAdult
+            isGeneralSpoiler
+            isMediaSpoiler
+          }
+					mediaIds
+        }
+				formats {
+          format
+          count
+          meanScore
+          minutesWatched
+          mediaIds
+        }
+				statuses {
+          status
+          count
+          meanScore
+          minutesWatched
+        }
+        countries {
+          country
+          count
+          meanScore
+          minutesWatched
+          mediaIds
+        }
+				lengths {
+          length
+          count
+          meanScore
+          minutesWatched
+          mediaIds
         }
 				startYears {
           startYear
+          count
           meanScore
           minutesWatched
-          count
-        }
-        genres(limit: $limit, sort: $genresSort) {
-          genre
-          meanScore
-          minutesWatched
-          count
           mediaIds
         }
-				tags(limit: $limit, sort: $tagsSort) {
+				releaseYears {
+          releaseYear
           count
           meanScore
-          mediaIds
           minutesWatched
-          tag {
-            category
-            description
-            isAdult
-            isGeneralSpoiler
-            isMediaSpoiler
+          mediaIds
+        }
+				studios {
+          studio {
+            id
             name
-            rank
+            isAnimationStudio
+            isFavourite
+            favourites
           }
-        }
-      }
-    }
-  }
-}
-
-query getGenresStatistics($userId: Int!, $limit: Int, $sort: [UserStatisticsSort] = [COUNT_DESC]) {
-  User(id: $userId) {
-    statistics {
-      anime {
-        genres(limit: $limit, sort: $sort) {
-          genre
-          meanScore
-          minutesWatched
-          count
-          mediaIds
-        }
-      }
-    }
-  }
-}
-
-query getTagsStatistics($userId: Int!, $limit: Int, $sort: [UserStatisticsSort] = [COUNT_DESC]) {
-  User(id: $userId) {
-    statistics {
-      anime {
-					tags(limit: $limit, sort: $sort) {
           count
           meanScore
-          mediaIds
           minutesWatched
-          tag {
-            category
-            description
-            isAdult
-            isGeneralSpoiler
-            isMediaSpoiler
-            name
-            rank
-          }
+          mediaIds
         }
       }
     }

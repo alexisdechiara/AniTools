@@ -3,9 +3,9 @@
 </template>
 
 <script lang="ts" setup>
-const statisticsStore = useStatisticsStore();
+const { minutesWatched } = storeToRefs(useStatisticsStore());
 
 const formattedWatchTime = computed(() => {
-  return formatWatchTime(statisticsStore.totalWatchTime);
+	return formatWatchTime(minutesWatched.value);
 });
 </script>

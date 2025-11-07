@@ -1,27 +1,23 @@
 <template>
-  <ListCard title="Tags" :list="list" @update:sort="updateSort" />
+  <ListCard title="Tags" :list="list" v-model:sort="tagsSort" />
 </template>
 
 <script lang="ts" setup>
-import { UserStatisticsSort } from "#gql/default";
-
-const { anime, tagsSort } = storeToRefs(useStatisticsStore());
+const statisticsStore = useStatisticsStore();
+const { tagsSort } = storeToRefs(statisticsStore);
+const { getSortedTags } = statisticsStore;
 const { getAnimesByMediaIds } = useEntriesStore();
 
 const list = computed(() => {
-  if (!anime.value) return [];
-  return anime.value.tags?.map((tag) => ({
+  if (!getSortedTags(tagsSort.value)) return [];
+  return getSortedTags(tagsSort.value).map((tag) => ({
     name: tag?.tag?.name,
     count: tag?.count,
     meanScore: tag?.meanScore,
-    timeWatched: tag?.minutesWatched,
+    minutesWatched: tag?.minutesWatched,
     entries: getAnimesByMediaIds(
       tag?.mediaIds?.filter((id): id is number => id !== null) || []
     ),
   }));
 });
-
-function updateSort(sort: string) {
-  tagsSort.value = [sort as UserStatisticsSort];
-}
 </script>
