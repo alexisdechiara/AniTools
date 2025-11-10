@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Formats" v-bind="$attrs">
+  <MetricsCard title="Formats" v-bind="$attrs" enable-sort-select v-model:sort="formatsSort">
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -8,6 +8,7 @@
       :orientation="orientation"
       :width="width"
       :height="height"
+      :metric-type="formatsSort"
     />
   </MetricsCard>
 </template>
@@ -17,7 +18,7 @@ import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import { MediaFormat } from "#gql/default";
 
-const { formats: formatsRef } = storeToRefs(useStatisticsStore());
+const { formats: formatsRef, formatsSort } = storeToRefs(useStatisticsStore());
 
 export interface DonutFormat {
   color: string;
@@ -70,14 +71,12 @@ const formatDisplayNames: Record<string, string> = {
 
 // Transforme les données pour le composant DonutChart
 const chartData = computed<DonutFormat[]>(() => {
-  // Utilisation directe du ref du store
   const formats = formatsRef.value || [];
 
   // Filtre les formats non pertinents ou sans données
   const relevantFormats = formats.filter((format) => {
-    if (!format?.format || format?.count <= 0) return false;
+    if (!format?.format) return false;
 
-    // Exclure les formats non-anime
     const excludedFormats = [
       MediaFormat.MANGA,
       MediaFormat.NOVEL,
@@ -88,18 +87,16 @@ const chartData = computed<DonutFormat[]>(() => {
     return !excludedFormats.includes(format.format);
   });
 
-  // Calcule le total pour les pourcentages
-  const total = relevantFormats.reduce((sum, format) => sum + (format?.count || 0), 0);
-  if (total === 0) return [];
+  const accessor = (f: any) => {
+    if (formatsSort.value === "meanScore") return f?.meanScore ?? 0;
+    if (formatsSort.value === "minutesWatched") return f?.minutesWatched ?? 0;
+    return f?.count ?? 0;
+  };
 
-  return relevantFormats
-    .filter(
-      (format): format is NonNullable<typeof format> =>
-        format?.format != null && format?.count != null
-    )
+  const mapped = relevantFormats
+    .filter((format): format is NonNullable<typeof format> => format?.format != null)
     .map((format) => {
-      const percentage = (format.count / total) * 100;
-      const { count, ...rest } = format;
+      const metric = accessor(format);
 
       // Format du nom pour l'affichage
       const formatName = format.format
@@ -117,10 +114,15 @@ const chartData = computed<DonutFormat[]>(() => {
           formatColors[format.format as keyof typeof formatColors] ||
           "var(--color-text-muted)",
         name: formatName,
-        value: parseFloat(percentage.toFixed(2)),
-        count,
-        ...rest,
+        value: metric,
+        count: format?.count ?? 0,
+        meanScore: format?.meanScore,
+        minutesWatched: format?.minutesWatched,
       } as DonutFormat;
     });
+
+  if (formatsSort.value === "count") return mapped.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+  if (formatsSort.value === "meanScore") return mapped.sort((a, b) => (b.meanScore ?? 0) - (a.meanScore ?? 0));
+  return mapped.sort((a, b) => (b.minutesWatched ?? 0) - (a.minutesWatched ?? 0));
 });
 </script>

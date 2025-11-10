@@ -1,13 +1,34 @@
 <template>
   <UPageCard
-    :title="title"
     :ui="{
       title: 'text-xs capitalize text-toned font-medium',
       container: 'gap-y-2 group/grab',
       root: 'bg-white dark:bg-black',
+      body: 'size-full',
     }"
     :class="{ 'cursor-grabbing': isDragging }"
   >
+    <template v-if="title" #title>
+      <div class="flex items-center justify-between gap-3">
+        <span
+          class="text-xs capitalize text-toned font-medium text-ellipsis text-nowrap overflow-hidden whitespace-nowrap"
+          >{{ title }}</span
+        >
+        <USelect
+          v-if="enableSortSelect"
+          v-model="selectedSort"
+          :items="selectItems"
+          size="xs"
+          variant="soft"
+          :ui="{
+            base: 'cursor-pointer',
+            content: 'min-w-fit',
+            item: 'px-2 cursor-pointer',
+          }"
+          aria-label="Sort"
+        />
+      </div>
+    </template>
     <Icon
       v-if="draggable"
       name="i-lucide-grip-vertical"
@@ -40,6 +61,7 @@
 </template>
 
 <script lang="ts" setup>
+import type { MetricSort } from "../../stores/Statistics";
 const props = withDefaults(
   defineProps<{
     title?: string;
@@ -48,15 +70,24 @@ const props = withDefaults(
     changeUnit?: string | "%";
     showChangeIcon?: boolean;
     draggable?: boolean;
+    enableSortSelect?: boolean;
+    selectItems?: Array<{ value: string; label: string }>;
   }>(),
   {
     changeUnit: "%",
     showChangeIcon: true,
     draggable: false,
+    enableSortSelect: false,
+    selectItems: () => [
+      { value: "count", label: "Count" },
+      { value: "meanScore", label: "Mean Score" },
+      { value: "minutesWatched", label: "Watch Time" },
+    ],
   }
 );
 
 const isDragging = ref(false);
+const selectedSort = defineModel<MetricSort>("sort", { default: "count" });
 
 const onMouseDown = () => {
   isDragging.value = true;

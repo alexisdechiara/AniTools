@@ -69,6 +69,7 @@
 </template>
 
 <script lang="ts" setup>
+import type { MetricSort } from "../../stores/Statistics";
 const hoveredItem = ref<string | null>(null);
 // Pour stocker l'index aléatoire de l'image affichée pour chaque élément de la liste
 const currentEntryIndex = ref<Record<string, number>>({});
@@ -79,7 +80,7 @@ const sortItems = [
   { value: "minutesWatched", label: "Watch Time" },
 ];
 
-const selectedSort = defineModel<string>("sort", { default: "count", required: true });
+const selectedSort = defineModel<MetricSort>("sort", { default: "count", required: true });
 
 const handleMouseOver = (name: string) => {
   hoveredItem.value = name;

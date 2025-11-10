@@ -1,7 +1,7 @@
 <template>
   <div class="flex gap-8" :class="orientation === 'horizontal' ? 'flex-row' : 'flex-col'">
     <VisSingleContainer
-      :data="data"
+      :data="chartDataForDonut"
       :width="width"
       :height="height"
       :style="{ '--chart-width': width, '--chart-height': height }"
@@ -40,7 +40,7 @@
         <span :class="{ 'opacity-50': isItemInOverflow(item) }">
           {{ item.name }}
         </span>
-        <span class="ms-auto">{{ item.value }}%</span>
+        <span class="ms-auto">{{ legendRawValue(item) }}</span>
       </li>
     </ul>
   </div>
@@ -69,6 +69,7 @@ const props = withDefaults(
     showCentralValue?: boolean;
     orientation?: "horizontal" | "vertical";
     angleRange?: [number, number];
+    metricType?: 'count' | 'meanScore' | 'minutesWatched';
   }>(),
   {
     width: "100%",
@@ -78,6 +79,7 @@ const props = withDefaults(
     showTooltip: false, // Désactivé par défaut
     showCentralValue: true, // Activé par défaut
     orientation: "vertical",
+    metricType: 'count', // Add default value for metricType
   }
 );
 
@@ -121,6 +123,11 @@ const processedData = computed<DonutDataItem[]>(() => {
   ] as DonutDataItem[];
 });
 
+// Données réellement affichées dans le donut (on garde "Other", on masque les items overflow individuels)
+const chartDataForDonut = computed<DonutDataItem[]>(() =>
+  processedData.value.filter((i) => !i.isOverflowItem)
+);
+
 // Vérifie si un élément fait partie du débordement
 const isItemInOverflow = (item: DonutDataItem): boolean => {
   return Boolean(item?.isOverflowItem);
@@ -128,8 +135,10 @@ const isItemInOverflow = (item: DonutDataItem): boolean => {
 
 // Fonctions pour le graphique
 const value = (d: DonutDataItem) => d?.value ?? 0;
-const color = (d: number, i: number) =>
-  processedData.value[i]?.color || "var(--ui-text-muted)";
+const color = (d: unknown, i: number) => chartDataForDonut.value[i]?.color || "var(--ui-text-muted)";
+
+// Totaux pour le calcul des pourcentages (centre + tooltip)
+const totalAll = computed(() => (props.data ?? []).reduce((s, it) => s + (it?.value ?? 0), 0));
 
 // Gestion des labels centraux
 const centralLabelText = ref("");
@@ -138,13 +147,14 @@ const centralSubLabelText = ref("");
 // Configuration du tooltip
 const triggers = {
   [Donut.selectors.segment]: (d: { index: number }) => {
-    const item = processedData.value[d.index];
+    const item = chartDataForDonut.value[d.index];
     if (!item) return "";
 
+    const percent = totalAll.value ? Math.round(((item.value || 0) / totalAll.value) * 100) : 0;
     return `
       <div class='flex flex-col p-1'>
         <span class='font-semibold capitalize'>${item.name || ""}</span>
-        <span>${item.value || 0}%</span>
+        <span>${percent}%</span>
       </div>
     `;
   },
@@ -154,10 +164,11 @@ const triggers = {
 const events = {
   [Donut.selectors.segment]: {
     mouseover: (d: { index: number }) => {
-      const item = processedData.value[d.index];
+      const item = chartDataForDonut.value[d.index];
       if (item) {
         centralLabelText.value = item.name || "";
-        centralSubLabelText.value = `${item.value || 0}%`;
+        const percent = totalAll.value ? Math.round(((item.value || 0) / totalAll.value) * 100) : 0;
+        centralSubLabelText.value = `${percent}%`;
       }
     },
     mouseout: () => {
@@ -165,6 +176,29 @@ const events = {
       centralSubLabelText.value = "";
     },
   },
+};
+
+// Affichage brut dans la légende selon les métadonnées disponibles
+const formatDuration = (minutes: number) => {
+  const d = Math.floor((minutes || 0) / 1440);
+  const h = Math.floor(((minutes || 0) % 1440) / 60);
+  const m = (minutes || 0) % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
+
+const legendRawValue = (item: DonutDataItem): string => {
+  // Si un type de métrique est fourni, on suit strictement ce type
+  if (props.metricType === 'meanScore') return `${item.meanScore ?? item.value ?? 0}%`;
+  if (props.metricType === 'minutesWatched') return formatDuration((item as any).minutesWatched ?? item.value ?? 0);
+  if (props.metricType === 'count') return String((item as any).count ?? item.value ?? 0);
+
+  // Fallback heuristique si metricType n'est pas fourni
+  if (typeof (item as any).count === 'number') return String((item as any).count);
+  if (typeof (item as any).minutesWatched === 'number') return formatDuration((item as any).minutesWatched);
+  if (typeof (item as any).meanScore === 'number') return `${(item as any).meanScore}%`;
+  return String(item.value ?? 0);
 };
 </script>
 

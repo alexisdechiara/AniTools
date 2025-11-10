@@ -1,5 +1,10 @@
 <template>
-  <MetricsCard title="Countries of origin" v-bind="$attrs">
+  <MetricsCard
+    title="Countries of origin"
+    v-bind="$attrs"
+    enable-sort-select
+    v-model:sort="countriesSort"
+  >
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -9,6 +14,7 @@
       :width="width"
       :height="height"
       :angle-range="DONUT_HALF_ANGLE_RANGE_TOP"
+      :metric-type="countriesSort"
       class="gap-4!"
     />
   </MetricsCard>
@@ -18,7 +24,7 @@
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import { DONUT_HALF_ANGLE_RANGE_TOP } from "@unovis/ts";
-const { countries: countriesRef } = storeToRefs(useStatisticsStore());
+const { countries: countriesRef, countriesSort } = storeToRefs(useStatisticsStore());
 
 export interface DonutCountry {
   color: string;
@@ -71,35 +77,44 @@ const countryData: Record<string, { name: string; color: string }> = {
 const chartData = computed<DonutCountry[]>(() => {
   const countries = (countriesRef.value || []) as Array<{
     country: string;
-    count: number;
+    count?: number;
+    meanScore?: number;
+    minutesWatched?: number;
   }>;
 
-  // If no data, return an empty array
   if (countries.length === 0) return [];
 
-  // Create an object with only countries that have data
-  const countryCounts = Object.fromEntries(countries.map((c) => [c.country, c.count]));
+  // determine accessor based on selectedSort
+  const accessor = (c: typeof countries[number]) => {
+    if (countriesSort.value === "meanScore") return c.meanScore ?? 0;
+    if (countriesSort.value === "minutesWatched") return c.minutesWatched ?? 0;
+    return c.count ?? 0;
+  };
 
-  // Calculate total count
-  const total = Object.values(countryCounts).reduce((sum, count) => sum + count, 0);
-  if (total === 0) return [];
+  // Pas de calcul de pourcentage ici; on transmet des valeurs brutes au DonutChart
 
-  // Transform data for the chart
-  return Object.entries(countryCounts)
-    .map(([countryCode, count]) => {
-      const countryInfo = countryData[countryCode] || {
-        name: countryCode,
+  const mapped = countries
+    .filter((c) => c.country)
+    .map((c) => {
+      const countryInfo = countryData[c.country] || {
+        name: c.country,
         color: "var(--color-text-muted)",
       };
-
+      const metric = accessor(c);
       return {
         color: countryInfo.color,
         name: countryInfo.name,
-        value: parseFloat(((count / total) * 100).toFixed(2)),
-        count,
-        country: countryCode,
+        value: metric,
+        count: c.count ?? 0,
+        country: c.country,
+        meanScore: c.meanScore,
+        minutesWatched: c.minutesWatched,
       };
-    })
-    .sort((a, b) => b.count - a.count); // Trie par ordre décroissant
+    });
+
+  // Always keep a deterministic order (default by count when metric is count)
+  if (countriesSort.value === "count") return mapped.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+  if (countriesSort.value === "meanScore") return mapped.sort((a, b) => (b.meanScore ?? 0) - (a.meanScore ?? 0));
+  return mapped.sort((a, b) => (b.minutesWatched ?? 0) - (a.minutesWatched ?? 0));
 });
 </script>

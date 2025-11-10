@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Status" v-bind="$attrs">
+  <MetricsCard title="Status" v-bind="$attrs" enable-sort-select v-model:sort="statusSort">
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -8,6 +8,7 @@
       :orientation="orientation"
       :width="width"
       :height="height"
+      :metric-type="statusSort"
     />
   </MetricsCard>
 </template>
@@ -16,7 +17,7 @@
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
 
-const { statuses: statusesRef } = storeToRefs(useStatisticsStore());
+const { statuses: statusesRef, statusSort } = storeToRefs(useStatisticsStore());
 
 export interface DonutStatus {
   color: string;
@@ -57,34 +58,42 @@ const statusColors: Record<string, string> = {
 // Type pour les statuts d'anime
 interface AnimeStatus {
   status: string;
-  meanScore: number;
-  minutesWatched: number;
-  count: number;
+  meanScore?: number;
+  minutesWatched?: number;
+  count?: number;
 }
 
 // Transforme les données pour le composant DonutChart
 const chartData = computed<DonutStatus[]>(() => {
   const statuses = (statusesRef.value || []) as AnimeStatus[];
 
-  // Calcule le nombre total d'éléments pour les pourcentages
-  const total = statuses.reduce((sum, status) => sum + (status.count || 0), 0);
-  if (total === 0) return [];
+  if (!statuses || statuses.length === 0) return [];
 
-  return statuses
-    .filter(
-      (status): status is AnimeStatus => status.status != null && status.count != null
-    )
-    .map((status) => {
-      // Calcule le pourcentage avec 2 décimales
-      const percentage = (status.count / total) * 100;
-      const { count, ...rest } = status; // On extrait count séparément
+  const accessor = (s: AnimeStatus) => {
+    if (statusSort.value === "meanScore") return s.meanScore ?? 0;
+    if (statusSort.value === "minutesWatched") return s.minutesWatched ?? 0;
+    return s.count ?? 0;
+  };
+
+  const mapped = statuses
+    .filter((s): s is AnimeStatus => !!s.status)
+    .map((s) => {
+      const metric = accessor(s);
       return {
-        color: statusColors[status.status] || "var(--color-text-muted)",
-        name: status.status.charAt(0) + status.status.slice(1).toLowerCase(),
-        value: parseFloat(percentage.toFixed(2)), // Arrondi à 2 décimales
-        count, // On garde le comptage brut aussi au cas où
-        ...rest, // On étend avec le reste des propriétés sauf count
-      };
+        color: statusColors[s.status] || "var(--color-text-muted)",
+        name:
+          s.status === "CURRENT"
+            ? "Watching"
+            : s.status.charAt(0) + s.status.slice(1).toLowerCase(),
+        value: metric,
+        count: s.count ?? 0,
+        meanScore: s.meanScore,
+        minutesWatched: s.minutesWatched,
+      } as DonutStatus;
     });
+
+  if (statusSort.value === "count") return mapped.sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+  if (statusSort.value === "meanScore") return mapped.sort((a, b) => (b.meanScore ?? 0) - (a.meanScore ?? 0));
+  return mapped.sort((a, b) => (b.minutesWatched ?? 0) - (a.minutesWatched ?? 0));
 });
 </script>

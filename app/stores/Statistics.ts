@@ -3,6 +3,8 @@ import type { UserStatisticsQuery } from "#gql/default"
 
 type statistics = NonNullable<NonNullable<NonNullable<UserStatisticsQuery["User"]>["statistics"]>["anime"]>
 
+export type MetricSort = "count" | "meanScore" | "minutesWatched"
+
 export const useStatisticsStore = defineStore("Statistics", () => {
 	const entriesStore = useEntriesStore()
 
@@ -20,8 +22,11 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	const studios = ref<statistics["studios"]>()
 	const formats = ref<statistics["formats"]>()
 	const lengths = ref<statistics["lengths"]>()
-	const genresSort = ref<"count" | "meanScore" | "minutesWatched">("count")
-	const tagsSort = ref<"count" | "meanScore" | "minutesWatched">("count")
+	const genresSort = ref<MetricSort>("count")
+	const tagsSort = ref<MetricSort>("count")
+	const formatsSort = ref<MetricSort>("count")
+	const countriesSort = ref<MetricSort>("count")
+	const statusSort = ref<MetricSort>("count")
 
 	const isInitialized = ref(false)
 	const loading = ref(false)
@@ -65,7 +70,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		}
 	}
 
-	function getSortedGenres(sort: "count" | "meanScore" | "minutesWatched" = genresSort.value, limit: number = 5) {
+	function getSortedGenres(sort: MetricSort = genresSort.value, limit: number = 5) {
 		if (!genres.value) return []
 		let sortedGenres: statistics["genres"] = []
 		switch (sort) {
@@ -87,7 +92,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		return sortedGenres
 	}
 
-	function getSortedTags(sort: "count" | "meanScore" | "minutesWatched", limit: number = 5) {
+	function getSortedTags(sort: MetricSort, limit: number = 5) {
 		if (!tags.value) return []
 		let sortedTags: statistics["tags"] = []
 		switch (sort) {
@@ -107,6 +112,69 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		if (sortedTags.length > limit)
 			return sortedTags.slice(0, limit)
 		return sortedTags
+	}
+
+	function getSortedFormats(sort: MetricSort = formatsSort.value, limit: number = 6) {
+		if (!formats.value) return []
+		let sorted = formats.value
+		switch (sort) {
+			case "count":
+				sorted = formats.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
+				break
+			case "meanScore":
+				sorted = formats.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
+				break
+			case "minutesWatched":
+				sorted = formats.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
+				break
+			default:
+				sorted = formats.value
+		}
+		if (sorted.length > limit)
+			return sorted.slice(0, limit)
+		return sorted
+	}
+
+	function getSortedCountries(sort: MetricSort = countriesSort.value, limit: number = 4) {
+		if (!countries.value) return []
+		let sorted = countries.value
+		switch (sort) {
+			case "count":
+				sorted = countries.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
+				break
+			case "meanScore":
+				sorted = countries.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
+				break
+			case "minutesWatched":
+				sorted = countries.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
+				break
+			default:
+				sorted = countries.value
+		}
+		if (sorted.length > limit)
+			return sorted.slice(0, limit)
+		return sorted
+	}
+
+	function getSortedStatus(sort: MetricSort = statusSort.value, limit: number = 5) {
+		if (!statuses.value) return []
+		let sorted = statuses.value
+		switch (sort) {
+			case "count":
+				sorted = statuses.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
+				break
+			case "meanScore":
+				sorted = statuses.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
+				break
+			case "minutesWatched":
+				sorted = statuses.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
+				break
+			default:
+				sorted = statuses.value
+		}
+		if (sorted.length > limit)
+			return sorted.slice(0, limit)
+		return sorted
 	}
 
 	// TODO corriger le problème de favoris
@@ -222,9 +290,15 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		lengths,
 		genresSort,
 		tagsSort,
+		formatsSort,
+		countriesSort,
+		statusSort,
 		fetchStatistics,
 		getSortedGenres,
 		getSortedTags,
+		getSortedFormats,
+		getSortedCountries,
+		getSortedStatus,
 		getBestScoreAnime,
 		getLongestAnime,
 		getMostWatchedAnime,

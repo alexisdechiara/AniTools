@@ -11,8 +11,8 @@
         <TagsCard class="col-span-1 row-span-2" />
         <HighlightCard class="col-span-2 row-span-2" />
         <CountriesDonutCard class="col-span-1 row-span-1" />
+        <WatchYearLineCard class="col-span-3 row-span-1" />
         <FormatsDonutCard class="col-span-1 row-span-1" />
-        <WatchYearLineCard class="col-span-3 row-span-2" />
       </div>
     </template>
   </UDashboardPanel>
