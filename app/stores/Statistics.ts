@@ -6,7 +6,6 @@ type statistics = NonNullable<NonNullable<NonNullable<UserStatisticsQuery["User"
 export const useStatisticsStore = defineStore("Statistics", () => {
 	const entriesStore = useEntriesStore()
 
-	const isInitialized = ref(false)
 	const meanScore = ref<statistics["meanScore"]>()
 	const minutesWatched = ref<statistics["minutesWatched"]>()
 	const episodesWatched = ref<statistics["episodesWatched"]>()
@@ -14,12 +13,17 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	const statuses = ref<statistics["statuses"]>()
 	const scores = ref<statistics["scores"]>()
 	const startYears = ref<statistics["startYears"]>()
+	const releaseYears = ref<statistics["releaseYears"]>()
 	const genres = ref<statistics["genres"]>()
 	const tags = ref<statistics["tags"]>()
-
+	const countries = ref<statistics["countries"]>()
+	const studios = ref<statistics["studios"]>()
+	const formats = ref<statistics["formats"]>()
+	const lengths = ref<statistics["lengths"]>()
 	const genresSort = ref<"count" | "meanScore" | "minutesWatched">("count")
 	const tagsSort = ref<"count" | "meanScore" | "minutesWatched">("count")
 
+	const isInitialized = ref(false)
 	const loading = ref(false)
 	const error = ref<string | null>(null)
 
@@ -44,8 +48,13 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 			statuses.value = animeStats.statuses
 			scores.value = animeStats.scores
 			startYears.value = animeStats.startYears
+			releaseYears.value = animeStats.releaseYears
 			genres.value = animeStats.genres
 			tags.value = animeStats.tags
+			countries.value = animeStats.countries
+			studios.value = animeStats.studios
+			formats.value = animeStats.formats
+			lengths.value = animeStats.lengths
 			return true
 		} catch (err) {
 			console.error("Error fetching statistics:", err)
@@ -204,8 +213,13 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		statuses,
 		scores,
 		startYears,
+		releaseYears,
 		genres,
 		tags,
+		countries,
+		studios,
+		formats,
+		lengths,
 		genresSort,
 		tagsSort,
 		fetchStatistics,

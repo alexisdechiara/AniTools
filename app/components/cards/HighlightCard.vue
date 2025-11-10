@@ -19,15 +19,25 @@
         </template>
       </div>
       <div class="col-span-7 flex flex-col gap-y-3 size-full relative">
-        <span class="text-xs capitalize text-toned font-medium text-pretty">
+        <span
+          v-if="currentHighlightedAnime?.title"
+          class="text-xs capitalize text-toned font-medium text-pretty"
+        >
           {{ currentHighlightedAnime.title }}
         </span>
-        <span class="text-2xl font-semibold text-highlighted text-ellipsis">
+        <span
+          v-if="currentHighlightedAnime?.name"
+          class="text-2xl font-semibold text-highlighted text-ellipsis"
+        >
           {{ currentHighlightedAnime.name }}
         </span>
-        <span class="text-4xl font-bold text-highlighted text-ellipsis">{{
-          currentHighlightedAnime.value
-        }}</span>
+        <span
+          v-if="currentHighlightedAnime?.value"
+          class="text-4xl font-bold text-highlighted text-ellipsis"
+        >
+          {{ currentHighlightedAnime.value }}
+        </span>
+        <span v-else class="text-sm text-gray-500">No data available</span>
         <div class="absolute top-0 right-0 flex gap-x-3 h-fit">
           <UButton
             icon="i-lucide-chevron-left"
@@ -126,9 +136,9 @@ function indexToRotate(index: number): string {
   }
 }
 
-const currentHighlightedAnime = computed(
-  () => highlitedAnimes.value[currentIndex.value]!
-);
+const currentHighlightedAnime = computed(() => {
+  return highlitedAnimes.value[currentIndex.value];
+});
 </script>
 
 <style scoped>

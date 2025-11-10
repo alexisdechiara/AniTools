@@ -46,15 +46,10 @@
 	--color-completed: oklch(from var(--ui-color-primary-400) l c h);
 	--color-planning: oklch(from var(--ui-color-warning-400) l c h );
 	--color-dropped: oklch(from var(--ui-color-error-400) l c h );
-	--color-watching: oklch(from var(--ui-color-neutral-200) l c h );
-	--color-paused: oklch(from var(--ui-color-neutral-400) l c h );
+	--color-watching: oklch(from var(--ui-color-success-400) l c h );
+	--color-paused: oklch(from var(--ui-color-neutral-200) l c h );
 
-	--color-completed-hover: oklch(from var(--ui-color-primary-500) l c h);
-	--color-planning-hover: oklch(from var(--ui-color-warning-500) l c h );
-	--color-dropped-hover: oklch(from var(--ui-color-error-500) l c h );
-	--color-watching-hover: oklch(from var(--ui-color-neutral-300) l c h );
-	--color-paused-hover: oklch(from var(--ui-color-neutral-500) l c h );
-
+	--vis-color-main: var(--ui-color-primary-400);
 	--vis-axis-tick-color: var(--ui-color-neutral-200);
 }
 

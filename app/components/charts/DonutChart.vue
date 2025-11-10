@@ -15,6 +15,7 @@
         :events="showCentralValue ? events : {}"
         :centralLabel="showCentralValue ? centralLabelText : ''"
         :centralSubLabel="showCentralValue ? centralSubLabelText : ''"
+        :angleRange="angleRange || [0, 360]"
       />
       <VisTooltip v-if="showTooltip" :triggers="triggers" />
     </VisSingleContainer>
@@ -22,7 +23,7 @@
     <ul
       v-if="showLegend"
       class="text-sm flex flex-col gap-2"
-      :class="orientation === 'horizontal' ? 'mx-0' : 'mx-4'"
+      :class="orientation === 'horizontal' ? 'mx-0 justify-center' : 'mx-4'"
     >
       <li
         v-for="(item, index) in processedData"
@@ -67,6 +68,7 @@ const props = withDefaults(
     showTooltip?: boolean;
     showCentralValue?: boolean;
     orientation?: "horizontal" | "vertical";
+    angleRange?: [number, number];
   }>(),
   {
     width: "100%",
@@ -106,7 +108,7 @@ const processedData = computed<DonutDataItem[]>(() => {
   return [
     ...mainItems,
     {
-      name: "Autres",
+      name: "Other",
       value: parseFloat(otherSum.toFixed(2)),
       color: "var(--ui-text-muted)",
       isOverflow: true,
@@ -198,32 +200,12 @@ const events = {
 .unovis-single-container :deep(path[class*="segment"]:hover) {
   opacity: 1 !important;
   transform: scale(1.03) !important;
-  filter: none !important;
+  filter: brightness(90%) !important;
 }
 
 /* Style de tous les segments non survolés quand l'un d'eux est survolé */
 .unovis-single-container:has(path[class*="segment"]:hover)
   :deep(path[class*="segment"]:not(:hover)) {
   opacity: 0.3 !important;
-}
-
-/* Applique les couleurs de survol spécifiques */
-.unovis-single-container :deep(path[style*="--color-completed"]:hover) {
-  fill: var(--color-completed-hover) !important;
-}
-
-.unovis-single-container :deep(path[style*="--color-planning"]:hover) {
-  fill: var(--color-planning-hover) !important;
-}
-
-.unovis-single-container :deep(path[style*="--color-dropped"]:hover) {
-  fill: var(--color-dropped-hover) !important;
-}
-
-.unovis-single-container :deep(path[style*="--color-watching"]:hover) {
-  fill: var(--color-watching-hover) !important;
-}
-.unovis-single-container :deep(path[style*="--color-paused"]:hover) {
-  fill: var(--color-paused-hover) !important;
 }
 </style>
