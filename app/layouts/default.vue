@@ -7,7 +7,7 @@ const toast = useToast()
 const open = ref(false)
 
 const links = [[{
-	label: "Overview",
+	label: "Playground",
 	icon: "i-lucide-layout-dashboard",
 	to: "/",
 	onSelect: () => {
@@ -16,10 +16,49 @@ const links = [[{
 }, {
 	label: "Statistics",
 	icon: "i-lucide-chart-no-axes-combined",
-	to: "/statistics",
-	onSelect: () => {
-		open.value = false
-	}
+	to: '/statistics',
+	children: [{
+		label: 'Overview',
+		to: '/statistics',
+		onSelect: () => {
+			open.value = false
+		}
+	}, {
+			label: 'Genres',
+			to: '/statistics/genres',
+			onSelect: () => {
+				open.value = false
+			},
+			disabled: true
+		}, {
+			label: 'Tags',
+			to: '/statistics/tags',
+			onSelect: () => {
+				open.value = false
+			},
+			disabled: true
+		}, {
+			label: 'Voice Actors',
+			to: '/statistics/voice-actors',
+			onSelect: () => {
+				open.value = false
+			},
+			disabled: true
+		}, {
+			label: 'Studios',
+			to: '/statistics/studios',
+			onSelect: () => {
+				open.value = false
+			},
+			disabled: true
+		}, {
+			label: 'Staff',
+			to: '/statistics/staff',
+			onSelect: () => {
+				open.value = false
+			},
+			disabled: true
+		}]
 }, {
 	label: "Rewind",
 	icon: "i-lucide-rewind",

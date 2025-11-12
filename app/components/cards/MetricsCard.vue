@@ -32,7 +32,7 @@
     <Icon
       v-if="draggable"
       name="i-lucide-grip-vertical"
-      class="draggable-grip absolute top-6 right-6 z-999 group-hover/grab:opacity-50 hover:opacity-100 opacity-0 cursor-grab transition-opacity duration-75 ease-in"
+      class="draggable-grip absolute top-1.5 right-1.5 z-999 group-hover/grab:opacity-50 hover:opacity-100 opacity-0 cursor-grab transition-opacity duration-75 ease-in"
       :class="{ 'cursor-grabbing': isDragging }"
       @mousedown="onMouseDown"
     />

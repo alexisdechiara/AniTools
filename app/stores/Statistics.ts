@@ -27,6 +27,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	const formatsSort = ref<MetricSort>("count")
 	const countriesSort = ref<MetricSort>("count")
 	const statusSort = ref<MetricSort>("count")
+	const studiosSort = ref<MetricSort>("count")
 
 	const isInitialized = ref(false)
 	const loading = ref(false)
@@ -177,7 +178,29 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		return sorted
 	}
 
-	// TODO corriger le problème de favoris
+	function getSortedStudios(sort: MetricSort = studiosSort.value, limit: number = 5) {
+		if (!studios.value) return []
+		let sortedStudios: statistics["studios"] = []
+		switch (sort) {
+			case "count":
+				sortedStudios = studios.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
+				break
+			case "meanScore":
+				sortedStudios = studios.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
+				break
+			case "minutesWatched":
+				sortedStudios = studios.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
+				break
+			default:
+				sortedStudios = studios.value
+				break
+		}
+		if (sortedStudios.length > limit)
+			return sortedStudios.slice(0, limit)
+		return sortedStudios
+	}
+
+	// TODO : donner la licences au lieu de la saison
 	const getBestScoreAnime = computed(() => {
 		try {
 			const animes = entriesStore.getAllAnimes()
@@ -208,7 +231,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 				const favDiff = isFavB - isFavA
 				if (favDiff !== 0) return favDiff
 
-				// Si toujours égalité, comparer les meanScore
+				// Si toujours égalité, comparer les averageScore
 				const meanScoreA = Number(a?.media?.averageScore) || 0
 				const meanScoreB = Number(b?.media?.averageScore) || 0
 				return meanScoreB - meanScoreA
@@ -293,6 +316,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		formatsSort,
 		countriesSort,
 		statusSort,
+		studiosSort,
 		fetchStatistics,
 		getSortedGenres,
 		getSortedTags,
@@ -302,6 +326,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		getBestScoreAnime,
 		getLongestAnime,
 		getMostWatchedAnime,
+		getSortedStudios,
 		loading,
 		error,
 		isInitialized
