@@ -1,37 +1,42 @@
 <template>
-  <div class="fixed inset-y-24 inset-x-48">
-    <div class="size-full flex flex-col p-24 bg-neutral-900 rounded-2xl">
-      <h1 class="text-6xl font-bold text-white dark:text-neutral-300 mb-4">
-        <span class="text-primary-400 me-1">Ani</span>Tools
-      </h1>
-      <h2 class="text-2xl text-white">The awesome anime tools</h2>
-      <div class="mt-auto">
-        <UInput
-          v-model="username"
-          placeholder="Enter your username"
-          :ui="{ base: 'h-16 ps-8 rounded-full text-base', trailing: '-end-12' }"
-          @keyup.enter="login"
-        >
-          <template #trailing>
-            <UButton
-              @click="login"
-              :loading="isLoading"
-              :ui="{
-                base:
-                  'size-full cursor-pointer rounded-full px-8 hover:bg-primary-400 active:bg-primary-400',
-              }"
-            >
-              <Icon name="lucide:arrow-right" class="size-8" />
-            </UButton>
-          </template>
-        </UInput>
-      </div>
+  <div
+    class="fixed max-w-4xl left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 aspect-video h-fit w-full flex flex-col p-24 bg-neutral-900 rounded-[8rem] squircle"
+  >
+    <h1 class="text-6xl font-bold text-white dark:text-neutral-300 mb-4">
+      <span class="text-primary-400 me-1">Ani</span>Tools
+    </h1>
+    <h2 class="text-2xl text-white">The awesome anime tools</h2>
+    <div class="mt-auto">
+      <UInput
+        v-model="username"
+        placeholder="Enter your username"
+        :ui="{ base: 'h-16 ps-8 rounded-full text-base', trailing: '-end-12' }"
+        @keyup.enter="login"
+      >
+        <template #trailing>
+          <UButton
+            @click="login"
+            :ui="{
+              base:
+                'size-full cursor-pointer rounded-full px-8 hover:bg-primary-400 active:bg-primary-400',
+            }"
+          >
+            <Icon
+              name="lucide:loader-circle"
+              class="size-8 animate-spin"
+              v-if="isLoading"
+            />
+            <Icon name="lucide:arrow-right" class="size-8" v-else />
+          </UButton>
+        </template>
+      </UInput>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ScoreFormat } from "#gql/default";
+const { isLoading } = useLoadingIndicator();
 
 definePageMeta({
   layout: "none",
@@ -40,7 +45,6 @@ definePageMeta({
 const route = useRoute();
 const toast = useToast();
 const username = ref("");
-const isLoading = ref(false);
 
 const { fetchUserData } = useUserStore();
 const { fetchStatistics } = useStatisticsStore();
@@ -56,8 +60,6 @@ const login = async () => {
     });
     return;
   }
-
-  isLoading.value = true;
 
   try {
     // Récupérer les données de l'utilisateur
@@ -82,8 +84,12 @@ const login = async () => {
       color: "error",
       icon: "i-lucide-circle-alert",
     });
-  } finally {
-    isLoading.value = false;
   }
 };
 </script>
+
+<style>
+.squircle {
+  corner-shape: squircle !important;
+}
+</style>
