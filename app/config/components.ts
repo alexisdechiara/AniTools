@@ -16,7 +16,8 @@ const COMPONENTS = [
 	{ id: 12, name: "FormatsDonutCard" },
 	{ id: 13, name: "CountriesDonutCard" },
 	{ id: 14, name: "WatchYearLineCard" },
-	{ id: 15, name: "StudiosCard" }
+	{ id: 15, name: "StudiosCard" },
+	{ id: 16, name: "NextEpisodesCard" }
 ] as const
 
 type ComponentName = typeof COMPONENTS[number]["name"]

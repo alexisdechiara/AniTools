@@ -35,17 +35,22 @@ export const useEntriesStore = defineStore("Entries", () => {
 		})
 	}
 
-	function getAllAnimes() {
+	const getNextAiringAnimesEpisodes = computed(() => {
+		if (!lists.value) return []
+		return lists.value?.flatMap(list => list?.entries || []).filter(entry => entry?.media?.nextAiringEpisode && entry?.media?.nextAiringEpisode?.airingAt)
+	})
+
+	const getAllAnimes = computed(() => {
 		if (!lists.value) return []
 		return lists.value.flatMap(list => list?.entries || []).sort((a, b) => (b?.score || 0) - (a?.score || 0))
-	}
+	})
 
 	function getAnimesByStatus(status: string[], limit?: number) {
 		return lists.value?.filter(list => status.includes(list!.status!))?.flatMap(list => list?.entries || []).slice(0, limit) ?? []
 	}
 
 	function getAnimesByGenres(genres: string[], limit?: number) {
-		return getAllAnimes()
+		return getAllAnimes.value
 			.filter((entry): entry is NonNullable<typeof entry> => {
 				return Boolean(entry?.media?.genres?.some(genre => genres.includes(genre ?? "")))
 			})
@@ -53,7 +58,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 	}
 
 	function getAnimeByTags(tags: string[], limit?: number) {
-		return getAllAnimes()
+		return getAllAnimes.value
 			.filter((entry): entry is NonNullable<typeof entry> => {
 				return Boolean(entry?.media?.tags?.some(tag => tags.includes(tag?.name ?? "")))
 			})
@@ -61,24 +66,26 @@ export const useEntriesStore = defineStore("Entries", () => {
 	}
 
 	function getAnimesByMediaIds(ids: number[], limit?: number) {
-		return getAllAnimes()
+		return getAllAnimes.value
 			.filter((entry): entry is NonNullable<typeof entry> => {
 				return Boolean(entry?.media?.id && ids.includes(entry.media.id))
 			})
 			.slice(0, limit)
 	}
 
+	function $reset() {
+		lists.value = []
+	}
+
 	return {
 		lists,
 		fetchAllAnimes,
 		getAllAnimes,
+		getNextAiringAnimesEpisodes,
 		getAnimesByStatus,
 		getAnimesByGenres,
 		getAnimeByTags,
-		getAnimesByMediaIds
-	}
-}, {
-	persist: {
-		storage: piniaPluginPersistedstate.localStorage()
+		getAnimesByMediaIds,
+		$reset
 	}
 })

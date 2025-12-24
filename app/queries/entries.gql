@@ -27,6 +27,10 @@ query getAllEntries($userId: Int, $format: ScoreFormat, $type: MediaType = ANIME
             native
             userPreferred
           }
+					nextAiringEpisode {
+						airingAt
+						episode
+					}
           siteUrl
           description
           format
@@ -91,6 +95,12 @@ query getAllEntries($userId: Int, $format: ScoreFormat, $type: MediaType = ANIME
               node {
                 id
                 format
+								title {
+									english
+									romaji
+									native
+									userPreferred
+								}
               }
             }
           }

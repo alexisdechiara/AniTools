@@ -6,7 +6,7 @@ type statistics = NonNullable<NonNullable<NonNullable<UserStatisticsQuery["User"
 export type MetricSort = "count" | "meanScore" | "minutesWatched"
 
 export const useStatisticsStore = defineStore("Statistics", () => {
-	const entriesStore = useEntriesStore()
+	const { getAllAnimes: animes } = storeToRefs(useEntriesStore())
 
 	const meanScore = ref<statistics["meanScore"]>()
 	const minutesWatched = ref<statistics["minutesWatched"]>()
@@ -203,12 +203,10 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	// TODO : donner la licences au lieu de la saison
 	const getBestScoreAnime = computed(() => {
 		try {
-			const animes = entriesStore.getAllAnimes()
-
-			if (!animes || animes.length === 0) return null
+			if (!animes.value || animes.value.length === 0) return null
 
 			// Filtrer les entrées sans média ou sans score valide
-			const validAnimes = animes.filter(anime =>
+			const validAnimes = animes.value.filter(anime =>
 				anime?.media
 				&& (anime.score !== null && anime.score !== undefined)
 			)
@@ -246,12 +244,10 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	const getLongestAnime = computed(() => {
 		try {
-			const animes = entriesStore.getAllAnimes()
-
-			if (!animes || animes.length === 0) return null
+			if (!animes.value || animes.value.length === 0) return null
 
 			// Filtrer les entrées avec un progrès valide
-			const validAnimes = animes.filter(anime =>
+			const validAnimes = animes.value.filter(anime =>
 				!!anime?.media
 				&& (anime.progress !== null && anime.progress !== undefined && anime.progress > 0)
 			)
@@ -272,12 +268,10 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	const getMostWatchedAnime = computed(() => {
 		try {
-			const animes = entriesStore.getAllAnimes()
-
-			if (!animes || animes.length === 0) return null
+			if (!animes.value || animes.value.length === 0) return null
 
 			// Filtrer les entrées avec un nombre de répétitions valide
-			const validAnimes = animes.filter(anime =>
+			const validAnimes = animes.value.filter(anime =>
 				!!anime?.media
 				&& (anime.repeat !== null && anime.repeat !== undefined && anime.repeat > 0)
 			)
@@ -295,6 +289,33 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 			return null
 		}
 	})
+
+	function $reset() {
+		meanScore.value = undefined
+		minutesWatched.value = undefined
+		episodesWatched.value = undefined
+		count.value = undefined
+		statuses.value = undefined
+		scores.value = undefined
+		startYears.value = undefined
+		releaseYears.value = undefined
+		genres.value = undefined
+		tags.value = undefined
+		countries.value = undefined
+		studios.value = undefined
+		formats.value = undefined
+		lengths.value = undefined
+		genresSort.value = "count"
+		tagsSort.value = "count"
+		formatsSort.value = "count"
+		countriesSort.value = "count"
+		statusSort.value = "count"
+		studiosSort.value = "count"
+
+		isInitialized.value = false
+		loading.value = false
+		error.value = null
+	}
 
 	return {
 		meanScore,
@@ -329,10 +350,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		getSortedStudios,
 		loading,
 		error,
-		isInitialized
-	}
-}, {
-	persist: {
-		storage: piniaPluginPersistedstate.localStorage()
+		isInitialized,
+		$reset
 	}
 })

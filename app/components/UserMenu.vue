@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui";
 
+const { logout } = useAuth();
+
 defineProps<{
   collapsed?: boolean;
 }>();
@@ -197,6 +199,9 @@ const items = computed<DropdownMenuItem[][]>(() => [
     {
       label: "Log out",
       icon: "i-lucide-log-out",
+      onSelect() {
+        logout();
+      },
     },
   ],
 ]);

@@ -110,7 +110,25 @@ export const useUserStore = defineStore("User", () => {
 		getMediaListOptions: computed(() => mediaListOptions.value),
 
 		// Actions
-		fetchUserData
+		fetchUserData,
+
+		// Reset function
+		$reset() {
+			id.value = undefined
+			username.value = "Not logged in"
+			avatar.value = undefined
+			updatedAt.value = undefined
+			options.value = {
+				titleLanguage: UserTitleLanguage.ENGLISH,
+				displayAdultContent: false,
+				profileColor: "#000000",
+				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+			}
+			mediaListOptions.value = {
+				scoreFormat: ScoreFormat.POINT_100,
+				rowOrder: "ANIME_BY_POPULARITY"
+			}
+		}
 	}
 }, {
 	persist: true

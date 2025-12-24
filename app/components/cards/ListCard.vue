@@ -11,7 +11,7 @@
     />
     <ol class="flex flex-col group mt-2">
       <template v-for="(item, index) in list" :key="item.name">
-        <GenresAndTagsPopover v-if="index < 5" v-bind="item">
+        <GenresAndTagsPopover v-if="Number(index) < 5" v-bind="item">
           <li
             class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
             @mouseover="handleMouseOver(item.name)"
@@ -54,7 +54,7 @@
                   base: 'bg-transparent',
                   indicator: `transition-colors group-hover:bg-elevated duration-200 ${
                     hoveredItem === item.name || (index === 0 && hoveredItem === null)
-                      ? '!bg-primary'
+                      ? 'bg-primary!'
                       : 'bg-elevated'
                   }`,
                 }"
@@ -80,7 +80,10 @@ const sortItems = [
   { value: "minutesWatched", label: "Watch Time" },
 ];
 
-const selectedSort = defineModel<MetricSort>("sort", { default: "count", required: true });
+const selectedSort = defineModel<MetricSort>("sort", {
+  default: "count",
+  required: true,
+});
 
 const handleMouseOver = (name: string) => {
   hoveredItem.value = name;
