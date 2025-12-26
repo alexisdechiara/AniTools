@@ -17,7 +17,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 			if (!statisticsStore.isInitialized) {
 				await statisticsStore.fetchStatistics(userStore.getId!)
 			}
-			if (!entriesStore.lists) {
+			if (!entriesStore.isInitialized) {
 				await entriesStore.fetchAllAnimes(userStore.getId!)
 			}
 			return

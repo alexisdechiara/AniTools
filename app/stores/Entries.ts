@@ -7,6 +7,7 @@ export type AnimesType = NonNullable<GetAllEntriesQuery["MediaListCollection"]>[
 export const useEntriesStore = defineStore("Entries", () => {
 	const user = useUserStore()
 	const lists = ref<AnimesType>([])
+	const isInitialized = ref(false)
 
 	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists.value> {
 		return new Promise((resolve) => {
@@ -15,7 +16,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 				variables: {
 					userId: userId || user.getId,
 					type: MediaType.ANIME,
-					format: format || user.getMediaListOptions.scoreFormat || ScoreFormat.POINT_100
+					format: ScoreFormat.POINT_100
 				}
 			})
 				.then(({ data }) => {
@@ -25,6 +26,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 						console.warn("Aucun anime trouvé pour cet utilisateur")
 						lists.value = []
 					}
+					isInitialized.value = true
 					resolve(lists.value)
 				})
 				.catch((error) => {
@@ -79,6 +81,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 
 	return {
 		lists,
+		isInitialized,
 		fetchAllAnimes,
 		getAllAnimes,
 		getNextAiringAnimesEpisodes,
