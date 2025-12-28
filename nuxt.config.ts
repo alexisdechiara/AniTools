@@ -49,5 +49,15 @@ export default defineNuxtConfig({
 				quotes: "double"
 			}
 		}
+	},
+
+	icon: {
+		customCollections: [
+			{
+				prefix: "custom",
+				dir: "./app/assets/icons",
+				recursive: true
+			}
+		]
 	}
 })

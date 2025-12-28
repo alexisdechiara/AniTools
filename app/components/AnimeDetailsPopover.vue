@@ -1,148 +1,2215 @@
 <template>
-	<UPopover :content="{
-		align: 'center',
-		side: 'right',
-		sideOffset: 8
-	}">
+	<UPopover :content="popoverContent">
 		<slot />
 		<template #content>
-			<div class="relative overflow-hidden"
-				:class="props.orientation === 'horizontal' ? 'grid grid-cols-3 h-64 max-w-lg' : 'grid grid-cols-1 h-fit max-w-xs'"
-				:style="{ '--anime-theme-color': data.media.coverImage.color }">
-				<div :id="`img-${data.media.id}`" v-if="props.orientation === 'horizontal'"
-					class="col-span-1 h-full w-fit relative">
-					<NuxtPicture :src="data.media.coverImage.large" :imgAttrs="{ class: 'size-full rounded-l-md' }" />
-				</div>
-				<div :id="`content-${data.media.id}`" class="col-span-2 flex flex-col gap-x-8 gap-y-4 p-4 sm:p-6 size-full"
-					:class="hoveredContent || props.orientation === 'vertical' ? 'overflow-y-auto' : 'overflow-y-hidden'"
-					:style="{ 'scrollbar-gutter': activeTab === 'summary' ? 'stable' : 'auto' }"
-					@mouseover="hoveredContent = true"
-					@mouseleave="hoveredContent = false">
-					<template v-if="activeTab === 'summary' || props.orientation === 'vertical'">
-						<div class="flex justify-between items-start">
-							<div class="flex flex-col gap-y-0.5">
-								<TextHover class="text-xs text-dimmed">
-									<template #default>
-										<div class="inline-flex gap-x-1 items-center">
-											<span> {{ data?.media?.format }} </span>
-											<span v-if="data.media.episodes && data.media.format"
-												class="size-1 rounded-full bg-(--ui-text-dimmed)" />
-											<span v-if="data?.media?.episodes"> <!-- Exemple to use for franchise only -->
-												<template v-if="Array.isArray(data?.media?.episodes) && data?.media?.episodes.length > 0">
-													{{data?.media?.episodes?.reduce((sum: number, episode: number) => sum + episode, 0)}}
-													episodes
-												</template>
-												<template v-else>
-													{{ data?.media?.episodes }}
-													{{ data?.media?.episodes > 1 ? "episodes" : "episode" }}
-												</template>
+			<div class="relative overflow-hidden" :class="isHorizontal ? 'h-64 max-w-lg' : 'h-fit max-w-xs'"
+				:style="{ '--anime-theme-color': animeThemeColor }">
+				<div :class="isHorizontal ? 'grid grid-cols-3 size-full' : 'grid grid-cols-1 size-full'">
+					<div v-if="isHorizontal" class="col-span-1 h-full w-fit relative">
+						<NuxtPicture :src="data.media.coverImage.large" :imgAttrs="{ class: 'size-full rounded-l-md' }" />
+						<div class="absolute bottom-0 inset-x-0 flex py-3 items-center justify-center">
+							<UTabs v-if="showTabs" v-model="activeTab" size="xs" :items="items" :content="false" :ui="{
+								root: 'opacity-95',
+								indicator: `bg-(--anime-theme-color)`,
+								trigger:
+									'cursor-pointer ring-0! ring-transparent! focus-visible:ring-transparent! focus-visible:ring-0!',
+							}" />
+						</div>
+					</div>
+					<div class="col-span-2 justify-center flex flex-col p-4 sm:p-6"
+						:class="[isHorizontal ? 'h-64' : 'h-full gap-y-4', showBadges ? 'pb-0 sm:pb-0' : '']">
+						<div class="relative flex flex-col gap-y-2 h-full" @mouseover="hoveredContent = true"
+							@mouseleave="hoveredContent = false"
+							:class="[hoveredContent || isVertical ? 'overflow-y-auto' : 'overflow-y-hidden', isHorizontal ? '' : '']"
+							v-if="showSummary" :style="{ 'scrollbar-gutter': isHorizontal ? 'stable' : 'auto' }">
+							<div class="flex justify-between items-start">
+								<div class="flex flex-col gap-y-0.5">
+									<TextHover class="text-xs text-dimmed">
+										<template #default>
+											<div class="inline-flex gap-x-1 items-center">
+												<span> {{ data?.media?.format }} </span>
+												<span v-if="data.media.episodes && data.media.format"
+													class="size-1 rounded-full bg-(--ui-text-dimmed)" />
+												<span v-if="data?.media?.episodes">
+													<!-- Exemple to use for franchise only -->
+													<template v-if="
+														Array.isArray(data?.media?.episodes) &&
+														data?.media?.episodes.length > 0
+													">
+														{{data?.media?.episodes?.reduce((sum: number, episode: number) => sum + episode, 0)}}
+														episodes
+													</template>
+													<template v-else>
+														{{ data?.media?.episodes }}
+														{{ data?.media?.episodes > 1 ? "episodes" : "episode" }}
+													</template>
+												</span>
+											</div>
+										</template>
+										<template #hover>
+											<span v-if="data?.media?.season || data?.media?.seasonYear">
+												{{ data.media.season }} {{ data.media.seasonYear }}
 											</span>
-										</div>
-									</template>
-									<template #hover>
-										<span v-if="data?.media?.season || data?.media?.seasonYear">
-											{{ data.media.season }} {{ data.media.seasonYear }}
-										</span>
-									</template>
-								</TextHover>
-								<TextHover class="text-base text-pretty font-semibold text-highlighted">
-									<template #default>
-										{{ data.media.title.english || data.media.title.romaji }}
-									</template>
-									<template #hover>
-										{{ data.media.title.romaji }}
-									</template>
-								</TextHover>
-								<TextHover class="inline-flex text-xs">
-									<template #default>
-										<div v-if="showStudios" class="inline-flex group-hover/subtitle:hidden text-(--anime-theme-color)"
-											:style="{ '--anime-theme-color': data.media.coverImage.color }">
-											<span v-for="(studio, index) in data.media.studios.edges.filter((edge: any) => edge.isMain)"
-												:key="studio.node.name">
-												{{ Number(index) > 0 ? ", " : "" }} {{ studio.node.name }}
-											</span>
-										</div>
-									</template>
-									<template #hover>
-										<div v-if="data.media.relations.edges.length"
-											class="hidden group-hover/subtitle:inline-flex text-dimmed font-light italic truncate">
-											<span
-												v-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'PREQUEL')">Sequel
-												to "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
-													'PREQUEL')?.node.title.english || data.media.title}}"
-											</span>
-											<span
-												v-else-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'ADAPTATION')">
-												Adapted from "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
-													'ADAPTATION')?.node.title.english || data.media.title.romaji}}"
-											</span>
-											<span v-else>
-												Source : "{{ data.media.relations.edges[0].node.title.english || data.media.title.romaji }}"
-											</span>
-										</div>
-									</template>
-								</TextHover>
+										</template>
+									</TextHover>
+									<TextHover class="text-base text-pretty font-semibold text-highlighted leading-tight">
+										<template #default>
+											{{ data.media.title.english || data.media.title.romaji }}
+										</template>
+										<template #hover>
+											{{ data.media.title.romaji }}
+										</template>
+									</TextHover>
+									<TextHover class="inline-flex text-xs">
+										<template #default>
+											<div v-if="showStudios" class="inline-flex group-hover/subtitle:hidden text-(--anime-theme-color)"
+												:style="{ '--anime-theme-color': data.media.coverImage.color }">
+												<span v-for="(studio, index) in mainStudios" :key="studio.node.name">
+													{{ Number(index) > 0 ? ", " : "" }} {{ studio.node.name }}
+												</span>
+											</div>
+										</template>
+										<template #hover>
+											<div v-if="data.media.relations.edges.length"
+												class="hidden group-hover/subtitle:inline-flex text-dimmed font-light italic truncate">
+												<span
+													v-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'PREQUEL')">Sequel
+													to "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	'PREQUEL')?.node.title.english || data.media.title
+
+													}}"
+												</span>
+												<span
+													v-else-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'ADAPTATION')">
+													Adapted from "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	'ADAPTATION')?.node.title.english || data.media.title.romaji
+
+													}}"
+												</span>
+												<span v-else>
+													Source : "{{
+														data.media.relations.edges[0].node.title.english ||
+														data.media.title.romaji
+													}}"
+												</span>
+											</div>
+										</template>
+									</TextHover>
+								</div>
 							</div>
 							<span v-if="data?.score" class="text-right font-medium text-2xl text-highlighted">
 								{{ data.score }} %
 							</span>
+							<p v-html="sanitizedDescription" class="text-muted text-sm w-full leading-tight" :class="isHorizontal
+								? hoveredContent
+									? 'overflow-y-visible h-max'
+									: 'overflow-y-hidden h-max max-h-22'
+								: 'max-h-22 h-full overflow-y-hidden hover:overflow-y-auto'
+								" />
 						</div>
-						<p v-html="data.media.description.replace(/(<([^>]+)>)/ig, '')"
-							class="text-muted text-sm w-full leading-tight"
-							:class="[props.orientation === 'horizontal' ? hoveredContent ? 'overflow-y-visible pb-6 h-max' : 'overflow-y-hidden h-max' : 'max-h-24 h-full overflow-y-hidden hover:overflow-y-auto']" />
-					</template>
-					<div v-show="activeTab === 'details' || props.orientation === 'vertical'"
-						class="flex flex-col justify-evenly size-full gap-y-4">
-						<div class="flex justify-between w-full">
-							<UUser :ui="{ wrapper: 'flex flex-col-reverse' }"
-								:name="data?.media?.rankings?.find((r: any) => r.type === 'RATED' && r.allTime) ? '#' + data?.media?.rankings?.find((r: any) => r.type === 'RATED' && r.allTime)?.rank : '-'"
-								description="Ranking" />
-							<UUser :ui="{ wrapper: 'flex flex-col-reverse' }"
-								:name="data?.media?.rankings?.find((r: any) => r.type === 'POPULAR' && r.allTime) ? '#' + data?.media?.rankings?.find((r: any) => r.type === 'POPULAR' && r.allTime)?.rank : '-'"
-								description="Popularity" />
-							<UUser :ui="{ wrapper: 'flex flex-col-reverse' }"
-								:name="data.media.meanScore ? data.media.meanScore.toFixed(0) + ' %' : '-'" description="Mean Score" />
-							<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="data.media.favourites || '-'"
-								description="Favourites" />
-						</div>
-						<div class="grid grid-cols-6 gap-2 justify-between h-36 w-full">
-							<iframe v-if="data.media.trailer"
-								:src="'https://www.youtube.com/embed/' + data.media.trailer.id + '?autoplay=0&autohide=1'"
-								allow="autoplay" frameborder="0" class="rounded-lg col-span-5 size-full" />
-							<div class="grid grid-rows-5 auto-cols-max grid-flow-col gap-1 min-w-min h-full flex-1 overflow-hidden">
-								<NuxtLink v-for="(link, index) in data.media.externalLinks" :key="index" :to="link.url" target="_blank"
-									:style="{ '--simple-icons-color': link.color || 'black' }"
-									class="bg-(--simple-icons-color) rounded-sm flex justify-center items-center size-6">
-									<Icon :name="`i-simple-icons-${link.site.toLowerCase()}`" class="text-inverted" />
-								</NuxtLink>
+						<div v-show="showDetails" class="flex flex-col justify-evenly size-full gap-y-4">
+							<div class="flex justify-between w-full">
+								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="ratedRankText" description="Ranking" />
+								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="popularRankText" description="Popularity" />
+								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="meanScoreText" description="Mean Score" />
+								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="favouritesText" description="Favourites" />
+							</div>
+							<div class="grid grid-cols-12 gap-2 justify-between w-full">
+								<iframe v-if="data.media.trailer" :src="'https://www.youtube.com/embed/' +
+									data.media.trailer.id +
+									'?autoplay=0&autohide=1'
+									" allow="autoplay" frameborder="0" class="rounded-lg w-full h-34"
+									:class="nbLinks < 4 ? 'col-span-11' : 'col-span-10'" />
+								<div class="grid auto-cols-max grid-flow-col grid-rows-5 gap-1 min-w-min h-fit flex-1 overflow-hidden"
+									:class="nbLinks < 4 ? 'col-span-1' : 'col-span-2'">
+									<ExternalLink v-for="(link, index) in data.media.externalLinks" :key="index" :color="link.color"
+										:site="link.site" :url="link.url" />
+								</div>
 							</div>
 						</div>
-					</div>
-					<Teleport defer :to="`#img-${data.media.id}`" :disabled="props.orientation === 'vertical'">
-						<div class="inset-x-0 bottom-0 items-center rounded-b-md"
-							:class="[props.orientation === 'horizontal' ? (activeTab === 'summary' ? 'fixed grid grid-cols-3 h-12 overflow-hidden' : 'absolute flex h-12 overflow-hidden') : 'static flex w-full h-fit']">
-							<UTabs v-if="props.orientation === 'horizontal'" v-model="activeTab" size="xs" :items="items"
-								:content="false"
-								:ui="{ root: 'mx-auto opacity-95', indicator: `bg-(--anime-theme-color)`, trigger: 'cursor-pointer ring-0! ring-transparent! focus-visible:ring-transparent! focus-visible:ring-0!' }" />
-							<div v-if="activeTab === 'summary' || props.orientation === 'vertical'"
-								class="relative col-span-2 flex gap-2 size-full items-center cursor-default"
-								:class="props.orientation === 'horizontal' ? 'px-3' : '-mb-2'">
-								<div ref="badgesEl"
-									class="flex gap-1 overflow-x-auto w-full z-50 scroll-auto snap-x touch-pan-x select-none"
-									:class="badgesOverflowing ? (isBadgesDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'"
-									style="scrollbar-width: none;">
+						<div v-if="showBadges" class="static flex w-full items-center justify-center py-3"
+							:class="isHorizontal ? '' : '-mt-4'">
+							<div :class="isHorizontal
+								? 'relative col-span-2 flex gap-2 w-full items-center cursor-default'
+								: 'relative flex gap-2 w-full items-center cursor-default'
+								">
+								<div ref="badgesEl" :class="[
+									'flex gap-1 overflow-x-auto w-full z-50 scroll-auto snap-x touch-pan-x select-none',
+									badgesOverflowing
+										? isBadgesDragging
+											? 'cursor-grabbing'
+											: 'cursor-grab'
+										: 'cursor-default',
+								]" style="scrollbar-width: none">
 									<UBadge v-for="genre in data.media.genres" :key="genre" variant="subtle" size="md"
 										class="rounded-full whitespace-nowrap font-medium bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-(--anime-theme-color)">
 										{{ genre }}
 									</UBadge>
 								</div>
-								<span v-if="props.orientation === 'horizontal'" class="absolute inset-0 bg-default z-0" />
 								<UButton :to="`https://anilist.co/anime/${data.media.id}`" target="_blank" variant="subtle" size="sm"
 									class="rounded-full z-10 bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-(--anime-theme-color) hover:bg-(--anime-theme-color)/50"
 									icon="i-lucide-external-link" />
 							</div>
 						</div>
-					</Teleport>
+					</div>
 				</div>
 			</div>
 		</template>
@@ -161,6 +2228,27 @@ const props = withDefaults(defineProps<{
 	orientation: "horizontal"
 });
 
+const defaultPopoverContent = {
+	align: 'center',
+	side: 'right',
+	sideOffset: 8
+} satisfies NonNullable<PopoverProps['content']>;
+
+const popoverContent = computed<PopoverProps['content']>(() => ({
+	...defaultPopoverContent,
+	...(props.content || {})
+} as PopoverProps['content']));
+
+const orientation = computed<'horizontal' | 'vertical'>(() => props.orientation ?? 'horizontal');
+
+const isHorizontal = computed(() => orientation.value === 'horizontal');
+const isVertical = computed(() => orientation.value === 'vertical');
+
+const showTabs = computed(() => isHorizontal.value);
+const showSummary = computed(() => activeTab.value === 'summary' || isVertical.value);
+const showDetails = computed(() => activeTab.value === 'details' || isVertical.value);
+const showBadges = computed(() => showSummary.value);
+
 const items: TabsItem[] = [
 	{
 		label: 'Summary',
@@ -175,6 +2263,27 @@ const items: TabsItem[] = [
 const hoveredContent = ref(false);
 const showStudios = ref(true);
 const activeTab = ref("summary");
+
+const media = computed(() => props.data?.media);
+const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge: any) => edge.isMain) || []);
+const nbLinks = computed(() => Array(props.data.media.externalLinks).length);
+
+const ratedRankText = computed(() => {
+	const ranking = media.value?.rankings?.find((r: any) => r.type === 'RATED' && r.allTime);
+	return ranking ? `#${ranking.rank}` : '-';
+});
+
+const popularRankText = computed(() => {
+	const ranking = media.value?.rankings?.find((r: any) => r.type === 'POPULAR' && r.allTime);
+	return ranking ? `#${ranking.rank}` : '-';
+});
+
+const meanScoreText = computed(() => (media.value?.meanScore ? `${media.value.meanScore.toFixed(0)} %` : '-'));
+const favouritesText = computed(() => media.value?.favourites || '-');
+
+const animeThemeColor = computed(() => props.data?.media?.coverImage?.color || 'transparent');
+const sanitizedDescription = computed(() => (props.data?.media?.description || '').replace(/(<([^>]+)>)/ig, ''));
+
 
 const badgesEl = ref<HTMLElement | null>(null);
 const badgesOverflowing = ref(false);
