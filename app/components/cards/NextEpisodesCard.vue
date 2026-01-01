@@ -15,7 +15,7 @@ const { getNextAiringAnimesEpisodes } = storeToRefs(useEntriesStore());
 	<MetricsCard title="Next airing episodes">
 		<div v-if="getNextAiringAnimesEpisodes" class="block space-y-2">
 			<template v-for="(episode, index) in getNextAiringAnimesEpisodes" :key="episode!.media?.id">
-				<AnimeDetailsPopover :data="episode"
+				<AnimeDetailsPopover :data="episode" :content="{ sideOffset: 32 }"
 					v-if="episode?.media?.title && episode?.media?.nextAiringEpisode?.airingAt && index < 4">
 					<UUser :name="episode!.media.title.english || episode!.media.title.romaji || ''"
 						:description="new Date(episode!.media.nextAiringEpisode.airingAt * 1000).toLocaleString()" :ui="{
