@@ -24,7 +24,7 @@
 
 <script lang="ts" setup>
 import { ScoreFormat } from "#gql/default";
-const { isLoading } = useLoadingIndicator();
+const { isLoading, start } = useLoadingIndicator();
 
 definePageMeta({
 	layout: "none",
@@ -47,9 +47,12 @@ const login = async () => {
 			icon: "i-heroicons-exclamation-circle",
 		});
 		return;
+	} else {
+		start();
 	}
 
 	try {
+
 		// Récupérer les données de l'utilisateur
 		const userData = await fetchUserData(username.value);
 

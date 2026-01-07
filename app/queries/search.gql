@@ -1,0 +1,23 @@
+query search($search: String, $isAdult: Boolean = false) {
+	anime: Page(perPage: 10) {
+		pageInfo {
+			total
+		}
+		results: media(type: ANIME, isAdult: $isAdult, search: $search) {
+			id
+			title {
+				romaji
+				english
+				native
+				userPreferred
+			}
+			coverImage {
+				medium
+			}
+			format
+			startDate {
+				year
+			}
+		}
+	}
+}

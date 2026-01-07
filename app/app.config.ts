@@ -59,6 +59,17 @@ export default defineAppConfig({
 			slots: {
 				root: "border-none"
 			}
+		},
+		formField: {
+			variants: {
+				orientation: {
+					horizontal: {
+						root: "grid items-center grid-cols-3",
+						wrapper: "col-span-2",
+						container: "col-span-1 w-full flex justify-center items-center"
+					}
+				}
+			}
 		}
 	}
 })
