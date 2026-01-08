@@ -15,7 +15,7 @@ const { setBackground } = settingsStore
 </script>
 
 <template>
-	<USlideover title="Settings" :ui="{ content: 'max-w-xs' }">
+	<USlideover title="Settings" :overlay="false" :ui="{ content: 'max-w-xs' }">
 		<UButton icon="i-lucide-palette" variant="ghost" color="neutral" class="cursor-pointer" />
 		<template #content>
 			<div class="p-4">

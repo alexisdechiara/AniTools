@@ -2,7 +2,7 @@
 	<UContainer class="overflow-auto">
 		<UHeader title="" :ui="{ center: 'grow w-xs' }">
 			<div class="flex items-center gap-2 w-full">
-				<UModal>
+				<UModal v-model:open="openSearch">
 					<UButton label="Search animes..." color="neutral" variant="outline" block icon="i-lucide-search">
 						<template #trailing>
 							<div class="hidden lg:flex items-center gap-0.5 ms-auto">
@@ -20,7 +20,7 @@
 							</template>
 							<template #item-trailing="{ item }">
 								<UButton icon="i-lucide-plus" variant="ghost" color="neutral" class="rounded-full cursor-pointer"
-									@click="console.log('ajout de l\'anime')" />
+									@click.prevent="addAnime(item)" />
 							</template>
 						</UCommandPalette>
 					</template>
@@ -42,7 +42,7 @@
 								</div>
 							</UFormField>
 							<UFormField label="Score">
-								<USlider v-model="value" :min="0" :max="100" :step="1" :ui="{ base: 'w-full' }" />
+								<USlider v-model="value" :min="0" :max="100" :step="1" :ui="{ root: 'w-full' }" />
 							</UFormField>
 						</div>
 					</template>
@@ -51,23 +51,57 @@
 			<template #right>
 				<SlideoverSettings />
 			</template>
+			<template #left>
+				<AnimesImportModal v-model:open="openImport" />
+			</template>
 		</UHeader>
 		<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
-			<div v-for="(tier, index) in tiers" :key="index" class="grid grid-cols-12 min-h-32 w-full overflow-hidden"
+			<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" />
+			<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
 				:class="[selectedBackground, rowCornerClass]">
-				<div class="bg-primary-500 text-inverted text-lg font-semibold size-full flex justify-center items-center"
-					:class="[colWidthClass, headingCorner ? rowCornerClass : 'rounded-none']">
-					{{ tier }}
-				</div>
-				<div class="col-span-auto size-full">
-				</div>
+				<DraggableTier v-model="unrankedTier" />
 			</div>
+
+			<UEmpty v-else variant="naked" icon="i-lucide-file" title="No animes left" class="mt-8"
+				description="There are no anime to rank. If you want to add some, choose one of the actions below." :actions="[
+					{
+						icon: 'i-lucide-search',
+						label: 'Search',
+						color: 'neutral',
+						variant: 'subtle',
+						onClick: () => {
+							openSearch = true
+						}
+					}, {
+						icon: 'i-lucide-cloud-download',
+						label: 'Import from AniList',
+						onClick: () => {
+							openImport = true
+						}
+					},
+
+				]" />
 		</div>
+
 	</UContainer>
 </template>
 
 <script lang="ts" setup>
 import type { CommandPaletteItem } from '@nuxt/ui'
+
+defineShortcuts({
+	meta_k: () => openSearch.value = !openSearch.value
+})
+
+interface Tier {
+	name: string
+	color: string
+	range: Array<number>
+	entries: Array<any>
+}
+
+const openSearch = ref(false)
+const openImport = ref(false)
 
 const settingsStore = useTierlistSettingsStore()
 
@@ -75,12 +109,21 @@ const {
 	gapSizeClass,
 	selectedBackground,
 	rowCornerClass,
-	colWidthClass,
-	headingCorner
 } = storeToRefs(settingsStore)
 
 
-const tiers = ref(["S", "A", "B", "C"])
+const tiers = ref<Tier[]>([
+	{ name: "S", color: "bg-red-400", range: [100, 100], entries: [] },
+	{ name: "A", color: "bg-orange-400", range: [95, 99], entries: [] },
+	{ name: "B", color: "bg-yellow-400", range: [90, 94], entries: [] },
+	{ name: "C", color: "bg-green-500", range: [80, 89], entries: [] },
+	{ name: "D", color: "bg-blue-400", range: [70, 79], entries: [] },
+	{ name: "E", color: "bg-indigo-400", range: [60, 69], entries: [] },
+	{ name: "F", color: "bg-black", range: [0, 59], entries: [] },
+])
+
+const unrankedTier = ref<any[]>([])
+
 const value = ref(0)
 
 const searchTerm = ref('')
@@ -97,7 +140,7 @@ const onStopTyping = useDebounceFn(async () => {
 	loadingSearch.value = pending.value
 }, 500)
 
-const animes = computed(() => {
+const SearchedAnimes = computed(() => {
 	return rawAnimes.value.map(result => {
 		if (!result) return null
 		return {
@@ -106,6 +149,7 @@ const animes = computed(() => {
 			description: (result.startDate.year || '') + ' ' + (result.format || ''),
 			avatar: { src: result.coverImage?.medium || '' },
 			to: `https://anilist.co/anime/${result.id}`,
+			target: "_blank"
 		}
 	}) as CommandPaletteItem[] || []
 })
@@ -113,8 +157,25 @@ const animes = computed(() => {
 const groups = computed(() => [{
 	id: 'animes',
 	label: "Animes",
-	items: animes.value || [],
+	items: SearchedAnimes.value || [],
 	ignoreFilter: true
 }])
 
+async function addAnime(item: CommandPaletteItem) {
+	const userStore = useUserStore()
+	const { getAllAnimes } = storeToRefs(useEntriesStore())
+	console.log(item);
+
+	if (getAllAnimes.value.some(entry => entry?.media?.id === item.id)) {
+		console.log("Anime already in list", item.id);
+		tiers.value[0]!.entries.push(getAllAnimes.value.find(entry => entry?.media?.id === item.id)!)
+	} else {
+		const { data } = await useAsyncGql({
+			operation: "getMediaById",
+			variables: { mediaId: item.id, scoreFormat: userStore.mediaListOptions.scoreFormat },
+		})
+		console.log("Anime added", formatMediaToEntry(data.value));
+		tiers.value[0]!.entries.push(formatMediaToEntry(data.value))
+	}
+}
 </script>

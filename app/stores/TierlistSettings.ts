@@ -143,8 +143,5 @@ export const useTierlistSettingsStore = defineStore("tierlistSettings", () => {
 		setDefaultBackgroundForTheme
 	}
 }, {
-	persist: {
-		key: "tierlist-settings",
-		storage: localStorage
-	}
+	persist: true
 })

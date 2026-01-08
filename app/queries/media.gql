@@ -1,16 +1,59 @@
-query getMediasByGenre($ids: [Int]) {
-  Page(perPage: 100) {
-    media(id_in: $ids) {
-      id
-      title {
-        romaji
-        english
-				userPreferred
+query getMediaById(
+  $mediaId: Int!
+  $scoreFormat: ScoreFormat = POINT_100
+) {
+  Media(id: $mediaId) {
+    id
+    title {
+      romaji
+      english
+      native
+      userPreferred
+    }
+
+    description
+    format
+    status
+    season
+    seasonYear
+    episodes
+    duration
+    siteUrl
+    bannerImage
+
+    coverImage {
+      medium
+      large
+      extraLarge
+      color
+    }
+
+    nextAiringEpisode {
+      airingAt
+      episode
+    }
+
+    averageScore
+    meanScore
+    favourites
+    isFavourite
+    genres
+
+    mediaListEntry {
+			status
+      score(format: $scoreFormat)
+      repeat
+      progress
+      updatedAt
+      startedAt {
+        year
+        month
+        day
       }
-      coverImage {
-        large
-        medium
-				color
+      completedAt {
+        year
+        month
+        day
       }
     }
   }
