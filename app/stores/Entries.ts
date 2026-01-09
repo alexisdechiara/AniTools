@@ -10,6 +10,9 @@ export const useEntriesStore = defineStore("Entries", () => {
 	const isInitialized = ref(false)
 
 	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists.value> {
+		console.log("fetchAllAnimes called with:", { userId: userId || user.getId, format })
+		console.log("User store ID:", user.getId)
+
 		return new Promise((resolve) => {
 			useAsyncGql({
 				operation: "getAllEntries",
@@ -20,7 +23,10 @@ export const useEntriesStore = defineStore("Entries", () => {
 				}
 			})
 				.then(({ data }) => {
+					console.log("GQL response:", data.value)
+
 					if (data.value?.MediaListCollection?.lists) {
+						console.log("Found lists:", data.value.MediaListCollection.lists.length)
 						lists.value = data.value.MediaListCollection.lists
 					} else {
 						console.warn("Aucun anime trouvé pour cet utilisateur")

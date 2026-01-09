@@ -19,7 +19,76 @@ const templateItems = computed(() => {
 	return templates.value.map((t, index) => ({ label: t.label, value: index }))
 })
 
-const { setBackground, addTier, changeTemplate, removeTier } = tierlistStore
+const { setBackground, addTier, changeTemplate, removeTier, autoRankAll, unrankAll, checkOverlappingRanges, rankEntries } = tierlistStore
+
+const showOverlappingWarning = ref(false)
+const overlappingRanges = ref<string[]>([])
+
+function handleAutoRank() {
+	// Vérifier les ranges qui se chevauchent
+	const overlaps = checkOverlappingRanges()
+
+	if (overlaps.length > 0) {
+		overlappingRanges.value = overlaps
+		showOverlappingWarning.value = true
+	} else {
+		// Pas de chevauchement, procéder immédiatement
+		performAutoRank()
+	}
+}
+
+function performAutoRank() {
+	// Récupérer toutes les entrées de tous les tiers et du unranked
+	const allEntries: unknown[] = []
+
+	// Ajouter les entrées du unranked tier
+	allEntries.push(...tierlistStore.unrankedTier)
+
+	// Ajouter les entrées de tous les tiers
+	tierlistStore.tiers.forEach(tier => {
+		allEntries.push(...tier.entries)
+		// Vider les tiers pour le re-rank
+		tier.entries = []
+	})
+
+	// Vider le unranked tier
+	tierlistStore.unrankedTier = []
+
+	// Procéder au rank
+	rankEntries(allEntries)
+}
+
+function handleOverlappingConfirm() {
+	// Procéder avec duplication autorisée
+	performAutoRankWithDuplicates()
+	showOverlappingWarning.value = false
+}
+
+function handleOverlappingCancel() {
+	// Ne rien faire, juste fermer la popup
+	showOverlappingWarning.value = false
+}
+
+function performAutoRankWithDuplicates() {
+	// Récupérer toutes les entrées de tous les tiers et du unranked
+	const allEntries: unknown[] = []
+
+	// Ajouter les entrées du unranked tier
+	allEntries.push(...tierlistStore.unrankedTier)
+
+	// Ajouter les entrées de tous les tiers
+	tierlistStore.tiers.forEach(tier => {
+		allEntries.push(...tier.entries)
+		// Vider les tiers pour le re-rank
+		tier.entries = []
+	})
+
+	// Vider le unranked tier
+	tierlistStore.unrankedTier = []
+
+	// Procéder au rank avec duplication
+	rankEntries(allEntries, true)
+}
 
 const items = [
 	{
@@ -95,8 +164,8 @@ const items = [
 							<USelect :model-value="currentTemplate" :items="templateItems" value-key="value"
 								@update:model-value="(value) => changeTemplate(value as number)" />
 							<div class="flex gap-2">
-								<UButton label="Auto Rank" color="neutral" variant="solid" />
-								<UButton label="Unrank" color="error" variant="solid" />
+								<UButton label="Auto Rank" color="neutral" variant="solid" @click="handleAutoRank" />
+								<UButton label="Unrank" color="error" variant="solid" @click="unrankAll" />
 							</div>
 						</div>
 						<div class="flex flex-col gap-2 h-full overflow-y-auto max-h-136">
@@ -130,4 +199,8 @@ const items = [
 			</UTabs>
 		</template>
 	</USlideover>
+
+	<!-- Warning popup for overlapping ranges -->
+	<OverlappingRangesWarning v-model:open="showOverlappingWarning" :overlapping-ranges="overlappingRanges"
+		@confirm="handleOverlappingConfirm" @cancel="handleOverlappingCancel" />
 </template>

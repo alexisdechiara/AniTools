@@ -72,15 +72,103 @@
 		</template>
 		<template #footer="{ close }">
 			<UButton label="Cancel" variant="outline" @click="close(); reset()" />
-			<UButton label="Submit" />
+			<UButton label="Submit" @click="handleSubmit(close)" :loading="isLoading" :disabled="isLoading">
+				<template #leading>
+					<UIcon name="i-lucide-loader-circle" class="animate-spin" v-if="isLoading" />
+				</template>
+			</UButton>
 		</template>
 	</UModal>
+
+	<!-- Warning popup for overlapping ranges -->
+	<OverlappingRangesWarning v-model:open="showOverlappingWarning" :overlapping-ranges="overlappingRanges"
+		:is-loading="isConfirmLoading" @confirm="handleOverlappingConfirm" @cancel="handleOverlappingCancel" />
 </template>
 
 <script lang="ts" setup>
 const autoRank = ref(false)
 const score = ref([0, 100])
 const isFranchise = ref(false)
+
+const tierlistStore = useTierlistStore()
+const entriesStore = useEntriesStore()
+
+const { isInitialized } = storeToRefs(entriesStore)
+
+const showOverlappingWarning = ref(false)
+const overlappingRanges = ref<string[]>([])
+const isLoading = ref(false)
+const isConfirmLoading = ref(false)
+const modalCloseFunction = ref<(() => void) | null>(null)
+
+function handleSubmit(close: () => void) {
+	isLoading.value = true
+	// Stocker la fonction close pour l'utiliser plus tard
+	modalCloseFunction.value = close
+
+	// Pour l'instant, on gère uniquement le mode all seasons
+	// TODO: Implémenter le mode franchise plus tard
+
+	// Vérifier si les données sont chargées
+	if (!isInitialized.value) {
+		console.warn("Entries not initialized yet. Please wait for data to load.")
+		return
+	}
+
+	// Vérifier les ranges qui se chevauchent si autoRank est activé
+	if (autoRank.value) {
+		const overlaps = tierlistStore.checkOverlappingRanges()
+
+		if (overlaps.length > 0) {
+			overlappingRanges.value = overlaps
+			showOverlappingWarning.value = true
+			return
+		}
+	}
+
+	// Pas de chevauchement ou autoRank désactivé, procéder normalement
+	performImport(close)
+}
+
+function performImport(close: () => void) {
+	console.log("Starting import with settings:", { autoRank: autoRank.value, score: score.value })
+
+	// Import direct
+	tierlistStore.importAnimesFromEntries(autoRank.value, score.value as [number, number])
+
+	// Fermer le modal et reset seulement après la fin du loading
+	setTimeout(() => {
+		isLoading.value = false
+		close()
+		reset()
+	}, 500)
+}
+
+function handleOverlappingConfirm() {
+	// Procéder avec duplication autorisée
+	isConfirmLoading.value = true
+
+	console.log("Starting import with duplication:", { autoRank: autoRank.value, score: score.value })
+
+	// Import direct
+	tierlistStore.importAnimesFromEntries(autoRank.value, score.value as [number, number], true)
+
+	// Fermer le modal et reset seulement après la fin du loading
+	setTimeout(() => {
+		isConfirmLoading.value = false
+		showOverlappingWarning.value = false
+
+		// Fermer le modal et reset en utilisant la fonction stockée
+		if (modalCloseFunction.value) {
+			modalCloseFunction.value()
+		}
+		reset()
+	}, 500)
+}
+
+function handleOverlappingCancel() {
+	showOverlappingWarning.value = false
+}
 
 function reset() {
 	setTimeout(() => {

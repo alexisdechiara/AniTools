@@ -60,8 +60,12 @@
 			</template>
 		</UHeader>
 		<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
-			<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
-				:isLast="index === tiers.length - 1" />
+			<VueDraggable v-model="tiers" group="tier-list" handle=".grip-handle" ghostClass="opacity-50"
+				class="flex flex-col" :class="[gapSizeClass]" :animation="300" :force-fallback="false" :fallback-on-body="true"
+				:swap-threshold="0.65" :delay="0" :delay-on-touch-start="false">
+				<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
+					:isLast="index === tiers.length - 1" />
+			</VueDraggable>
 			<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
 				:class="[selectedBackground, rowCornerClass]">
 				<DraggableTier v-model="unrankedTier" />
@@ -94,6 +98,7 @@
 </template>
 
 <script lang="ts" setup>
+import { VueDraggable } from "vue-draggable-plus"
 import type { CommandPaletteItem } from '@nuxt/ui'
 import { tierlistFormats, tierlistGenres, tierlistSeasons, tierlistYears } from "~/utils/tierlist-data"
 
@@ -105,6 +110,14 @@ const openSearch = ref(false)
 const openImport = ref(false)
 
 const tierlistStore = useTierlistStore()
+const entriesStore = useEntriesStore()
+
+// Initialiser le store Entries si nécessaire
+onMounted(async () => {
+	if (!entriesStore.isInitialized) {
+		await entriesStore.fetchAllAnimes()
+	}
+})
 
 const {
 	filterTitle,

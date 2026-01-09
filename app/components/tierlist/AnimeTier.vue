@@ -1,5 +1,5 @@
 <template>
-	<div class="relative h-full w-24 group transition-all duration-100 ease-out z-0"
+	<div class="relative h-32 w-24 group transition-all duration-100 ease-out z-0"
 		:class="item.locked ? 'locked-item' : 'hover:scale-102'" :draggable="!item.locked" @dragstart="handleDragStart"
 		@dragend="handleDragEnd">
 		<UContextMenu :items="actions" size="sm" :key="`context-${item.id}-${item.locked}`">
@@ -29,7 +29,7 @@
 			class="rounded-lg transition-all duration-100 ease-in-out opacity-0 group-hover:opacity-100 absolute inset-0 z-40 bg-linear-to-t from-0% from-neutral-950/60 via-10% via-neutral-950/40 to-25% to-neutral-950/10"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
-class="invisible group-hover:visible absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px]">
+			class="invisible group-hover:visible absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px] cursor-move">
 			{{ item.media?.title?.userPreferred }}
 		</span>
 	</div>

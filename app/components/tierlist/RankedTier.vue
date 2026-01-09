@@ -7,7 +7,8 @@
 				class="absolute flex flex-col -left-8 h-full items-center justify-center opacity-0 hover:opacity-100 group-hover/control:opacity-100 transition-opacity">
 				<UButton icon="i-lucide-chevron-up" color="neutral" variant="link" class="cursor-pointer text-highlighted"
 					@click="moveTierUp(index)" :disabled="isFirst" />
-				<UButton icon="i-lucide-grip-vertical" color="neutral" variant="link" class="cursor-grab text-highlighted" />
+				<UButton icon="i-lucide-grip-vertical" color="neutral" variant="link"
+					class="cursor-grab grip-handle text-highlighted active:cursor-grabbing" />
 				<UButton icon="i-lucide-chevron-down" color="neutral" variant="link" class="cursor-pointer text-highlighted"
 					@click="moveTierDown(index)" :disabled="isLast" />
 			</div>
