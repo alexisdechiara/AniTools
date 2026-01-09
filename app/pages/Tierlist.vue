@@ -36,13 +36,13 @@
 							<UFormField label="Filters" class="mb-2">
 								<div class="flex flex-col gap-y-2">
 									<USelectMenu v-model="filterGenres" multiple :items="tierlistGenres" placeholder="Genres"
-										variant="soft" :ui="{ base: 'w-full' }" />
+										variant="outline" :ui="{ base: 'w-full' }" />
 									<USelectMenu v-model="filterYears" multiple :items="tierlistYears" value-key="value"
-										placeholder="Year" variant="soft" :ui="{ base: 'w-full' }" />
-									<USelectMenu v-model="filterSeasons" multiple :items="tierlistSeasons" value-key="value"
-										placeholder="Season" variant="soft" :ui="{ base: 'w-full' }" />
-									<USelectMenu v-model="filterFormats" multiple :items="tierlistFormats" value-key="value"
-										placeholder="Format" variant="soft" :ui="{ base: 'w-full' }" />
+										placeholder="Year" variant="outline" :ui="{ base: 'w-full' }" />
+									<USelect v-model="filterSeasons" multiple :items="tierlistSeasons" value-key="value"
+										placeholder="Season" variant="outline" :ui="{ base: 'w-full' }" />
+									<USelect v-model="filterFormats" multiple :items="tierlistFormats" value-key="value"
+										placeholder="Format" variant="outline" :ui="{ base: 'w-full' }" />
 								</div>
 							</UFormField>
 							<UFormField label="Score">
@@ -60,14 +60,18 @@
 			</template>
 		</UHeader>
 		<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
-			<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" />
+			<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
+				:isLast="index === tiers.length - 1" />
 			<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
 				:class="[selectedBackground, rowCornerClass]">
 				<DraggableTier v-model="unrankedTier" />
 			</div>
 
-			<UEmpty v-else variant="naked" icon="i-lucide-file" title="No animes left" class="mt-8"
-				description="There are no anime to rank. If you want to add some, choose one of the actions below." :actions="[
+			<UEmpty v-else ref="emptyDropZone" variant="outline" icon="i-lucide-file-question-mark" title="No animes left"
+				class="mt-8"
+				:ui="{ root: `border border-default border-dashed ring-0 min-h-32 flex items-center justify-center transition-colors ${isDragOver ? 'border-primary bg-primary/5' : ''}` }"
+				@drop="handleAnimeDrop" @dragover="handleDragOver" @dragleave="handleDragLeave"
+				description="If you want to add an anime, drop it here or choose one of the actions below." :actions="[
 					{
 						icon: 'i-lucide-search',
 						label: 'Search',
@@ -82,8 +86,7 @@
 						onClick: () => {
 							openImport = true
 						}
-					},
-
+	},
 				]" />
 		</div>
 
@@ -104,6 +107,12 @@ const openImport = ref(false)
 const tierlistStore = useTierlistStore()
 
 const {
+	filterTitle,
+	filterGenres,
+	filterYears,
+	filterSeasons,
+	filterFormats,
+	filterScore,
 	tiers,
 	unrankedTier,
 	gapSizeClass,
@@ -111,16 +120,54 @@ const {
 	rowCornerClass,
 } = storeToRefs(tierlistStore)
 
-const {
-	filterTitle,
-	filterGenres,
-	filterYears,
-	filterSeasons,
-	filterFormats,
-	filterScore
-} = storeToRefs(tierlistStore)
+const { addEntryToUnrankedTier } = tierlistStore
+const isDragOver = ref(false)
 
-const { addEntryToTier } = tierlistStore
+// Custom drop handler for anime items
+function handleAnimeDrop(event: DragEvent) {
+	event.preventDefault()
+	isDragOver.value = false
+
+	try {
+		const data = event.dataTransfer?.getData('application/json')
+		if (data) {
+			const animeItem = JSON.parse(data)
+			if (animeItem && animeItem.media) {
+				addEntryToUnrankedTier(animeItem)
+				// Supprimer l'anime de sa position d'origine
+				removeAnimeFromOrigin(animeItem)
+			}
+		}
+	} catch (error) {
+		console.error('Error parsing dropped anime:', error)
+	}
+}
+
+function removeAnimeFromOrigin(animeItem: any) {
+	// Parcourir tous les tiers pour trouver et supprimer l'anime
+	tiers.value.forEach(tier => {
+		const index = tier.entries.findIndex((entry: any) => entry.id === animeItem.id)
+		if (index > -1) {
+			tier.entries.splice(index, 1)
+		}
+	})
+
+	// Vérifier aussi dans unranked
+	const unrankedIndex = unrankedTier.value.findIndex((entry: any) => entry.id === animeItem.id)
+	if (unrankedIndex > -1) {
+		unrankedTier.value.splice(unrankedIndex, 1)
+	}
+}
+
+function handleDragOver(event: DragEvent) {
+	event.preventDefault()
+	isDragOver.value = true
+}
+
+function handleDragLeave(event: DragEvent) {
+	event.preventDefault()
+	isDragOver.value = false
+}
 
 const searchTerm = ref('')
 const rawAnimes = ref<any[]>([])

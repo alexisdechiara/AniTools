@@ -19,21 +19,45 @@ const templateItems = computed(() => {
 	return templates.value.map((t, index) => ({ label: t.label, value: index }))
 })
 
-const { setBackground, addTier, changeTemplate } = tierlistStore
+const { setBackground, addTier, changeTemplate, removeTier } = tierlistStore
+
+const items = [
+	{
+		label: 'Interface',
+		icon: 'i-lucide-palette',
+		slot: 'interface'
+	},
+	{
+		label: 'Configuration',
+		icon: 'i-lucide-settings-2',
+		slot: 'configuration'
+	}
+]
 </script>
 
 <template>
-	<USlideover title="Settings" :overlay="false" :ui="{ content: 'max-w-xs' }">
-		<UButton icon="i-lucide-palette" variant="ghost" color="neutral" class="cursor-pointer" />
+	<USlideover title="Settings" :overlay="false" :ui="{ content: 'max-w-sm p-4' }">
+		<UButton icon="i-lucide-ellipsis-vertical" variant="ghost" color="neutral" class="cursor-pointer" />
 		<template #content>
-			<div class="p-4">
-				<CollapseButton label="Tiers" first>
-					<UFormField label="Template">
-						<USelectMenu :model-value="currentTemplate" :items="templateItems" value-key="value" variant="soft"
-							@update:model-value="(value) => changeTemplate(value as number)" />
-					</UFormField>
-					<UButton label="Add tier" color="neutral" variant="subtle" block class="mt-2" @click="addTier" />
-				</CollapseButton>
+			<UTabs :items="items">
+				<template #interface>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 				<CollapseButton label="Rows">
 					<UFormField label="Gap">
 						<USlider v-model="gapSize" :step="25"
@@ -64,7 +88,46 @@ const { setBackground, addTier, changeTemplate } = tierlistStore
 						</div>
 					</UFormField>
 				</CollapseButton>
-			</div>
+				</template>
+				<template #configuration>
+					<div class="flex flex-col gap-2 h-full">
+						<div class="grid grid-cols-2 gap-2 mb-3">
+							<USelect :model-value="currentTemplate" :items="templateItems" value-key="value"
+								@update:model-value="(value) => changeTemplate(value as number)" />
+							<div class="flex gap-2">
+								<UButton label="Auto Rank" color="neutral" variant="solid" />
+								<UButton label="Unrank" color="error" variant="solid" />
+							</div>
+						</div>
+						<div class="flex flex-col gap-2 h-full overflow-y-auto max-h-136">
+							<div v-for="(tier, index) in tierlistStore.tiers" :key="index" class="p-2 bg-muted rounded-md">
+								<div class="flex gap-1">
+									<!-- <div class="flex flex-col justify-center items-center w-fit">
+										<Icon name="i-lucide-grip-vertical" class="cursor-grab" />
+									</div> -->
+									<div class="size-full">
+										<div class="flex gap-2 mb-2">
+											<UInput v-model="tier.name" size="sm" class="flex-1" />
+											<UPopover>
+												<UButton color="neutral" variant="outline" icon="i-lucide-swatch-book" class="cursor-pointer"
+													size="sm" />
+												<template #content>
+													<UColorPicker v-model="tier.color" class="p-2" />
+												</template>
+											</UPopover>
+										</div>
+										<USlider v-model="tier.range" :min="0" :max="100" size="sm" tooltip />
+									</div>
+									<UButton icon="i-lucide-trash" size="sm" color="error" variant="solid" class="ms-2 cursor-pointer"
+										@click="removeTier(index)" />
+								</div>
+							</div>
+						</div>
+						<UButton label="Add tier" icon="i-lucide-plus" color="neutral" variant="subtle" class="mt-2" block
+							@click="addTier" />
+					</div>
+				</template>
+			</UTabs>
 		</template>
 	</USlideover>
 </template>

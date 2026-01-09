@@ -3,7 +3,7 @@
 		<VueDraggable v-model="modelValue" group="tiers" :filter="'.locked-item'"
 			class="col-span-11 size-full flex flex-wrap p-4 gap-2">
 			<AnimeTier v-for="(entry, index) in filteredEntries" :key="entry.id" :item="entry" @remove="removeAnime"
-				@copy="copyAnime" @cut="cutAnime" @locked="entry.locked = $event" />
+				@copy="copyAnime" @cut="cutAnime" @locked="entry.locked = $event" @dragStart="handleDragStart" />
 		</VueDraggable>
 	</UContextMenu>
 </template>
@@ -38,6 +38,13 @@ function cutAnime(item: any) {
 	removeAnime(item)
 	console.log('Cut anime:', item)
 }
+
+function handleDragStart(item: any) {
+	// Stocker l'item draggé pour pouvoir le supprimer si drop réussi
+	draggedItem.value = item
+}
+
+const draggedItem = ref<any>(null)
 
 async function pasteAnime() {
 	try {
@@ -104,7 +111,7 @@ const actions = [
 		{
 			label: 'Clear',
 			color: 'error' as const,
-			icon: 'i-lucide-trash',
+			icon: 'i-lucide-brush-cleaning',
 			onClick(e: Event) {
 				modelValue.value = []
 			}

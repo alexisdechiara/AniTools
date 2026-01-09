@@ -1,6 +1,7 @@
 <template>
 	<div class="relative h-full w-24 group transition-all duration-100 ease-out z-0"
-		:class="item.locked ? 'locked-item' : 'hover:scale-102'">
+		:class="item.locked ? 'locked-item' : 'hover:scale-102'" :draggable="!item.locked" @dragstart="handleDragStart"
+		@dragend="handleDragEnd">
 		<UContextMenu :items="actions" size="sm" :key="`context-${item.id}-${item.locked}`">
 			<NuxtImg sizes="96px" loading="lazy" decoding="async"
 				:src="item.media?.coverImage?.extraLarge || item.media?.coverImage?.large || item.media?.coverImage?.medium"
@@ -28,8 +29,7 @@
 			class="rounded-lg transition-all duration-100 ease-in-out opacity-0 group-hover:opacity-100 absolute inset-0 z-40 bg-linear-to-t from-0% from-neutral-950/60 via-10% via-neutral-950/40 to-25% to-neutral-950/10"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
-			class="invisible transition-all duration-100 ease-in-out group-hover:visible group-hover:-translate-y-px absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px] line-clamp-2"
-			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'">
+class="invisible group-hover:visible absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px]">
 			{{ item.media?.title?.userPreferred }}
 		</span>
 	</div>
@@ -45,6 +45,7 @@ const emit = defineEmits<{
 	copy: [item: any]
 	cut: [item: any]
 	locked: [boolean]
+	dragStart: [item: any]
 }>()
 
 const showDetails = ref(false)
@@ -63,6 +64,27 @@ function copyAnime() {
 
 function cutAnime() {
 	emit('cut', props.item)
+}
+
+function handleDragStart(event: DragEvent) {
+	if (props.item.locked) {
+		event.preventDefault()
+		return
+	}
+
+	// Stocker les données de l'anime dans le drag event
+	event.dataTransfer?.setData('application/json', JSON.stringify(props.item))
+	event.dataTransfer?.setData('text/plain', props.item.media?.title?.userPreferred || 'Unknown anime')
+
+	// Ajouter un effet visuel
+	event.dataTransfer!.effectAllowed = 'move'
+
+	// Émettre l'événement pour notifier le parent
+	emit('dragStart', props.item)
+}
+
+function handleDragEnd(event: DragEvent) {
+	// Nettoyer si nécessaire
 }
 
 const actions = computed(() => [

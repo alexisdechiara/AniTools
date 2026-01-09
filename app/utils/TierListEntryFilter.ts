@@ -49,9 +49,13 @@ export function useTierListEntryFilter() {
 		}
 
 		// Filter by score
-		if (filterScore.value > 0) {
-			if ((entry.score || 0) < filterScore.value) {
-				return false
+		if (filterScore.value && Array.isArray(filterScore.value)) {
+			const [minScore, maxScore] = filterScore.value
+			if (minScore !== undefined && maxScore !== undefined) {
+				const score = entry.score || 0
+				if (score < minScore || score > maxScore) {
+					return false
+				}
 			}
 		}
 

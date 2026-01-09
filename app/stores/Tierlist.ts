@@ -28,7 +28,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 	const filterYears = ref<number[]>([])
 	const filterSeasons = ref<string[]>([])
 	const filterFormats = ref<string[]>([])
-	const filterScore = ref(0)
+	const filterScore = ref<[number, number]>([0, 100])
 
 	const colorMode = useColorMode()
 	const selectedBackground = ref(colorMode.value === "dark" ? "bg-neutral-900" : "bg-neutral-100")
@@ -64,14 +64,16 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		colWidth.value = width
 	}
 
+	function setFilterScore(range: [number, number]) {
+		filterScore.value = range
+	}
+
 	function setDefaultBackgroundForTheme() {
 		selectedBackground.value = colorMode.value === "dark" ? "bg-neutral-900" : "bg-neutral-100"
 	}
 
-	function addEntryToTier(tierIndex: number, entry: unknown) {
-		const tier = tiers.value[tierIndex]
-		if (!tier) return
-		tier.entries.push(entry)
+	function addEntryToUnrankedTier(entry: unknown) {
+		unrankedTier.value.push(entry)
 	}
 
 	function changeTemplate(index: number) {
@@ -88,21 +90,50 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		tiers.value.push({ name: "New tier", color: "bg-neutral-500", range: [0, 0], entries: [] })
 	}
 
+	function removeTier(index: number) {
+		if (index >= 0 && index < tiers.value.length) {
+			// Déplacer les entrées du tier supprimé vers unranked
+			const tierToRemove = tiers.value[index]
+			unrankedTier.value.push(...tierToRemove?.entries ?? [])
+			tiers.value.splice(index, 1)
+		}
+	}
+
+	function moveTierUp(index: number) {
+		if (index > 0 && index < tiers.value.length) {
+			// Échanger le tier avec celui du dessus
+			const tier = tiers.value[index]
+			if (tier) {
+				tiers.value.splice(index, 1)
+				tiers.value.splice(index - 1, 0, tier)
+			}
+		}
+	}
+
+	function moveTierDown(index: number) {
+		if (index >= 0 && index < tiers.value.length - 1) {
+			// Échanger le tier avec celui du dessous
+			const tier = tiers.value[index]
+			if (tier) {
+				tiers.value.splice(index, 1)
+				tiers.value.splice(index + 1, 0, tier)
+			}
+		}
+	}
+
 	async function addAnime(item: CommandPaletteItem) {
 		const userStore = useUserStore()
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
-		console.log(item)
-
 		if (getAllAnimes.value.some(entry => entry?.media?.id === item.id)) {
 			console.log("Anime already in list", item.id)
-			addEntryToTier(0, getAllAnimes.value.find(entry => entry?.media?.id === item.id)!)
+			addEntryToUnrankedTier(getAllAnimes.value.find(entry => entry?.media?.id === item.id)!)
 		} else {
 			const { data } = await useAsyncGql({
 				operation: "getMediaById",
 				variables: { mediaId: item.id, scoreFormat: userStore.mediaListOptions.scoreFormat }
 			})
 			console.log("Anime added", formatMediaToEntry(data.value))
-			addEntryToTier(0, formatMediaToEntry(data.value))
+			addEntryToUnrankedTier(formatMediaToEntry(data.value))
 		}
 	}
 
@@ -137,10 +168,14 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		setHeadingCorner,
 		setRowCorner,
 		setColWidth,
+		setFilterScore,
 		setDefaultBackgroundForTheme,
-		addEntryToTier,
+		addEntryToUnrankedTier,
 		changeTemplate,
 		addTier,
+		removeTier,
+		moveTierUp,
+		moveTierDown,
 		addAnime
 	}
 }, {
