@@ -1,5 +1,5 @@
 <template>
-	<UPopover :content="popoverContent" :reference="reference">
+	<UPopover :content="popoverContent" :reference="reference" v-bind="$attrs">
 		<slot />
 		<template #content>
 			<div class="relative overflow-hidden" :class="isHorizontal ? 'h-64 max-w-lg' : 'h-fit max-w-xs'" ref="popoverEl"
@@ -23,7 +23,7 @@
 							:class="[hoveredContent || isVertical ? 'overflow-y-auto' : 'overflow-y-hidden', isHorizontal ? '' : '']"
 							v-if="showSummary" :style="{ 'scrollbar-gutter': isHorizontal ? 'stable' : 'auto' }">
 							<div class="flex justify-between items-start">
-								<div class="flex flex-col gap-y-0.5">
+								<div class="flex w-full flex-col gap-y-0.5">
 									<TextHover class="text-xs text-dimmed">
 										<template #default>
 											<div class="inline-flex gap-x-1 items-center">
@@ -70,7 +70,7 @@
 											</div>
 										</template>
 										<template #hover>
-											<div v-if="data.media.relations.edges.length"
+											<div v-if="data.media.relations?.edges?.length"
 												class="hidden group-hover/subtitle:inline-flex text-dimmed font-light italic truncate">
 												<span v-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'PREQUEL')">
 													Sequel to "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
@@ -91,10 +91,10 @@
 										</template>
 									</TextHover>
 								</div>
+								<span v-if="data?.score" class="text-right font-medium text-2xl text-highlighted w-fit">
+									{{ data.score }} %
+								</span>
 							</div>
-							<span v-if="data?.score" class="text-right font-medium text-2xl text-highlighted">
-								{{ data.score }} %
-							</span>
 							<p v-html="sanitizedDescription" class="text-muted text-sm w-full leading-tight" :class="isHorizontal
 								? hoveredContent
 									? 'overflow-y-visible h-max'

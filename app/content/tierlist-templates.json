@@ -1,0 +1,102 @@
+[
+	{
+		"label": "logarithmic",
+		"value": [
+			{
+				"name": "S+",
+				"color": "#E13333",
+				"range": [10, 10],
+				"entries": []
+			},
+			{
+				"name": "S",
+				"color": "#e58e2b",
+				"range": [9.5, 9.9],
+				"entries": []
+			},
+			{
+				"name": "A",
+				"color": "#f9c62d",
+				"range": [9, 9.4],
+				"entries": []
+			},
+			{
+				"name": "B",
+				"color": "#6ac75a",
+				"range": [8.5, 8.9],
+				"entries": []
+			},
+			{
+				"name": "C",
+				"color": "#67aeed",
+				"range": [8, 8.4],
+				"entries": []
+			},
+			{
+				"name": "D",
+				"color": "#6188E2",
+				"range": [7, 7.9],
+				"entries": []
+			},
+			{
+				"name": "E",
+				"color": "#673AB7",
+				"range": [5, 6.9],
+				"entries": []
+			},
+			{
+				"name": "F",
+				"color": "#2B2D42",
+				"range": [0, 4.9],
+				"entries": []
+			}
+		]
+	},
+	{
+		"label": "linear",
+		"value": [
+			{
+				"name": "S",
+				"color": "#E13333",
+				"range": [10, 10],
+				"entries": []
+			},
+			{
+				"name": "A",
+				"color": "#e58e2b",
+				"range": [9, 9.9],
+				"entries": []
+			},
+			{
+				"name": "B",
+				"color": "#f9c62d",
+				"range": [8, 8.9],
+				"entries": []
+			},
+			{
+				"name": "C",
+				"color": "#6ac75a",
+				"range": [7, 7.9],
+				"entries": []
+			},
+			{
+				"name": "D",
+				"color": "#67aeed",
+				"range": [6, 6.9],
+				"entries": []
+			},
+			{
+				"name": "E",
+				"color": "#6188E2",
+				"range": [5, 5.9],
+				"entries": []
+			},
+			{
+				"name": "F",
+				"color": "#673AB7",
+				"range": [0, 4.9],
+				"entries": []
+			}
+		]
+	}
+]

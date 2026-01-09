@@ -1,7 +1,11 @@
 <script setup lang="ts">
-const settingsStore = useTierlistSettingsStore()
+import { computed } from "vue"
+
+const tierlistStore = useTierlistStore()
 
 const {
+	templates,
+	currentTemplate,
 	gapSize,
 	headingCorner,
 	rowCorner,
@@ -9,9 +13,13 @@ const {
 	selectedBackground,
 	neutralBackgrounds,
 	gapSizeText
-} = storeToRefs(settingsStore)
+} = storeToRefs(tierlistStore)
 
-const { setBackground } = settingsStore
+const templateItems = computed(() => {
+	return templates.value.map((t, index) => ({ label: t.label, value: index }))
+})
+
+const { setBackground, addTier, changeTemplate } = tierlistStore
 </script>
 
 <template>
@@ -19,7 +27,14 @@ const { setBackground } = settingsStore
 		<UButton icon="i-lucide-palette" variant="ghost" color="neutral" class="cursor-pointer" />
 		<template #content>
 			<div class="p-4">
-				<CollapseButton label="Rows" first>
+				<CollapseButton label="Tiers" first>
+					<UFormField label="Template">
+						<USelectMenu :model-value="currentTemplate" :items="templateItems" value-key="value" variant="soft"
+							@update:model-value="(value) => changeTemplate(value as number)" />
+					</UFormField>
+					<UButton label="Add tier" color="neutral" variant="subtle" block class="mt-2" @click="addTier" />
+				</CollapseButton>
+				<CollapseButton label="Rows">
 					<UFormField label="Gap">
 						<USlider v-model="gapSize" :step="25"
 							:tooltip="{ text: gapSizeText, delayDuration: 0, ui: { text: 'uppercase font-semibold' } }" />

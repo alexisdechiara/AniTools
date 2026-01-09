@@ -20,14 +20,14 @@ defineProps<{
 	tier: Tier
 }>()
 
-const settingsStore = useTierlistSettingsStore()
+const tierlistStore = useTierlistStore()
 
 const {
 	selectedBackground,
 	rowCornerClass,
 	colWidthClass,
 	headingCorner
-} = storeToRefs(settingsStore)
+} = storeToRefs(tierlistStore)
 </script>
 
 <style scoped></style>

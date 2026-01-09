@@ -25,8 +25,8 @@ const attrs = useAttrs()
 const min = computed(() => Number(attrs.min ?? 0))
 const max = computed(() => Number(attrs.max ?? 100))
 const step = computed(() => Number(attrs.step ?? 1))
-const range = computed(() => Boolean(attrs.range))
-const vertical = computed(() => Boolean(attrs.vertical))
+const range = computed(() => Array.isArray(props.modelValue))
+const vertical = computed(() => attrs.orientation === 'vertical' || Boolean(attrs.vertical))
 
 const steps = computed(() => {
 	const count = Math.floor((max.value - min.value) / step.value)
@@ -59,13 +59,16 @@ const onUpdateModelValue = (value: number | [number, number] | undefined) => {
 		<USlider v-bind="attrs" :model-value="modelValue" class="z-10" @update:model-value="onUpdateModelValue" />
 
 		<!-- Steps -->
-		<div v-if="showSteps" class="absolute pointer-events-none" :class="vertical
+		<div v-if="showSteps" class="absolute pointer-events-none z-20" :class="vertical
 			? 'inset-y-0 left-1/2 -translate-x-1/2'
 			: 'inset-x-0 top-1/2 -translate-y-1/2'">
-			<span v-for="stepValue in steps" :key="stepValue" class="absolute size-1 rounded-full transition-colors" :class="showSteps === 'always' || isActiveStep(stepValue)
+			<span v-for="stepValue in steps" :key="stepValue" class="absolute size-1.5 rounded-full transition-colors" :class="[
+				showSteps === 'always' || isActiveStep(stepValue)
 				? 'bg-primary'
 				: 'bg-muted/60'
-				" :style="vertical
+	,
+	vertical ? '-translate-x-1/2 translate-y-1/2' : '-translate-x-1/2 -translate-y-1/2'
+]" :style="vertical
 					? { bottom: positionPercent(stepValue) + '%' }
 					: { left: positionPercent(stepValue) + '%' }" />
 		</div>

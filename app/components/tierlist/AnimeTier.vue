@@ -1,0 +1,118 @@
+<template>
+	<div class="relative h-full w-24 group transition-all duration-100 ease-out z-0"
+		:class="item.locked ? 'locked-item' : 'hover:scale-102'">
+		<UContextMenu :items="actions" size="sm" :key="`context-${item.id}-${item.locked}`">
+			<NuxtImg sizes="96px" loading="lazy" decoding="async"
+				:src="item.media?.coverImage?.extraLarge || item.media?.coverImage?.large || item.media?.coverImage?.medium"
+				class="size-full object-cover rounded-lg" />
+			<div
+				class="absolute h-fit top-0 -right-4 gap-0.5 flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-250 ease-in">
+				<UDropdownMenu :items="actions" size="sm" :content="{
+					align: 'start',
+					side: 'right',
+					sideOffset: 8
+				}">
+					<UButton icon="i-lucide-ellipsis-vertical" color="neutral" variant="solid" size="xs"
+						class="rounded-full cursor-pointer transform scale-90 hover:scale-100 transition-all duration-100 ease-in delay-50 opacity-0 group-hover:opacity-100" />
+				</UDropdownMenu>
+				<AnimeDetailsPopover v-model:open="showDetails" :data="item" orientation="vertical" draggable>
+					<UButton icon="i-lucide-info" color="neutral" variant="solid" size="xs"
+						class="rounded-full cursor-pointer transform scale-90 hover:scale-100 transition-all duration-100 ease-in delay-100 opacity-0 group-hover:opacity-100" />
+				</AnimeDetailsPopover>
+				<UButton icon="i-lucide-trash" color="error" variant="solid" size="xs"
+					class="rounded-full cursor-pointer transform scale-90 hover:scale-100 transition-all duration-100 ease-in delay-150 opacity-0 group-hover:opacity-100"
+					@click.stop="removeAnime" />
+			</div>
+		</UContextMenu>
+		<div
+			class="rounded-lg transition-all duration-100 ease-in-out opacity-0 group-hover:opacity-100 absolute inset-0 z-40 bg-linear-to-t from-0% from-neutral-950/60 via-10% via-neutral-950/40 to-25% to-neutral-950/10"
+			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
+		<span
+			class="invisible transition-all duration-100 ease-in-out group-hover:visible group-hover:-translate-y-px absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px] line-clamp-2"
+			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'">
+			{{ item.media?.title?.userPreferred }}
+		</span>
+	</div>
+</template>
+
+<script lang="ts" setup>
+const props = defineProps<{
+	item: any
+}>()
+
+const emit = defineEmits<{
+	remove: [item: any]
+	copy: [item: any]
+	cut: [item: any]
+	locked: [boolean]
+}>()
+
+const showDetails = ref(false)
+
+function toggleLock() {
+	props.item.locked = !props.item.locked
+}
+
+function removeAnime() {
+	emit('remove', props.item)
+}
+
+function copyAnime() {
+	emit('copy', props.item)
+}
+
+function cutAnime() {
+	emit('cut', props.item)
+}
+
+const actions = computed(() => [
+	[
+		{
+			label: 'Details',
+			icon: 'i-lucide-info',
+			disabled: true,
+			onClick(e: Event) {
+				e.stopPropagation()
+				e.preventDefault()
+				showDetails.value = true
+			}
+		}
+	],
+	[
+		{
+			label: 'Lock',
+			icon: 'i-lucide-lock',
+			checked: props.item.locked,
+			type: 'checkbox' as const,
+			onUpdateChecked(checked: boolean) {
+				emit('locked', checked)
+			},
+		},
+		{
+			label: 'Copy',
+			icon: 'i-lucide-copy',
+			onClick(e: Event) {
+				copyAnime()
+			}
+		},
+		{
+			label: 'Cut',
+			icon: 'i-lucide-scissors',
+			onClick(e: Event) {
+				cutAnime()
+			}
+		}
+	],
+	[
+		{
+			label: 'Delete',
+			color: 'error' as const,
+			icon: 'i-lucide-trash',
+			onClick(e: Event) {
+				removeAnime()
+			}
+		}
+	]
+])
+
+</script>

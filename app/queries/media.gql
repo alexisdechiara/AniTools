@@ -3,41 +3,108 @@ query getMediaById(
   $scoreFormat: ScoreFormat = POINT_100
 ) {
   Media(id: $mediaId) {
-    id
-    title {
-      romaji
-      english
-      native
-      userPreferred
-    }
+		id
+		title {
+			romaji
+			english
+			native
+			userPreferred
+		}
+		nextAiringEpisode {
+			airingAt
+			episode
+		}
+		rankings {
+			allTime
+			context
+			season
+			type
+			year
+			rank
+		}
+		siteUrl
+		description
+		format
+		status
+		season
+		seasonYear
+		startDate {
+			year
+			month
+			day
+		}
+		endDate {
+			year
+			month
+			day
+		}
+		episodes
+		duration
+		bannerImage
+		coverImage {
+			medium
+			large
+			extraLarge
+			color
+		}
+		averageScore
+		meanScore
+		favourites
+		isFavourite
+		genres
+		tags {
+			name
+			category
+			description
+			isAdult
+			isGeneralSpoiler
+			isMediaSpoiler
+		}
+		studios(isMain: true) {
+			edges {
+				isMain
+				node {
+					name
+					siteUrl
+				}
+			}
+		}
+		externalLinks {
+			site
+			url
+			language
+			color
+		}
+		trailer {
+			id
+			site
+			thumbnail
+		}
+		relations {
+			edges {
+				relationType
+				node {
+					id
+					format
+					title {
+						english
+						romaji
+						native
+						userPreferred
+					}
+				}
+			}
+		}
 
-    description
-    format
-    status
-    season
-    seasonYear
-    episodes
-    duration
-    siteUrl
-    bannerImage
-
-    coverImage {
-      medium
-      large
-      extraLarge
-      color
-    }
-
-    nextAiringEpisode {
-      airingAt
-      episode
-    }
-
-    averageScore
-    meanScore
-    favourites
-    isFavourite
-    genres
+		studios(isMain: true) {
+			edges {
+				isMain
+				node {
+					name
+					siteUrl
+				}
+			}
+		}
 
     mediaListEntry {
 			status

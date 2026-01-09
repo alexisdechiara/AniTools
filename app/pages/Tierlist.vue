@@ -31,18 +31,22 @@
 					<template #content>
 						<div class="flex flex-col px-4 py-6 gap-y-2">
 							<UFormField label="Search" class="mb-2">
-								<UInput placeholder="Title" class="w-full" />
+								<UInput v-model="filterTitle" placeholder="Title" class="w-full" />
 							</UFormField>
 							<UFormField label="Filters" class="mb-2">
 								<div class="flex flex-col gap-y-2">
-									<USelect placeholder="Genres" variant="soft" :ui="{ base: 'w-full' }" />
-									<USelect placeholder="Year" variant="soft" :ui="{ base: 'w-full' }" />
-									<USelect placeholder="Season" variant="soft" :ui="{ base: 'w-full' }" />
-									<USelect placeholder="Format" variant="soft" :ui="{ base: 'w-full' }" />
+									<USelectMenu v-model="filterGenres" multiple :items="tierlistGenres" placeholder="Genres"
+										variant="soft" :ui="{ base: 'w-full' }" />
+									<USelectMenu v-model="filterYears" multiple :items="tierlistYears" value-key="value"
+										placeholder="Year" variant="soft" :ui="{ base: 'w-full' }" />
+									<USelectMenu v-model="filterSeasons" multiple :items="tierlistSeasons" value-key="value"
+										placeholder="Season" variant="soft" :ui="{ base: 'w-full' }" />
+									<USelectMenu v-model="filterFormats" multiple :items="tierlistFormats" value-key="value"
+										placeholder="Format" variant="soft" :ui="{ base: 'w-full' }" />
 								</div>
 							</UFormField>
 							<UFormField label="Score">
-								<USlider v-model="value" :min="0" :max="100" :step="1" :ui="{ root: 'w-full' }" />
+								<USlider v-model="filterScore" :min="0" :max="100" :step="1" :ui="{ root: 'w-full' }" />
 							</UFormField>
 						</div>
 					</template>
@@ -88,43 +92,35 @@
 
 <script lang="ts" setup>
 import type { CommandPaletteItem } from '@nuxt/ui'
+import { tierlistFormats, tierlistGenres, tierlistSeasons, tierlistYears } from "~/utils/tierlist-data"
 
 defineShortcuts({
 	meta_k: () => openSearch.value = !openSearch.value
 })
 
-interface Tier {
-	name: string
-	color: string
-	range: Array<number>
-	entries: Array<any>
-}
-
 const openSearch = ref(false)
 const openImport = ref(false)
 
-const settingsStore = useTierlistSettingsStore()
+const tierlistStore = useTierlistStore()
 
 const {
+	tiers,
+	unrankedTier,
 	gapSizeClass,
 	selectedBackground,
 	rowCornerClass,
-} = storeToRefs(settingsStore)
+} = storeToRefs(tierlistStore)
 
+const {
+	filterTitle,
+	filterGenres,
+	filterYears,
+	filterSeasons,
+	filterFormats,
+	filterScore
+} = storeToRefs(tierlistStore)
 
-const tiers = ref<Tier[]>([
-	{ name: "S", color: "bg-red-400", range: [100, 100], entries: [] },
-	{ name: "A", color: "bg-orange-400", range: [95, 99], entries: [] },
-	{ name: "B", color: "bg-yellow-400", range: [90, 94], entries: [] },
-	{ name: "C", color: "bg-green-500", range: [80, 89], entries: [] },
-	{ name: "D", color: "bg-blue-400", range: [70, 79], entries: [] },
-	{ name: "E", color: "bg-indigo-400", range: [60, 69], entries: [] },
-	{ name: "F", color: "bg-black", range: [0, 59], entries: [] },
-])
-
-const unrankedTier = ref<any[]>([])
-
-const value = ref(0)
+const { addEntryToTier } = tierlistStore
 
 const searchTerm = ref('')
 const rawAnimes = ref<any[]>([])
@@ -162,20 +158,7 @@ const groups = computed(() => [{
 }])
 
 async function addAnime(item: CommandPaletteItem) {
-	const userStore = useUserStore()
-	const { getAllAnimes } = storeToRefs(useEntriesStore())
-	console.log(item);
-
-	if (getAllAnimes.value.some(entry => entry?.media?.id === item.id)) {
-		console.log("Anime already in list", item.id);
-		tiers.value[0]!.entries.push(getAllAnimes.value.find(entry => entry?.media?.id === item.id)!)
-	} else {
-		const { data } = await useAsyncGql({
-			operation: "getMediaById",
-			variables: { mediaId: item.id, scoreFormat: userStore.mediaListOptions.scoreFormat },
-		})
-		console.log("Anime added", formatMediaToEntry(data.value));
-		tiers.value[0]!.entries.push(formatMediaToEntry(data.value))
-	}
+	const tierlistStore = useTierlistStore()
+	tierlistStore.addAnime(item)
 }
 </script>
