@@ -1,5 +1,5 @@
 <template>
-	<div class="relative h-32 w-24 group transition-all duration-100 ease-out z-0"
+	<div class="relative h-fit w-full aspect-3/4 group transition-all duration-100 ease-out z-0"
 		:class="item.locked ? 'locked-item' : 'hover:scale-102'" :draggable="!item.locked" @dragstart="handleDragStart"
 		@dragend="handleDragEnd">
 		<UContextMenu :items="actions" size="sm" :key="`context-${item.id}-${item.locked}`">

@@ -146,9 +146,10 @@ function handleAnimeDrop(event: DragEvent) {
 		if (data) {
 			const animeItem = JSON.parse(data)
 			if (animeItem && animeItem.media) {
-				addEntryToUnrankedTier(animeItem)
-				// Supprimer l'anime de sa position d'origine
+				// Supprimer l'anime de sa position d'origine (y compris unranked)
 				removeAnimeFromOrigin(animeItem)
+				// Ajouter l'anime au unranked tier
+				addEntryToUnrankedTier(animeItem)
 			}
 		}
 	} catch (error) {
@@ -165,7 +166,7 @@ function removeAnimeFromOrigin(animeItem: any) {
 		}
 	})
 
-	// Vérifier aussi dans unranked
+	// Supprimer aussi du unrankedTier pour éviter les doublons
 	const unrankedIndex = unrankedTier.value.findIndex((entry: any) => entry.id === animeItem.id)
 	if (unrankedIndex > -1) {
 		unrankedTier.value.splice(unrankedIndex, 1)

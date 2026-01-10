@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import { defaultTierlistTemplateIndex, tierlistTemplates } from "~/utils/tierlist-templates"
-import { colWidthToClass, gapSizeToClass, gapSizeToText, getTierlistNeutralBackgrounds, rowCornerToClass } from "~/utils/tierlist"
+import { colWidthToClass, gapSizeToClass, gapSizeToText, getTierlistNeutralBackgrounds, rowCornerToClass, nbColToClass } from "~/utils/tierlist"
 
 interface Tier {
 	name: string
@@ -18,10 +18,11 @@ export const useTierlistStore = defineStore("tierlist", () => {
 
 	const unrankedTier = ref<unknown[]>([])
 
-	const gapSize = ref(50)
+	const gapSize = ref(25)
 	const headingCorner = ref(true)
 	const rowCorner = ref(6)
 	const colWidth = ref(0)
+	const nbCol = ref(10)
 
 	const filterTitle = ref("")
 	const filterGenres = ref<string[]>([])
@@ -42,6 +43,8 @@ export const useTierlistStore = defineStore("tierlist", () => {
 	const gapSizeClass = computed(() => gapSizeToClass(gapSize.value))
 	const rowCornerClass = computed(() => rowCornerToClass(rowCorner.value))
 	const colWidthClass = computed(() => colWidthToClass(colWidth.value))
+	const bodyColWidthClass = computed(() => bodyColWidthToClass(colWidth.value))
+	const nbColClass = computed(() => nbColToClass(nbCol.value))
 
 	// Actions
 	function setBackground(color: string) {
@@ -472,6 +475,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		filterSeasons,
 		filterFormats,
 		filterScore,
+		nbCol,
 
 		// Getters
 		neutralBackgrounds,
@@ -479,6 +483,8 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		gapSizeClass,
 		rowCornerClass,
 		colWidthClass,
+		bodyColWidthClass,
+		nbColClass,
 
 		// Actions
 		setBackground,

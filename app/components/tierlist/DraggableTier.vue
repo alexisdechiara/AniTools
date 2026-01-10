@@ -1,7 +1,7 @@
 <template>
 	<UContextMenu :items="actions" size="sm">
-		<VueDraggable v-model="modelValue" group="tiers" :filter="'.locked-item'"
-			class="col-span-11 size-full flex flex-wrap p-4 gap-2">
+		<VueDraggable v-model="modelValue" group="tiers" :filter="'.locked-item'" class="grid size-full flex-wrap p-4 gap-2"
+			:class="[nbColClass, bodyColWidthClass]">
 			<AnimeTier v-for="(entry, index) in filteredEntries" :key="entry.id" :item="entry" @remove="removeAnime"
 				@copy="copyAnime" @cut="cutAnime" @locked="entry.locked = $event" @dragStart="handleDragStart" />
 		</VueDraggable>
@@ -16,6 +16,9 @@ const modelValue = defineModel<any>()
 
 const { filterEntry } = useTierListEntryFilter()
 const { copy, text, isSupported } = useClipboard()
+
+const tierlistStore = useTierlistStore()
+const { nbColClass, bodyColWidthClass } = storeToRefs(tierlistStore)
 
 const filteredEntries = computed(() => {
 	return modelValue.value.filter((entry: any) => filterEntry(entry))

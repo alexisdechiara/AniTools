@@ -12,7 +12,8 @@ const {
 	colWidth,
 	selectedBackground,
 	neutralBackgrounds,
-	gapSizeText
+	gapSizeText,
+	nbCol
 } = storeToRefs(tierlistStore)
 
 const templateItems = computed(() => {
@@ -110,53 +111,39 @@ const items = [
 		<template #content>
 			<UTabs :items="items">
 				<template #interface>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-				<CollapseButton label="Rows">
-					<UFormField label="Gap">
-						<USlider v-model="gapSize" :step="25"
-							:tooltip="{ text: gapSizeText, delayDuration: 0, ui: { text: 'uppercase font-semibold' } }" />
-					</UFormField>
-					<UFormField label="Rounded corner">
-						<USlider v-model="rowCorner" :max="6" />
-					</UFormField>
-				</CollapseButton>
-				<CollapseButton label="Heading">
-					<UFormField orientation="horizontal" label="Rounded separator">
-						<USwitch v-model="headingCorner" />
-					</UFormField>
-					<UFormField label="Width">
-						<USlider v-model="colWidth" :max="4" />
-					</UFormField>
-				</CollapseButton>
-				<CollapseButton label="Body">
-					<UFormField label="Background color">
-						<div class="flex gap-0.5">
-							<div v-for="bg in neutralBackgrounds" :key="bg" @click="setBackground(bg)"
-								class="size-6 first:rounded-l-xs transition-all hover:scale-110 cursor-pointer last:rounded-r-full flex justify-center items-center"
-								:class="[bg, selectedBackground === bg ? 'ring-2 ring-offset-2 ring-primary z-50' : '']">
-								<UTooltip text="Transparent" :delay="0">
-									<Icon v-if="bg === 'bg-transparent'" name="i-lucide-ban" class="text-error" />
-								</UTooltip>
+					<CollapseButton label="Rows">
+						<UFormField label="Gap">
+							<USlider v-model="gapSize" :step="25"
+								:tooltip="{ text: gapSizeText, delayDuration: 0, ui: { text: 'uppercase font-semibold' } }" />
+						</UFormField>
+						<UFormField label="Rounded corner">
+							<USlider v-model="rowCorner" :max="6" />
+						</UFormField>
+					</CollapseButton>
+					<CollapseButton label="Heading">
+						<UFormField orientation="horizontal" label="Rounded separator">
+							<USwitch v-model="headingCorner" />
+						</UFormField>
+						<UFormField label="Width">
+							<USlider v-model="colWidth" :max="4" />
+						</UFormField>
+					</CollapseButton>
+					<CollapseButton label="Body">
+						<UFormField label="Background color">
+							<div class="flex gap-0.5">
+								<div v-for="bg in neutralBackgrounds" :key="bg" @click="setBackground(bg)"
+									class="size-6 first:rounded-l-xs transition-all hover:scale-110 cursor-pointer last:rounded-r-full flex justify-center items-center"
+									:class="[bg, selectedBackground === bg ? 'ring-2 ring-offset-2 ring-primary z-50' : '']">
+									<UTooltip text="Transparent" :delay="0">
+										<Icon v-if="bg === 'bg-transparent'" name="i-lucide-ban" class="text-error" />
+									</UTooltip>
+								</div>
 							</div>
-						</div>
-					</UFormField>
-				</CollapseButton>
+						</UFormField>
+						<UFormField label="Number of columns">
+							<USlider v-model="nbCol" :min="1" :max="12" tooltip />
+						</UFormField>
+					</CollapseButton>
 				</template>
 				<template #configuration>
 					<div class="flex flex-col gap-2 h-full">

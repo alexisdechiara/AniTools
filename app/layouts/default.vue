@@ -117,21 +117,7 @@ const links = [[{
 	icon: "i-lucide-info",
 	to: "https://github.com/nuxt-ui-templates/dashboard",
 	target: "_blank"
-}]] satisfies NavigationMenuItem[][]
-
-onMounted(async () => {
-	toast.add({
-		title: "Me soutenir",
-		description: "Ce site est entièrement gratuit et open source. Si vous aimez mon travail, vous pouvez me faire un don sur patreon.",
-		duration: 5000,
-		close: true,
-		actions: [{
-			label: "Faire un don",
-			color: "neutral",
-			variant: "outline",
-		}]
-	})
-})
+		}]] satisfies NavigationMenuItem[][]
 </script>
 
 <template>
