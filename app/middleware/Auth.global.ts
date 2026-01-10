@@ -1,5 +1,7 @@
 // Définition des routes publiques qui ne nécessitent pas d'authentification
-const publicPaths = ["/login", "/calendar", "/tierlist"]
+const publicPaths = ["/login", "/calendar"]
+// Routes qui fonctionnent avec et sans authentification
+const hybridPaths = ["/tierlist"]
 
 export default defineNuxtRouteMiddleware(async (to) => {
 	// Si c'est une route publique, on ne fait rien
@@ -25,12 +27,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
 		// Si on arrive ici, l'utilisateur n'est pas authentifié
 		// On redirige vers la page de connexion avec un paramètre de retour
-		return navigateTo({
-			path: "/login",
-			query: {
-				redirect: to.fullPath
-			}
-		})
+		if (!hybridPaths.includes(to.path)) {
+			return navigateTo({
+				path: "/login",
+				query: {
+					redirect: to.fullPath
+				}
+			})
+		}
 	} catch (error) {
 		console.error("Error while verifying authentication:", error)
 		// En cas d'erreur, on redirige vers la page de connexion

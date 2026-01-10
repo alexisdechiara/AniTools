@@ -1,28 +1,25 @@
 <template>
-	<UModal v-model:open="isOpen" title="Inconsistency Detected" :ui="{ content: 'max-w-xs' }">
+	<UModal v-model:open="isOpen" title="Inconsistency Detected" :close="false" :dismissible="false"
+		description="Overlapping tier ranges have been detected. Animes with scores in these ranges will be duplicated in the corresponding tiers.">
 		<template #body>
-			<div class="space-y-4">
-				<p class="text-sm text-muted-foreground">
-					Overlapping tier ranges have been detected. Animes with scores in these ranges will be duplicated in the
-					corresponding tiers.
-				</p>
-				<div class="space-y-2">
-					<p class="text-sm font-medium">Affected ranges:</p>
-					<ul class="text-sm text-muted-foreground space-y-1">
-						<li v-for="overlap in overlappingRanges" :key="overlap" class="flex items-center gap-2">
+			<div class="flex flex-col gap-2">
+				<span class="text-sm font-medium text-highlighted">Affected ranges:</span>
+				<div class="flex w-full h-fit px-2 py-1 rounded-lg bg-muted">
+					<ul class="text-sm text-muted-foreground divide-muted divide-y w-full overflow-y-auto max-h-64">
+						<li v-for="overlap in overlappingRanges" :key="overlap" class="flex items-center gap-2 py-1">
 							<UIcon name="i-lucide-alert-triangle" class="text-warning size-4" />
 							{{ overlap }}
 						</li>
 					</ul>
 				</div>
-				<p class="text-sm text-muted-foreground">
-					Do you want to continue with entry duplication?
-				</p>
+				<span class="text-sm mt-4">
+					Do you want to continue with duplication?
+				</span>
 			</div>
 		</template>
 		<template #footer>
-			<UButton label="Cancel" variant="outline" @click="handleCancel" />
-			<UButton label="Continue with Duplication" color="primary" @click="handleConfirm" :loading="isLoading"
+			<UButton label="Cancel" color="neutral" variant="outline" @click="handleCancel" class="ms-auto" />
+			<UButton label="Continue with duplication" color="primary" @click="handleConfirm" :loading="isLoading"
 				:disabled="isLoading" />
 		</template>
 	</UModal>

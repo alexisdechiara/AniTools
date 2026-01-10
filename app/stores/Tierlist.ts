@@ -137,11 +137,38 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		}
 	}
 
-	function importAnimesFromEntries(autoRank: boolean, scoreRange: [number, number], allowDuplicates = false) {
+	function importAnimesFromEntries(
+		autoRank: boolean,
+		scoreRange: [number, number],
+		status: string[] = [],
+		genres: string[] = [],
+		years: number[] = [],
+		seasons: string[] = [],
+		formats: string[] = [],
+		isFranchise = false,
+		allowDuplicates = false
+	) {
 		const entriesStore = useEntriesStore()
 		const { getAllAnimes, isInitialized } = storeToRefs(entriesStore)
 
-		console.log("Import started:", { autoRank, scoreRange })
+		const normalize = (v: unknown) => String(v ?? "").trim().toLowerCase()
+		if (isFranchise) {
+			years = []
+			seasons = []
+			formats = []
+		}
+
+		const normalizedStatus = status.map(normalize)
+		const normalizedGenres = genres.map(normalize)
+		const normalizedFormats = formats.map(normalize)
+		const normalizedSeasons = (seasons as unknown[]).map((s) => {
+			if (typeof s === "object" && s !== null && "value" in s) {
+				return normalize((s as { value?: unknown }).value)
+			}
+			return normalize(s)
+		})
+
+		console.log("Import started:", { autoRank, scoreRange, isFranchise })
 		console.log("Entries initialized:", isInitialized.value)
 		console.log("All animes count:", getAllAnimes.value.length)
 
@@ -170,27 +197,127 @@ export const useTierlistStore = defineStore("tierlist", () => {
 
 		console.log("Existing entries count:", existingIds.size)
 
-		// Filtrer les animes par score range ET par IDs non existants
+		// Filtrer les animes par score range ET par tous les filtres
 		const filteredAnimes = getAllAnimes.value.filter((entry) => {
 			const score = entry?.score || 0
 			const inRange = score >= scoreRange[0] && score <= scoreRange[1]
 			const mediaId = entry?.media?.id
 			const notDuplicate = mediaId && !existingIds.has(mediaId)
 
-			console.log(`Anime: ${entry?.media?.title?.romaji}, Score: ${score}, In range: ${inRange}, Not duplicate: ${notDuplicate}`)
-			return inRange && notDuplicate
+			// Filtrage par status
+			const entryStatus = normalize(entry?.status)
+			const statusMatch = normalizedStatus.length === 0 || normalizedStatus.includes(entryStatus)
+
+			// Filtrage par genres
+			const genresMatch
+				= normalizedGenres.length === 0 || (entry?.media?.genres?.some((genre: unknown) => {
+					if (typeof genre === "object" && genre !== null && "name" in genre) {
+						return normalizedGenres.includes(normalize((genre as { name?: unknown }).name))
+					}
+					return normalizedGenres.includes(normalize(genre))
+				}) || false)
+
+			// Filtrage par years
+			const yearMatch = years.length === 0 || (entry?.media?.startDate?.year && years.includes(entry.media.startDate.year))
+
+			// Filtrage par seasons
+			const entrySeason = normalize(entry?.media?.season)
+			const seasonMatch = normalizedSeasons.length === 0 || (entrySeason && normalizedSeasons.includes(entrySeason))
+
+			// Filtrage par formats
+			const entryFormat = normalize(entry?.media?.format)
+			const formatMatch = normalizedFormats.length === 0 || (entryFormat && normalizedFormats.includes(entryFormat))
+
+			const matchesAllFilters = inRange && notDuplicate && statusMatch && genresMatch && yearMatch && seasonMatch && formatMatch
+
+			console.log(`Anime: ${entry?.media?.title?.romaji}, Score: ${score}, Status: ${entry?.status}, In range: ${inRange}, Status match: ${statusMatch}, Genres match: ${genresMatch}, Year match: ${yearMatch}, Season match: ${seasonMatch}, Format match: ${formatMatch}, All filters match: ${matchesAllFilters}`)
+			return matchesAllFilters
 		})
 
+		let animesToImport: unknown[] = filteredAnimes
+
+		if (isFranchise) {
+			const byMediaId = new Map<number, unknown>()
+			for (const e of getAllAnimes.value) {
+				const id = e?.media?.id
+				if (typeof id === "number") byMediaId.set(id, e)
+			}
+
+			const filteredIds = new Set<number>()
+			for (const e of filteredAnimes) {
+				const id = (e as any)?.media?.id
+				if (typeof id === "number") filteredIds.add(id)
+			}
+
+			const rootCache = new Map<number, number>()
+			const getPrequelId = (e: unknown): number | null => {
+				const edges = (e as any)?.media?.relations?.edges
+				if (!Array.isArray(edges)) return null
+				const prequel = edges.find((ed: unknown) => normalize((ed as any)?.relationType) === "prequel")
+				const pid = prequel?.node?.id
+				return typeof pid === "number" ? pid : null
+			}
+
+			const getRootId = (mediaId: number): number => {
+				const cached = rootCache.get(mediaId)
+				if (cached) return cached
+				let current = mediaId
+				const seen = new Set<number>()
+				while (!seen.has(current)) {
+					seen.add(current)
+					const currentEntry = byMediaId.get(current)
+					const prequelId = currentEntry ? getPrequelId(currentEntry) : null
+					if (!prequelId) break
+					if (!byMediaId.has(prequelId)) break
+					current = prequelId
+				}
+				rootCache.set(mediaId, current)
+				return current
+			}
+
+			const getEarliestMatchingId = (mediaId: number): { rootId: number, representativeId: number } => {
+				let current = mediaId
+				let representative = mediaId
+				const seen = new Set<number>()
+				while (!seen.has(current)) {
+					seen.add(current)
+					if (filteredIds.has(current)) representative = current
+					const currentEntry = byMediaId.get(current)
+					const prequelId = currentEntry ? getPrequelId(currentEntry) : null
+					if (!prequelId) break
+					if (!byMediaId.has(prequelId)) break
+					current = prequelId
+				}
+				const rootId = getRootId(mediaId)
+				return { rootId, representativeId: representative }
+			}
+
+			const chosenByRoot = new Map<number, unknown>()
+			for (const entry of filteredAnimes) {
+				const mid = (entry as any)?.media?.id
+				if (typeof mid !== "number") continue
+				const { rootId, representativeId } = getEarliestMatchingId(mid)
+				if (existingIds.has(representativeId)) continue
+				if (!chosenByRoot.has(rootId)) {
+					const repEntry = byMediaId.get(representativeId)
+					if (repEntry) chosenByRoot.set(rootId, repEntry)
+				}
+			}
+
+			animesToImport = [...chosenByRoot.values()]
+		}
+
 		console.log("Filtered animes count (no duplicates):", filteredAnimes.length)
+		console.log("Animes to import count:", animesToImport.length)
 
 		if (autoRank) {
 			// Utiliser la fonction factorisée pour placer automatiquement
-			rankEntries(filteredAnimes, allowDuplicates)
+			rankEntries(animesToImport, allowDuplicates)
 		} else {
 			// Ajouter tout au unranked tier
-			filteredAnimes.forEach((entry) => {
+			animesToImport.forEach((entry) => {
 				addEntryToUnrankedTier(entry)
-				console.log(`Added to unranked: ${entry?.media?.title?.romaji}`)
+				console.log(`Added to unranked: ${(entry as any)?.media?.title?.romaji}`)
 			})
 		}
 
