@@ -11,7 +11,6 @@
 							</div>
 						</template>
 					</UButton>
-
 					<template #content>
 						<UCommandPalette v-model:search-term="searchTerm" @input="onStopTyping" :loading="loadingSearch"
 							:groups="groups" placeholder="Search users..." :ui="{ item: 'items-center', itemDescription: 'text-xs' }">
@@ -52,11 +51,15 @@
 					</template>
 				</UPopover>
 			</div>
-			<template #right>
-				<SlideoverSettings />
-			</template>
 			<template #left>
-				<AnimesImportModal v-model:open="openImport" />
+				<UDropdownMenu :items="settingsItems" :content="{ align: 'start' }">
+					<UButton icon="i-lucide-ellipsis-vertical" variant="ghost" color="neutral" class="cursor-pointer" />
+				</UDropdownMenu>
+				<SlideoverSettings v-model:open="openSlideover" />
+			</template>
+			<template #right>
+				<UButton :icon="isInspectorEnabled ? 'i-lucide-scan-eye' : 'i-lucide-scan'" class="cursor-pointer"
+					:variant="isInspectorEnabled ? 'solid' : 'ghost'" color="neutral" size="md" @click="toggleInspector" />
 			</template>
 		</UHeader>
 		<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
@@ -93,14 +96,23 @@
 	},
 				]" />
 		</div>
-
 	</UContainer>
+	<AnimesImportModal v-model:open="openImport" />
+	<InspectorOverlay />
+	<InspectorCursorTooltip />
+	<InspectorPopup />
 </template>
 
 <script lang="ts" setup>
 import { VueDraggable } from "vue-draggable-plus"
-import type { CommandPaletteItem } from '@nuxt/ui'
+import type { CommandPaletteItem, DropdownMenuItem } from '@nuxt/ui'
 import { tierlistFormats, tierlistGenres, tierlistSeasons, tierlistYears } from "~/utils/tierlist-data"
+
+const { isInspectorEnabled, toggleInspector, initializeInspector } = useInspector()
+
+onMounted(() => {
+	initializeInspector()
+})
 
 defineShortcuts({
 	meta_k: () => openSearch.value = !openSearch.value
@@ -108,9 +120,39 @@ defineShortcuts({
 
 const openSearch = ref(false)
 const openImport = ref(false)
+const openSlideover = ref(false)
 
 const tierlistStore = useTierlistStore()
 const entriesStore = useEntriesStore()
+
+const settingsItems: DropdownMenuItem[] = [
+	{
+		label: 'Configure tiers',
+		icon: 'i-lucide-settings-2',
+		onClick: () => openSlideover.value = true
+	}, {
+		label: 'Import',
+		icon: 'i-lucide-cloud-download',
+		onClick: () => openImport.value = true
+	}, {
+		label: 'Export',
+		icon: 'i-lucide-download',
+		children: [
+			{
+				label: 'JSON',
+			},
+			{
+				label: 'JPEG',
+			},
+			{
+				label: 'PNG',
+			},
+			{
+				label: 'WEBP',
+			}
+		]
+	}
+]
 
 // Initialiser le store Entries si nécessaire
 onMounted(async () => {

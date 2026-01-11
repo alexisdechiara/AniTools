@@ -1,12 +1,13 @@
 <template>
-	<div class="relative h-fit w-full aspect-3/4 group transition-all duration-100 ease-out z-0"
-		:class="item.locked ? 'locked-item' : 'hover:scale-102'" :draggable="!item.locked" @dragstart="handleDragStart"
-		@dragend="handleDragEnd">
+	<div class="relative h-fit w-full aspect-3/4 group transition-all duration-100 ease-out z-20 pointer-events-auto"
+		:class="[item.locked ? 'locked-item' : (!isInspectorEnabled ? 'hover:scale-102' : ''), (hoveredTarget?.id === item.id && hoveredTarget?.type === 'anime') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background cursor-pointer' : '']"
+		:draggable="!item.locked" @dragstart="handleDragStart" @dragend="handleDragEnd" @click.stop="selectItem"
+		@mouseover.stop="setHovered(item.id, 'anime', 'Anime')" @mouseleave="clearHovered">
 		<UContextMenu :items="actions" size="sm" :key="`context-${item.id}-${item.locked}`">
 			<NuxtImg sizes="96px" loading="lazy" decoding="async"
 				:src="item.media?.coverImage?.extraLarge || item.media?.coverImage?.large || item.media?.coverImage?.medium"
 				class="size-full object-cover rounded-lg" />
-			<div
+			<div v-if="!isInspectorEnabled"
 				class="absolute h-fit top-0 -right-4 gap-0.5 flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-250 ease-in">
 				<UDropdownMenu :items="actions" size="sm" :content="{
 					align: 'start',
@@ -25,11 +26,12 @@
 					@click.stop="removeAnime" />
 			</div>
 		</UContextMenu>
-		<div
+		<div v-if="!isInspectorEnabled"
 			class="rounded-lg transition-all duration-100 ease-in-out opacity-0 group-hover:opacity-100 absolute inset-0 z-40 bg-linear-to-t from-0% from-neutral-950/60 via-10% via-neutral-950/40 to-25% to-neutral-950/10"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
-			class="invisible group-hover:visible absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px] cursor-move">
+class="invisible group-hover:visible absolute inset-x-2 bottom-2 font-medium text-white z-50 text-[10px]"
+			:class="isInspectorEnabled ? 'cursor-pointer' : 'cursor-move'">
 			{{ item.media?.title?.userPreferred }}
 		</span>
 	</div>
@@ -39,6 +41,8 @@
 const props = defineProps<{
 	item: any
 }>()
+
+const { isInspectorEnabled, setHovered, clearHovered, selectItem, hoveredTarget } = useInspector()
 
 const emit = defineEmits<{
 	remove: [item: any]

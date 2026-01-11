@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import { defaultTierlistTemplateIndex, tierlistTemplates } from "~/utils/tierlist-templates"
-import { colWidthToClass, gapSizeToClass, gapSizeToText, getTierlistNeutralBackgrounds, rowCornerToClass, nbColToClass } from "~/utils/tierlist"
+import { colWidthToClass, gapSizeToClass, gapSizeToText, getTierlistNeutralBackgrounds, rowCornerToClass, nbColToClass, bodyColWidthToClass } from "~/utils/tierlist"
 
 interface Tier {
 	name: string

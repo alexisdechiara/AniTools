@@ -1,7 +1,7 @@
 <template>
 	<UContextMenu :items="actions" size="sm">
 		<VueDraggable v-model="modelValue" group="tiers" :filter="'.locked-item'" class="grid size-full flex-wrap p-4 gap-2"
-			:class="[nbColClass, bodyColWidthClass]">
+			:class="[nbColClass, bodyColWidthClass]" :disabled="isInspectorEnabled">
 			<AnimeTier v-for="(entry, index) in filteredEntries" :key="entry.id" :item="entry" @remove="removeAnime"
 				@copy="copyAnime" @cut="cutAnime" @locked="entry.locked = $event" @dragStart="handleDragStart" />
 		</VueDraggable>
@@ -19,6 +19,7 @@ const { copy, text, isSupported } = useClipboard()
 
 const tierlistStore = useTierlistStore()
 const { nbColClass, bodyColWidthClass } = storeToRefs(tierlistStore)
+const { isInspectorEnabled } = useInspector()
 
 const filteredEntries = computed(() => {
 	return modelValue.value.filter((entry: any) => filterEntry(entry))

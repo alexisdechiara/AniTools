@@ -2,7 +2,6 @@
 	<UModal v-bind="$attrs" title="Import from AniList" :close="false"
 		:ui="{ content: 'max-w-2xl', footer: 'justify-end' }"
 		description="Select the settings for importing animes from your lists">
-		<UButton icon="i-lucide-cloud-download" variant="ghost" color="neutral" class="cursor-pointer" />
 		<template #body>
 			<div v-if="isAuthenticated" class="flex flex-col gap-3">
 				<div class="grid grid-cols-2 gap-3">
