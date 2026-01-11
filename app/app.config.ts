@@ -70,6 +70,33 @@ export default defineAppConfig({
 					}
 				}
 			}
+		},
+		radioGroup: {
+			compoundVariants: [
+				{
+					size: "xs",
+					variant: [
+						"card",
+						"table"
+					],
+					class: {
+						item: "py-1.5 px-2.5"
+					}
+				}
+			],
+			variants: {
+				orientation: {
+					horizontal: {
+						item: "first:rounded-s-full! last:rounded-e-full!"
+					}
+				},
+				variant: {
+					table: {
+						item: "group cursor-pointer has-data-[state=checked]:bg-primary! has-data-[state=checked]:border-primary! hover:bg-primary/10 hover:border-primary/50",
+						label: "group-has-data-[state=checked]:text-inverted!"
+					}
+				}
+			}
 		}
 	}
 })
