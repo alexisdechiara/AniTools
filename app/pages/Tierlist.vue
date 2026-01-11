@@ -137,6 +137,7 @@ const settingsItems: DropdownMenuItem[] = [
 	}, {
 		label: 'Export',
 		icon: 'i-lucide-download',
+		disabled: true,
 		children: [
 			{
 				label: 'JSON',

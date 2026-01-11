@@ -3,7 +3,7 @@
 		:class="[selectedBackground, rowCornerClass, (hoveredTarget?.id === `row-${index}` && hoveredTarget?.type === 'row') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background cursor-pointer' : '']"
 		@click.stop="selectItem" @mouseover.stop="setHovered(`row-${index}`, 'row', 'Tier Row')" @mouseleave="clearHovered">
 		<!-- Invisible absolute padding for easier hovering -->
-		<div v-if="isInspectorEnabled" class="absolute -inset-8 z-10" />
+		<div v-if="isInspectorEnabled" class="absolute -inset-6 z-10" />
 		<div
 			class="relative z-20 text-inverted text-lg font-semibold size-full flex justify-center items-center group/control transition-all duration-200"
 			:class="[colWidthClass, headingCorner ? rowCornerClass : 'rounded-none', tier.color, (hoveredTarget?.id === `header-${index}` && hoveredTarget?.type === 'header') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '', isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']">
@@ -28,7 +28,7 @@
 		<div class="col-span-11 w-full relative z-20"
 			:class="[(hoveredTarget?.id === `content-${index}` && hoveredTarget?.type === 'content') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '', isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']">
 			<!-- Content Interaction Hitbox -->
-			<div v-if="isInspectorEnabled" class="absolute inset-y-8 left-0 right-8 z-10 pointer-events-auto cursor-pointer"
+			<div v-if="isInspectorEnabled" class="absolute inset-y-6 left-0 right-8 z-10 pointer-events-auto cursor-pointer"
 				@click.stop="selectItem" @mouseover.stop="setHovered(`content-${index}`, 'content', 'Tier Content')"
 				@mouseleave="clearHovered" />
 

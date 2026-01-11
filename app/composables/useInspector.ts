@@ -12,8 +12,6 @@ export interface InspectorState {
 
 export const useInspector = () => {
 	const isInspectorEnabled = useState<boolean>("inspector-enabled", () => false)
-
-	// Global state for popup - needs to persist across components
 	const inspectorState = useState<InspectorState>("inspector-state", () => ({
 		isOpen: false,
 		type: null,
@@ -22,22 +20,19 @@ export const useInspector = () => {
 		targetName: ""
 	}))
 
-	// Local refs for high-frequency updates - using regular ref for reactivity
-	const hoveredTarget = ref<{ id: string, type: InspectorType, name: string } | null>(null)
-	const cursorPosition = ref({ x: 0, y: 0 })
-	const inspectorActivatedAt = ref(0)
+	const hoveredTarget = useState<{ id: string, type: InspectorType, name: string } | null>("inspector-hovered", () => null)
+	const cursorPosition = useState<{ x: number, y: number }>("inspector-cursor", () => ({ x: 0, y: 0 }))
+	const inspectorActivatedAt = useState<number>("inspector-activated-at", () => 0)
 
-	// RAF-based cursor update for smoother performance
 	const { pause: pauseCursor, resume: resumeCursor } = useRafFn(() => {
 		if (!isInspectorEnabled.value) return
-		// Cursor position is updated via mousemove event
 	}, { immediate: false })
 
 	const toggleInspector = () => {
-		const newValue = !isInspectorEnabled.value
-		isInspectorEnabled.value = newValue
+		const enabled = !isInspectorEnabled.value
+		isInspectorEnabled.value = enabled
 
-		if (!newValue) {
+		if (!enabled) {
 			hoveredTarget.value = null
 			pauseCursor()
 		} else {
@@ -70,7 +65,6 @@ export const useInspector = () => {
 			position: { x: event.clientX, y: event.clientY }
 		}
 
-		// Disable inspector mode after selection
 		isInspectorEnabled.value = false
 		hoveredTarget.value = null
 		pauseCursor()
@@ -88,10 +82,9 @@ export const useInspector = () => {
 			}
 		})
 
-		// Optimized cursor update with RAF
 		const updateCursor = useThrottleFn((e: MouseEvent) => {
 			cursorPosition.value = { x: e.clientX, y: e.clientY }
-		}, 8) // ~120fps for smoother tracking
+		}, 8)
 
 		useEventListener(window, "mousemove", (e) => {
 			if (isInspectorEnabled.value) {
@@ -99,14 +92,10 @@ export const useInspector = () => {
 			}
 		})
 
-		// Click outside to disable inspector (with delay to avoid conflicts)
 		useEventListener(window, "click", (_e) => {
-			// Use setTimeout to allow selectItem to be called first
 			setTimeout(() => {
-				// Don't disable if inspector was just activated (within 500ms)
 				const timeSinceActivation = Date.now() - inspectorActivatedAt.value
-				if (isInspectorEnabled.value && !hoveredTarget.value && timeSinceActivation > 500) {
-					// Click outside any inspectable element
+				if (isInspectorEnabled.value && !hoveredTarget.value && timeSinceActivation > 200) {
 					toggleInspector()
 				}
 			}, 50)
