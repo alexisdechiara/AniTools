@@ -76,6 +76,7 @@ const links = [[{
 	label: "Create",
 	icon: "i-lucide-circle-fading-plus",
 	to: "/create",
+	disabled: true,
 	onSelect: () => {
 		open.value = false
 	}
@@ -90,6 +91,7 @@ const links = [[{
 	label: "Explore",
 	icon: "i-lucide-telescope",
 	to: "/explore",
+	disabled: true,
 	onSelect: () => {
 		open.value = false
 	}
@@ -97,6 +99,7 @@ const links = [[{
 	label: "Podium",
 	icon: "i-lucide-trophy",
 	to: "/podium",
+	disabled: true,
 	onSelect: () => {
 		open.value = false
 	}
@@ -104,6 +107,7 @@ const links = [[{
 	label: "Timeline",
 	icon: "i-lucide-chart-no-axes-gantt",
 	to: "/timeline",
+	disabled: true,
 	onSelect: () => {
 		open.value = false
 	}

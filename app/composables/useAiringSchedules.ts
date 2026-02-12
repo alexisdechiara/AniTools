@@ -8,7 +8,6 @@ export const useAiringSchedules = () => {
 	const airingAtGreater = ref<number>()
 	const airingAtLesser = ref<number>()
 
-	// Variables réactives pour la plage de dates
 	const updateDateRange = (start: number, end: number) => {
 		airingAtGreater.value = start
 		airingAtLesser.value = end
@@ -34,18 +33,16 @@ export const useAiringSchedules = () => {
 	const onCalendarReady = () => {
 		nextTick(() => {
 			if (vueCalRef.value) {
-				const now = new Date()
-				const currentMinutes = (now.getHours() - 1) * 60 + now.getMinutes()
-				vueCalRef.value.view.scrollToTime(currentMinutes)
+				vueCalRef.value.view.scrollToCurrentTime()
 			}
 		})
 	}
 
 	// Gérer le changement de vue du calendrier
-	const onViewChange = (view: { startDate: Date, endDate: Date }, refreshCallback: () => void) => {
+	const refreshView = (view: any) => {
 		// Obtenir la plage de dates de la vue actuelle
-		const startDate = view.startDate
-		const endDate = view.endDate
+		const startDate = view.extendedStart
+		const endDate = view.extendedEnd
 
 		// Convertir en timestamps Unix
 		const startTimestamp = Math.floor(startDate.getTime() / 1000)
@@ -53,18 +50,6 @@ export const useAiringSchedules = () => {
 
 		// Mettre à jour les variables réactives
 		updateDateRange(startTimestamp, endTimestamp)
-
-		// Toujours rafraîchir les données lors du changement de vue
-		refreshCallback()
-
-		// Faire le scrollToTime après le changement de vue
-		nextTick(() => {
-			if (vueCalRef.value) {
-				const now = new Date()
-				const currentMinutes = (now.getHours() - 1) * 60 + now.getMinutes()
-				vueCalRef.value.view.scrollToTime(currentMinutes)
-			}
-		})
 	}
 
 	// Layout des événements
@@ -375,7 +360,7 @@ export const useAiringSchedules = () => {
 		updateDateRange,
 		handleWheel,
 		onCalendarReady,
-		onViewChange,
+		refreshView,
 
 		// Layout des événements
 		setEventCardRef,
