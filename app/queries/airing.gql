@@ -1,0 +1,141 @@
+query getAiringAnimes(
+  $page: Int,
+  $airingAtGreater: Int,
+  $airingAtLesser: Int
+) {
+  Page(page: $page, perPage: 50) {
+    pageInfo {
+      hasNextPage
+    }
+    airingSchedules(
+      airingAt_greater: $airingAtGreater,
+      airingAt_lesser: $airingAtLesser
+    ) {
+      airingAt
+      episode
+      media {
+        id
+				countryOfOrigin
+        title {
+          romaji
+          english
+          native
+          userPreferred
+        }
+        nextAiringEpisode {
+          airingAt
+          episode
+        }
+        rankings {
+          allTime
+          context
+          season
+          type
+          year
+          rank
+        }
+        siteUrl
+        description
+        format
+        status
+        season
+        seasonYear
+        startDate {
+          year
+          month
+          day
+        }
+        endDate {
+          year
+          month
+          day
+        }
+        episodes
+        duration
+        bannerImage
+        coverImage {
+          medium
+          large
+          extraLarge
+          color
+        }
+        averageScore
+        meanScore
+        favourites
+        isFavourite
+        genres
+        tags {
+          name
+          category
+          description
+          isAdult
+          isGeneralSpoiler
+          isMediaSpoiler
+        }
+        studios(isMain: true) {
+          edges {
+            isMain
+            node {
+              name
+              siteUrl
+            }
+          }
+        }
+        externalLinks {
+          site
+          url
+          language
+          color
+        }
+        trailer {
+          id
+          site
+          thumbnail
+        }
+        relations {
+          edges {
+            relationType
+            node {
+              id
+              format
+              title {
+                english
+                romaji
+                native
+                userPreferred
+              }
+            }
+          }
+        }
+
+				studios(isMain: true) {
+					edges {
+						isMain
+						node {
+							name
+							siteUrl
+						}
+					}
+				}
+
+        mediaListEntry {
+          status
+          score(format: POINT_100)
+          repeat
+          progress
+          updatedAt
+          startedAt {
+            year
+            month
+            day
+          }
+          completedAt {
+            year
+            month
+            day
+          }
+        }
+      }
+    }
+  }
+}

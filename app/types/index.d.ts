@@ -58,3 +58,27 @@ export interface Range {
 	start: Date
 	end: Date
 }
+
+export interface VueCalEvent {
+	start: Date | string
+	end: Date | string
+	id?: string
+	title?: string
+	content?: string
+	class?: string
+	allDay?: boolean
+	resizable?: boolean
+	draggable?: boolean
+	deletable?: boolean
+}
+
+// Import des types depuis vue-cal et les types GraphQL générés
+import type { VueCalEvent } from 'vue-cal'
+import type { Media } from '#gql/default'
+
+export interface AnimeCalEventInterface extends VueCalEvent {
+	media: Media
+	episode?: number
+	timeUntilAiring?: number
+	airingAt?: number
+}

@@ -5,6 +5,7 @@
     "": {
       "name": "ani-tools",
       "dependencies": {
+        "@iconify-json/circle-flags": "^1.2.10",
         "@iconify-json/lucide": "1.2.82",
         "@iconify-json/simple-icons": "1.2.63",
         "@nuxt/image": "2.0.0",
@@ -22,6 +23,7 @@
         "nuxt-graphql-client": "0.2.46",
         "pinia": "3.0.4",
         "pinia-plugin-persistedstate": "^4.7.1",
+        "vue-cal": "^5.0.1-rc.34",
         "vue-draggable-plus": "^0.6.0",
         "zod": "^4.1.12",
       },
@@ -373,6 +375,8 @@
     "@humanwhocodes/module-importer": ["@humanwhocodes/module-importer@1.0.1", "", {}, "sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA=="],
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
+
+    "@iconify-json/circle-flags": ["@iconify-json/circle-flags@1.2.10", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-sZRxs689a281RtZvuAiKtV7pQHv8Tk0HkinSM7QvLgdLEK8xgGRCcbDvL09Rq+/KtemmsMzGhS9/qt+r3ca+Ug=="],
 
     "@iconify-json/lucide": ["@iconify-json/lucide@1.2.82", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-fHZWegspOZonl5GNTvOkHsjnTMdSslFh3EzpzUtRyLxO8bOonqk2OTU3hCl0k4VXzViMjqpRK3X1sotnuBXkFA=="],
 
@@ -2965,6 +2969,8 @@
     "vue": ["vue@3.5.26", "", { "dependencies": { "@vue/compiler-dom": "3.5.26", "@vue/compiler-sfc": "3.5.26", "@vue/runtime-dom": "3.5.26", "@vue/server-renderer": "3.5.26", "@vue/shared": "3.5.26" }, "peerDependencies": { "typescript": "*" } }, "sha512-SJ/NTccVyAoNUJmkM9KUqPcYlY+u8OVL1X5EW9RIs3ch5H2uERxyyIUI4MRxVCSOiEcupX9xNGde1tL9ZKpimA=="],
 
     "vue-bundle-renderer": ["vue-bundle-renderer@2.2.0", "", { "dependencies": { "ufo": "^1.6.1" } }, "sha512-sz/0WEdYH1KfaOm0XaBmRZOWgYTEvUDt6yPYaUzl4E52qzgWLlknaPPTTZmp6benaPTlQAI/hN1x3tAzZygycg=="],
+
+    "vue-cal": ["vue-cal@5.0.1-rc.34", "", { "peerDependencies": { "vue": "^3.5.11" } }, "sha512-ue9VX1la9sh1GzEMI7QiqP4DTchwlI7/8gTaZdkZHkMIgjh6wCtUDwlEMV3X+c/LXcxmCjKIg+DOS2sqHWzt4A=="],
 
     "vue-chrts": ["vue-chrts@2.0.0", "", { "peerDependencies": { "vue": "^3.5.13" } }, "sha512-TwjTlULMT4DQfw7XRH1scTNZSqIy/jCKf1+vSZ9+hm61KHrKLhK8+7+UeuK/tP2i4sCaOsRfvd+8ZQvluXyWAg=="],
 

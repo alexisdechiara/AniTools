@@ -12,6 +12,7 @@
 		"typecheck": "nuxt typecheck"
 	},
 	"dependencies": {
+		"@iconify-json/circle-flags": "^1.2.10",
 		"@iconify-json/lucide": "1.2.82",
 		"@iconify-json/simple-icons": "1.2.63",
 		"@nuxt/image": "2.0.0",
@@ -29,6 +30,7 @@
 		"nuxt-graphql-client": "0.2.46",
 		"pinia": "3.0.4",
 		"pinia-plugin-persistedstate": "^4.7.1",
+		"vue-cal": "^5.0.1-rc.34",
 		"vue-draggable-plus": "^0.6.0",
 		"zod": "^4.1.12"
 	},

@@ -223,7 +223,7 @@ const popularRankText = computed(() => {
 const meanScoreText = computed(() => (media.value?.meanScore ? `${media.value.meanScore.toFixed(0)} %` : '-'));
 const favouritesText = computed(() => media.value?.favourites || '-');
 
-const animeThemeColor = computed(() => props.data?.media?.coverImage?.color || 'var(--ui-)');
+const animeThemeColor = computed(() => props.data?.media?.coverImage?.color || 'var(--ui-color-primary-400)');
 const sanitizedDescription = computed(() => (props.data?.media?.description || '').replace(/(<([^>]+)>)/ig, ''));
 
 
