@@ -1,56 +1,9 @@
-// Cache simple pour stocker les résultats
-const cache = new Map<string, unknown>()
+import type { GetAiringAnimesQuery } from "#gql/default"
+
+type AiringSchedule = NonNullable<NonNullable<GetAiringAnimesQuery["Page"]>["airingSchedules"]>[number]
 
 export const useAiringSchedules = () => {
-	// État réactif pour le calendrier
-	const vueCalRef = ref()
-	const timeStep = ref(20)
-	const airingAtGreater = ref<number>()
-	const airingAtLesser = ref<number>()
-
-	const updateDateRange = (start: number, end: number) => {
-		airingAtGreater.value = start
-		airingAtLesser.value = end
-	}
-
-	// Gérer Ctrl + scroll pour modifier le time step
-	const handleWheel = (event: WheelEvent) => {
-		if (event.ctrlKey) {
-			event.preventDefault()
-
-			// Augmenter ou réduire le time step
-			if (event.deltaY < 0) {
-				// Scroll up - augmenter la précision (réduire le time step)
-				timeStep.value = Math.max(5, timeStep.value - 5)
-			} else {
-				// Scroll down - réduire la précision (augmenter le time step)
-				timeStep.value = Math.min(120, timeStep.value + 5)
-			}
-		}
-	}
-
-	// Centrer le calendrier sur l'heure actuelle lorsqu'il est prêt
-	const onCalendarReady = () => {
-		if (vueCalRef.value) {
-			vueCalRef.value.view.scrollToCurrentTime()
-		}
-	}
-
-	// Gérer le changement de vue du calendrier
-	const refreshView = (view: any) => {
-		// Obtenir la plage de dates de la vue actuelle
-		const startDate = view.extendedStart
-		const endDate = view.extendedEnd
-
-		// Convertir en timestamps Unix
-		const startTimestamp = Math.floor(startDate.getTime() / 1000)
-		const endTimestamp = Math.floor(endDate.getTime() / 1000)
-
-		// Mettre à jour les variables réactives
-		updateDateRange(startTimestamp, endTimestamp)
-	}
-
-	// Layout des événements
+	// ========== Layout des événements ==========
 	const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 	const EVENT_NARROW_WIDTH = 120
 	const EVENT_TINY_WIDTH = 92
@@ -101,7 +54,7 @@ export const useAiringSchedules = () => {
 		return eventWidths[getEventKey(event)] ?? Infinity
 	}
 
-	const getEventVisualScale = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => {
+	const getEventVisualScale = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, _timeStep: number) => {
 		const width = getMeasuredEventWidth(event)
 		const height = getMeasuredEventHeight(event)
 
@@ -121,12 +74,12 @@ export const useAiringSchedules = () => {
 		fontScale: number
 	}
 
-	const getEventLayout = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }): EventLayout => {
+	const getEventLayout = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): EventLayout => {
 		const width = getMeasuredEventWidth(event)
 		const height = getMeasuredEventHeight(event)
-		const ratio = clamp(getEventStepsRatio(event), 0.75, 8)
+		const ratio = clamp(getEventStepsRatio(event, timeStep), 0.75, 8)
 		const titleLength = (event.title || "").length
-		const scale = getEventVisualScale(event)
+		const scale = getEventVisualScale(event, timeStep)
 		const titleDensity = clamp(titleLength / 28, 0.8, 2.8)
 
 		// Taille typo période.
@@ -219,25 +172,25 @@ export const useAiringSchedules = () => {
 		}
 	}
 
-	const shouldShowBadges = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => getEventLayout(event).showBadges
-	const shouldShowPeriod = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => getEventLayout(event).showPeriod
-	const getPeriodTextClass = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => getEventLayout(event).periodClass
-	const getBadgeSize = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }): "xs" | "sm" | "md" => getEventLayout(event).badgeSize
+	const shouldShowBadges = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).showBadges
+	const shouldShowPeriod = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).showPeriod
+	const getPeriodTextClass = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).periodClass
+	const getBadgeSize = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): "xs" | "sm" | "md" => getEventLayout(event, timeStep).badgeSize
 
 	const getEventDurationInMinutes = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => {
 		const start = new Date(event.start).getTime()
 		const end = new Date(event.end).getTime()
 
-		if (Number.isNaN(start) || Number.isNaN(end)) return timeStep.value
+		if (Number.isNaN(start) || Number.isNaN(end)) return 20 // default timeStep
 		return Math.max(1, Math.round((end - start) / 60000))
 	}
 
-	const getEventStepsRatio = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => {
-		return getEventDurationInMinutes(event) / Math.max(1, timeStep.value)
+	const getEventStepsRatio = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => {
+		return getEventDurationInMinutes(event) / Math.max(1, timeStep)
 	}
 
-	const getEventStyleVars = (event: { start: Date | string, end: Date | string, media?: { id?: number, title?: string, coverImage?: { color?: string } } }) => {
-		const layout = getEventLayout(event)
+	const getEventStyleVars = (event: { start: Date | string, end: Date | string, media?: { id?: number, title?: string, coverImage?: { color?: string } } }, timeStep: number) => {
+		const layout = getEventLayout(event, timeStep)
 
 		return {
 			"--anime-theme-color": event.media?.coverImage?.color || "var(--ui-color-primary-400)",
@@ -270,97 +223,64 @@ export const useAiringSchedules = () => {
 		eventCardElements.clear()
 	})
 
-	// Fonction pour générer une clé de cache basée sur la plage de dates
-	const getCacheKey = (start: number, end: number): string => {
-		return `${start}-${end}`
-	}
+	// ========== Fonction pour récupérer tous les airing animes avec pagination ==========
+	async function fetchAiringAnimesByDateRange() {
+		const { airingAtGreater, airingAtLesser } = storeToRefs(useCalendarStore())
 
-	// Fonction pour fetcher toutes les pages avec pagination et cache
-	const fetchAllAiringAnimes = async (start: number, end: number) => {
-		const cacheKey = getCacheKey(start, end)
+		return await useAsyncData(
+			`airing-animes-${airingAtGreater.value}-${airingAtLesser.value}`,
+			async () => {
+				let allSchedules: AiringSchedule[] = []
+				let hasNextPage = true
+				let page = 1
+				let retryCount = 0
+				const maxRetries = 3
 
-		// Vérifier si les données sont déjà en cache
-		if (cache.has(cacheKey)) {
-			return cache.get(cacheKey)
-		}
+				while (hasNextPage && retryCount < maxRetries) {
+					console.log("Fetching")
 
-		let allSchedules: unknown[] = []
-		let page = 1
-		let hasNextPage = true
-		let retryCount = 0
-		const maxRetries = 3
+					try {
+						const { data: gqlData } = await useAsyncGql({
+							operation: "getAiringAnimes",
+							variables: { page, airingAtGreater: airingAtGreater.value, airingAtLesser: airingAtLesser.value }
+						})
 
-		while (hasNextPage && retryCount < maxRetries) {
-			try {
-				const { data } = await useAsyncGql({
-					operation: "getAiringAnimes",
-					variables: {
-						page,
-						airingAtGreater: start,
-						airingAtLesser: end
+						console.log("fetch animes page ", page)
+
+						if (gqlData.value?.Page?.airingSchedules) {
+							const newSchedules = gqlData.value.Page.airingSchedules as AiringSchedule[]
+							allSchedules = [...allSchedules, ...newSchedules]
+							hasNextPage = (gqlData.value.Page.pageInfo?.hasNextPage as boolean) ?? false
+							page++
+							retryCount = 0
+						} else {
+							hasNextPage = false
+						}
+					} catch (error) {
+						console.error(`Erreur lors de la récupération de la page ${page}:`, error)
+						retryCount++
+						if (retryCount >= maxRetries) {
+							console.error("Nombre maximum de tentatives atteint")
+							break
+						}
+						// Attendre avant de réessayer
+						await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
 					}
-				})
-
-				if (data.value?.Page?.airingSchedules) {
-					allSchedules = [...allSchedules, ...(data.value.Page.airingSchedules as unknown[])]
-					hasNextPage = (data.value.Page.pageInfo?.hasNextPage as boolean) ?? false
-					page++
-					retryCount = 0 // Reset retry count on success
-				} else {
-					hasNextPage = false
 				}
-			} catch (error) {
-				console.error(`Erreur lors du fetch de la page ${page}:`, error)
-				retryCount++
-				if (retryCount >= maxRetries) {
-					console.error("Nombre maximum de tentatives atteint, arrêt du fetch")
-					hasNextPage = false
-				}
-				// Attendre un peu avant de réessayer
-				await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+				return allSchedules
+			},
+			{
+				watch: [airingAtGreater, airingAtLesser]
 			}
-		}
-
-		const result = { Page: { airingSchedules: allSchedules } } as { Page: { airingSchedules: unknown[] } }
-
-		// Stocker en cache
-		cache.set(cacheKey, result)
-
-		return result
+		)
 	}
 
-	// Fonction pour vider le cache (utile pour forcer un rafraîchissement)
-	const clearCache = (): void => {
-		cache.clear()
-		console.log("🗑️ Cache vidé")
-	}
-
-	// Fonction pour vider une entrée spécifique du cache
-	const clearCacheEntry = (start: number, end: number): void => {
-		const cacheKey = getCacheKey(start, end)
-		cache.delete(cacheKey)
-		console.log(`🗑️ Entrée ${cacheKey} supprimée du cache`)
-	}
-
-	// Retourner les fonctions et l'état du cache
+	// Retourner les fonctions
 	return {
-		// Fonctions existantes
-		fetchAllAiringAnimes,
-		clearCache,
-		clearCacheEntry,
-		cacheSize: cache.size,
+		// Data fetching
+		fetchAiringAnimesByDateRange,
 
-		// État et fonctions du calendrier
-		vueCalRef,
-		timeStep,
-		airingAtGreater,
-		airingAtLesser,
-		updateDateRange,
-		handleWheel,
-		onCalendarReady,
-		refreshView,
-
-		// Layout des événements
+		// Layout des événements (requiert timeStep en paramètre)
 		setEventCardRef,
 		shouldShowBadges,
 		shouldShowPeriod,

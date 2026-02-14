@@ -1,5 +1,9 @@
 import type { AvatarProps } from "@nuxt/ui"
 
+// Import des types depuis vue-cal et les types GraphQL générés
+import type { VueCalEvent } from "vue-cal"
+import type { Media } from "#gql/default"
+
 export type UserStatus = "subscribed" | "unsubscribed" | "bounced"
 export type SaleStatus = "paid" | "failed" | "refunded"
 
@@ -71,10 +75,6 @@ export interface VueCalEvent {
 	draggable?: boolean
 	deletable?: boolean
 }
-
-// Import des types depuis vue-cal et les types GraphQL générés
-import type { VueCalEvent } from 'vue-cal'
-import type { Media } from '#gql/default'
 
 export interface AnimeCalEventInterface extends VueCalEvent {
 	media: Media

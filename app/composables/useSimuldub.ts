@@ -17,20 +17,22 @@ export const useSimuldub = () => {
 		const startDate = formatDateToUTC(dateRange.start)
 		const endDate = formatDateToUTC(dateRange.end)
 
-		return await useAsyncData(() =>
-			directus.request(
-				readItems("simuldub", {
-					filter: {
-						status: {
-							_or: [{ _eq: "published" }, { _eq: "draft" }]
-						},
-						start_date: {
-							_gte: startDate,
-							_lte: endDate
+		return await useAsyncData(
+			`simuldubs-${startDate}-${endDate}`,
+			() =>
+				directus.request(
+					readItems("simuldub", {
+						filter: {
+							status: {
+								_or: [{ _eq: "published" }, { _eq: "draft" }]
+							},
+							start_date: {
+								_gte: startDate,
+								_lte: endDate
+							}
 						}
-					}
-				})
-			)
+					})
+				)
 		)
 	}
 

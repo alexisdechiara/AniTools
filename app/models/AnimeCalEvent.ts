@@ -1,8 +1,8 @@
 import { add } from "date-fns"
 
 interface VueCalEvent {
-	start: Date | string
-	end: Date | string
+	start: Date
+	end: Date
 	id?: string
 	title?: string
 	content?: string
@@ -31,9 +31,9 @@ const languageToCountry = (item: string) => {
 }
 
 export class AnimeCalEvent implements VueCalEvent {
-	start: Date | string
-	end: Date | string
-	id?: string
+	start: Date
+	end: Date
+	id: string
 	title?: string
 	content?: string
 	class?: string
@@ -53,7 +53,7 @@ export class AnimeCalEvent implements VueCalEvent {
 		this.title = data.media?.title?.english || data.media?.title?.romaji || "Unknown Title"
 		this.content = `Episode ${data.episode}`
 		this.class = "anime-event"
-		this.id = `${data.media?.id}-${data.episode}`
+		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
 		this.media = data.media
 		this.episode = data.episode
 		this.timeUntilAiring = data.timeUntilAiring
@@ -71,6 +71,7 @@ export class SimuldubCalEvent extends AnimeCalEvent {
 		} else if (data.media.duration) {
 			this.end = add(new Date(this.start), { minutes: data.media.duration })
 		}
+		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
 		this.languages = data.languages.map(languageToCountry)
 		this.streaming = data.streaming
 	}

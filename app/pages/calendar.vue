@@ -1,8 +1,9 @@
 <template>
 	<UDashboardPanel id="calendar" class="h-screen">
-		<vue-cal ref="vueCalRef" v-model:view="currentView" :time-step="timeStep" time-at-cursor week-numbers
-			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="handleWheel"
-			:time-cell-height="currentView === 'day' ? 96 : currentView === 'week' ? 64 : 48" @ready="onCalendarReady"
+		<vue-cal ref="vueCalRef" v-model:view="store.currentView" :time-step="store.timeStep" time-at-cursor week-numbers
+			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="store.handleWheel"
+			:time-cell-height="store.currentView === 'day' ? 96 : store.currentView === 'week' ? 64 : 48"
+			@ready="onCalendarReady"
 			@view-change="onViewChange">
 			<template #header="{ view, availableViews }">
 				<div class="flex items-center bg-default px-6 h-16">
@@ -13,7 +14,7 @@
 							</strong>
 							{{ view.now.format('YYYY') }}
 							<span class="text-primary text-sm ms-2 flex items-center -tracking-widest ">
-								{{ isWeekView ? `W ${view.now.getWeek()}` : isDayView ? view.now.format(`DD{S}`) : '' }}
+								{{ store.isWeekView ? `W ${view.now.getWeek()}` : store.isDayView ? view.now.format(`DD{S}`) : '' }}
 							</span>
 						</h2>
 						<UButton label="Today" size="xs" color="neutral" variant="soft" @click="view.goToToday()"
@@ -30,7 +31,7 @@
 							<UButton icon="i-lucide-list-filter" size="sm" color="neutral" variant="soft"
 								class="h-fit cursor-pointer" />
 						</UDropdownMenu>
-						<UTabs v-model="currentView" size="xs" class="w-fit" color="neutral"
+						<UTabs v-model="store.currentView" size="xs" class="w-fit" color="neutral"
 							:ui="{ root: 'gap-0', trigger: 'cursor-pointer' }"
 							:items="Object.keys(availableViews).map((viewKey: string) => ({ label: String(viewKey).charAt(0).toUpperCase() + String(viewKey).slice(1), value: viewKey }))" />
 					</div>
@@ -38,30 +39,32 @@
 			</template>
 			<template #weekday-heading="{ label, date }">
 				<UButton size="sm" color="neutral" variant="soft" class="rounded-full uppercase m-2"
-					:class="!isMonthView && 'cursor-pointer'"
-					@click="!isMonthView ? $refs.vueCalRef?.view.switch('day', date) : ''">
+					:class="!store.isMonthView && 'cursor-pointer'"
+					@click="!store.isMonthView ? $refs.vueCalRef?.view.switch('day', date) : ''">
 					{{ date.format("dddd") }}
-					<strong v-if="!isMonthView" class="font-bold">{{ date.format('DD') }}</strong>
+					<strong v-if="!store.isMonthView" class="font-bold">{{ date.format('DD') }}</strong>
 				</UButton>
 			</template>
 			<template #event="{ event }">
 				<AnimeDetailsPopover :data="event" :content="{ sideOffset: 32 }">
 					<div
 						class="calendar-event-card flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer hover:bg-(--anime-theme-color)/50 transition-colors"
-						:ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event)">
+						:ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event, store.timeStep)">
 						<span class="font-medium text-default calendar-event-title">{{ event.title }}</span>
-						<span v-if="shouldShowPeriod(event)" class="text-muted font-light" :class="getPeriodTextClass(event)">{{
+						<span v-if="shouldShowPeriod(event, store.timeStep)" class="text-muted font-light"
+							:class="getPeriodTextClass(event, store.timeStep)">{{
 							event.start.format('HH:mm') }} - {{ event.end.format('HH:mm')
 							}}</span>
-						<div v-if="shouldShowBadges(event)" class="flex items-center gap-2">
+						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2">
 
 							<template v-if="event.streaming">
 								<UBadge v-for="platform in event.streaming" :key="platform" :label="platform"
-									:size="getBadgeSize(event)" variant="subtle"
+									:size="getBadgeSize(event, store.timeStep)" variant="subtle"
 									class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
 									:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
 							</template>
-							<UBadge v-else-if="event.media?.format" :label="event.media?.format" :size="getBadgeSize(event)"
+							<UBadge v-else-if="event.media?.format" :label="event.media?.format"
+								:size="getBadgeSize(event, store.timeStep)"
 								variant="subtle"
 								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
 								:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
@@ -73,7 +76,7 @@
 					</div>
 				</AnimeDetailsPopover>
 			</template>
-			<template v-if="isMonthView" #cell="{ cell }">
+			<template v-if="store.isMonthView" #cell="{ cell }">
 				<div class="relative flex flex-col items-end size-full cursor-pointer hover:bg-muted p-2"
 					@click="$refs.vueCalRef?.view.switch('week', cell.start)">
 					<UBadge variant="soft" color="neutral" class="rounded-full size-fit">
@@ -90,183 +93,41 @@
 import { VueCal, addDatePrototypes } from 'vue-cal'
 import 'vue-cal/style'
 import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
-import { getCalendarRange } from '~/utils/calendarRange'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
-import type { DropdownMenuItem } from '@nuxt/ui'
+import { useCalendarStore } from '~/stores/Calendar'
 
 addDatePrototypes()
-const calendarRange = getCalendarRange()
+
+const store = useCalendarStore()
+
+const vueCalRef = ref()
 
 const {
-	timeStep,
-	airingAtGreater,
-	airingAtLesser,
-	updateDateRange,
-	handleWheel,
-	onCalendarReady,
-	refreshView,
-	fetchAllAiringAnimes,
 	setEventCardRef,
 	shouldShowBadges,
 	shouldShowPeriod,
 	getPeriodTextClass,
 	getBadgeSize,
 	getEventStyleVars,
-	vueCalRef
+	fetchAiringAnimesByDateRange
 } = useAiringSchedules()
 
-const { fetchSimuldubByDateRange } = useSimuldub()
+const { fetchSimuldubByDateRange, fetchAllSimuldub } = useSimuldub()
 
-const currentView = ref('week')
-const currentFormat = ref<string[]>(['TV', 'ONA', 'MOVIE'])
-const dubbing = ref<string[]>(['jp', 'cn', 'en', 'fr'])
+// Récupérer les données
+const { data: airingSchedules } = await fetchAiringAnimesByDateRange()
+const { data: simuldubs } = await fetchAllSimuldub()
 
+// ========== Filtres ==========
 const items = computed(() => {
-	let array = [{
-	label: 'Formats',
-	type: 'label' as const
-}, {
-	type: 'separator' as const
-}, {
-	label: 'TV',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('TV'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('TV') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'TV')
-	},
-	onSelect(e: Event) {
-		e.preventDefault()
-	}
-}, {
-	label: 'ONA',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('ONA'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('ONA') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'ONA')
-		},
-		onSelect(e: Event) {
-			e.preventDefault()
-	}
-}, {
-	label: 'Movie',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('MOVIE'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('MOVIE') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'MOVIE')
-	},
-		onSelect(e: Event) {
-			e.preventDefault()
-		}
-}, {
-	label: 'TV Short',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('TV_SHORT'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('TV_SHORT') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'TV_SHORT')
-	},
-		onSelect(e: Event) {
-			e.preventDefault()
-		}
-}, {
-	label: 'OVA',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('OVA'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('OVA') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'OVA')
-	},
-		onSelect(e: Event) {
-			e.preventDefault()
-		}
-}, {
-	label: 'Specials',
-	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('SPECIAL'),
-	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('SPECIAL') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'SPECIAL')
-	},
-		onSelect(e: Event) {
-			e.preventDefault()
-		}
-}, {
-	label: 'Dubbing',
-	type: 'label' as const
-}, {
-	type: 'separator' as const
-}, {
-			label: 'Japanese',
-			type: 'checkbox' as const,
-			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('jp')),
-			checked: dubbing.value.includes('jp'),
-			onUpdateChecked(checked: boolean) {
-				checked ? dubbing.value.push('jp') : dubbing.value = dubbing.value.filter((format: string) => format !== 'jp')
-			},
-			onSelect(e: Event) {
-				e.preventDefault()
-			}
-		}, {
-			label: 'Chinese',
-			type: 'checkbox' as const,
-			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('cn')),
-			checked: dubbing.value.includes('cn'),
-			onUpdateChecked(checked: boolean) {
-				checked ? dubbing.value.push('cn') : dubbing.value = dubbing.value.filter((format: string) => format !== 'cn')
-			},
-			onSelect(e: Event) {
-				e.preventDefault()
-			}
-		}] satisfies DropdownMenuItem[]
-
-	if (calendarEvents.value.some((event: any) => event.languages.includes('en'))) {
-		array.push({
-			label: 'English',
-			type: 'checkbox' as const,
-			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('en')),
-			checked: dubbing.value.includes('en'),
-			onUpdateChecked(checked: boolean) {
-				checked ? dubbing.value.push('en') : dubbing.value = dubbing.value.filter((format: string) => format !== 'en')
-			},
-			onSelect(e: Event) {
-				e.preventDefault()
-			}
-		})
-	}
-
-	if (calendarEvents.value.some((event: any) => event.languages.includes('fr'))) {
-		array.push({
-	label: 'French',
-	type: 'checkbox' as const,
-			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('fr')),
-			checked: dubbing.value.includes('fr'),
-	onUpdateChecked(checked: boolean) {
-		checked ? dubbing.value.push('fr') : dubbing.value = dubbing.value.filter((format: string) => format !== 'fr')
-	},
-			onSelect(e: Event) {
-				e.preventDefault()
-			}
-		})
-	}
-
-	return array
+	const availableLanguages = [...new Set(filteredCalendarEvents.value.flatMap((e: AnimeCalEvent) => e.languages ?? []))]
+	return store.getFilterMenuItems(availableLanguages)
 })
 
-const isMonthView = computed(() => currentView.value === 'month')
-const isDayView = computed(() => currentView.value === 'day')
-const isWeekView = computed(() => currentView.value === 'week')
-
-updateDateRange(calendarRange.start, calendarRange.end)
-
-const { data, refresh } = await useAsyncData('calendar-animes', async () => {
-	const schedules = await fetchAllAiringAnimes(airingAtGreater.value!, airingAtLesser.value!)
-	return (schedules as any)?.Page?.airingSchedules
-})
-
-const { data: simuldubs, refresh: refreshSimuldubs } = await fetchSimuldubByDateRange({ start: new Date(calendarRange.start * 1000), end: new Date(calendarRange.end * 1000) })
-
-const calendarEvents = ref<Array<AnimeCalEvent>>([])
-watch(() => [data.value, simuldubs.value], () => {
-	if (data.value) {
-		const events = data.value.map((item: any) => new AnimeCalEvent(item))
-
+const filteredCalendarEvents = computed(() => {
+	let events: Array<AnimeCalEvent> = []
+	if (airingSchedules.value) {
+		events = airingSchedules.value.map((item: any) => new AnimeCalEvent(item))
 		if (simuldubs.value?.length) {
 			simuldubs.value.forEach((simuldub: any) => {
 				const matchingCalEvent = events.find((event: AnimeCalEvent) => event.media.id === simuldub.anilist_media_id)
@@ -283,39 +144,33 @@ watch(() => [data.value, simuldubs.value], () => {
 				}
 			})
 		}
-
-		// TODO: faire en sorte que l'on ne perde pas les données mais qu'ils n'y ai pas non plus de doublons
-		calendarEvents.value = events
 	}
-}, {
-	immediate: true,
-	deep: true
-})
 
-const filteredCalendarEvents = computed(() =>
-	calendarEvents.value.filter((event: any) => {
-		const formatMatch = currentFormat.value.includes(event.media?.format)
-		const languageMatch = event.languages.some((language: string) => dubbing.value.includes(language))
-
+	return events.filter((event: any) => {
+		const formatMatch = store.currentFormat.includes(event.media?.format)
+		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
 		return formatMatch && languageMatch
 	})
-)
+})
+
+// ========== Gestion des vues et refresh ==========
+const onCalendarReady = () => {
+	vueCalRef.value?.view?.scrollToCurrentTime()
+}
 
 const onViewChange = async (view: any) => {
-	refreshView(view)
-	nextTick(async () => {
-		await refresh()
-		await refreshSimuldubs()
-	})
+	store.setDateRangeFromView(view)
+
 	setTimeout(() => {
-		vueCalRef.value?.view.scrollToCurrentTime()
+		vueCalRef.value?.view?.scrollToCurrentTime()
 	}, 500)
 }
 
 onMounted(() => {
-	vueCalRef.value?.view.scrollToCurrentTime()
+	setTimeout(() => {
+		vueCalRef.value?.view?.scrollToCurrentTime()
+	}, 500)
 })
-
 </script>
 
 <style>

@@ -1,8 +1,8 @@
 export type CalendarRangeType = "week" | "month" | "year"
 
 export interface CalendarRange {
-	start: number
-	end: number
+	start: Date
+	end: Date
 }
 
 export function getCalendarRange(
@@ -37,7 +37,7 @@ export function getCalendarRange(
 	}
 
 	return {
-		start: Math.floor(start.getTime() / 1000),
-		end: Math.floor(end.getTime() / 1000)
+		start: start,
+		end: end
 	}
 }

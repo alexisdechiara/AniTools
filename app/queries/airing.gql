@@ -3,7 +3,7 @@ query getAiringAnimes(
   $airingAtGreater: Int,
   $airingAtLesser: Int
 ) {
-  Page(page: $page, perPage: 50) {
+  Page(page: $page, perPage: 100) {
     pageInfo {
       hasNextPage
     }
