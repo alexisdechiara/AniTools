@@ -1,7 +1,7 @@
 <template>
 	<UDashboardPanel id="calendar" class="h-screen">
 		<vue-cal ref="vueCalRef" v-model:view="currentView" :time-step="timeStep" time-at-cursor week-numbers
-			:views="['day', 'week', 'month']" :events="calendarEvents" @wheel="handleWheel"
+			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="handleWheel"
 			:time-cell-height="currentView === 'day' ? 96 : currentView === 'week' ? 64 : 48" @ready="onCalendarReady"
 			@view-change="onViewChange">
 			<template #header="{ view, availableViews }">
@@ -53,12 +53,22 @@
 						<span v-if="shouldShowPeriod(event)" class="text-muted font-light" :class="getPeriodTextClass(event)">{{
 							event.start.format('HH:mm') }} - {{ event.end.format('HH:mm')
 							}}</span>
-						<div v-if="shouldShowBadges(event)" class="flex items-center gap-2 justify-between">
-							<UBadge v-if="event.media?.format" :label="event.media?.format" :size="getBadgeSize(event)"
+						<div v-if="shouldShowBadges(event)" class="flex items-center gap-2">
+
+							<template v-if="event.streaming">
+								<UBadge v-for="platform in event.streaming" :key="platform" :label="platform"
+									:size="getBadgeSize(event)" variant="subtle"
+									class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
+									:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
+							</template>
+							<UBadge v-else-if="event.media?.format" :label="event.media?.format" :size="getBadgeSize(event)"
 								variant="subtle"
 								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
 								:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
-							<Icon :name="`i-circle-flags-${event.media?.countryOfOrigin || 'jp'}`" class="size-3" />
+							<template v-if="event.languages">
+								<Icon v-for="language in event.languages" :key="language" :name="`i-circle-flags-${language}`"
+									class="size-3" />
+							</template>
 						</div>
 					</div>
 				</AnimeDetailsPopover>
@@ -79,7 +89,7 @@
 // @ts-ignore
 import { VueCal, addDatePrototypes } from 'vue-cal'
 import 'vue-cal/style'
-import { AnimeCalEvent } from '~/models/AnimeCalEvent'
+import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
 import { getCalendarRange } from '~/utils/calendarRange'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -101,14 +111,18 @@ const {
 	shouldShowPeriod,
 	getPeriodTextClass,
 	getBadgeSize,
-	getEventStyleVars
+	getEventStyleVars,
+	vueCalRef
 } = useAiringSchedules()
+
+const { fetchSimuldubByDateRange } = useSimuldub()
 
 const currentView = ref('week')
 const currentFormat = ref<string[]>(['TV', 'ONA', 'MOVIE'])
-const dubbing = ref<string[]>([])
+const dubbing = ref<string[]>(['jp', 'cn', 'en', 'fr'])
 
-const items = computed(() => [{
+const items = computed(() => {
+	let array = [{
 	label: 'Formats',
 	type: 'label' as const
 }, {
@@ -129,6 +143,9 @@ const items = computed(() => [{
 	checked: currentFormat.value.includes('ONA'),
 	onUpdateChecked(checked: boolean) {
 		checked ? currentFormat.value.push('ONA') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'ONA')
+		},
+		onSelect(e: Event) {
+			e.preventDefault()
 	}
 }, {
 	label: 'Movie',
@@ -137,6 +154,9 @@ const items = computed(() => [{
 	onUpdateChecked(checked: boolean) {
 		checked ? currentFormat.value.push('MOVIE') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'MOVIE')
 	},
+		onSelect(e: Event) {
+			e.preventDefault()
+		}
 }, {
 	label: 'TV Short',
 	type: 'checkbox' as const,
@@ -144,6 +164,9 @@ const items = computed(() => [{
 	onUpdateChecked(checked: boolean) {
 		checked ? currentFormat.value.push('TV_SHORT') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'TV_SHORT')
 	},
+		onSelect(e: Event) {
+			e.preventDefault()
+		}
 }, {
 	label: 'OVA',
 	type: 'checkbox' as const,
@@ -151,6 +174,9 @@ const items = computed(() => [{
 	onUpdateChecked(checked: boolean) {
 		checked ? currentFormat.value.push('OVA') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'OVA')
 	},
+		onSelect(e: Event) {
+			e.preventDefault()
+		}
 }, {
 	label: 'Specials',
 	type: 'checkbox' as const,
@@ -158,26 +184,70 @@ const items = computed(() => [{
 	onUpdateChecked(checked: boolean) {
 		checked ? currentFormat.value.push('SPECIAL') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'SPECIAL')
 	},
+		onSelect(e: Event) {
+			e.preventDefault()
+		}
 }, {
 	label: 'Dubbing',
 	type: 'label' as const
 }, {
 	type: 'separator' as const
 }, {
-	label: 'English',
-	type: 'checkbox' as const,
-	checked: dubbing.value.includes('EN'),
-	onUpdateChecked(checked: boolean) {
-		checked ? dubbing.value.push('EN') : dubbing.value = dubbing.value.filter((format: string) => format !== 'EN')
-	},
-}, {
+			label: 'Japanese',
+			type: 'checkbox' as const,
+			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('jp')),
+			checked: dubbing.value.includes('jp'),
+			onUpdateChecked(checked: boolean) {
+				checked ? dubbing.value.push('jp') : dubbing.value = dubbing.value.filter((format: string) => format !== 'jp')
+			},
+			onSelect(e: Event) {
+				e.preventDefault()
+			}
+		}, {
+			label: 'Chinese',
+			type: 'checkbox' as const,
+			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('cn')),
+			checked: dubbing.value.includes('cn'),
+			onUpdateChecked(checked: boolean) {
+				checked ? dubbing.value.push('cn') : dubbing.value = dubbing.value.filter((format: string) => format !== 'cn')
+			},
+			onSelect(e: Event) {
+				e.preventDefault()
+			}
+		}] satisfies DropdownMenuItem[]
+
+	if (calendarEvents.value.some((event: any) => event.languages.includes('en'))) {
+		array.push({
+			label: 'English',
+			type: 'checkbox' as const,
+			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('en')),
+			checked: dubbing.value.includes('en'),
+			onUpdateChecked(checked: boolean) {
+				checked ? dubbing.value.push('en') : dubbing.value = dubbing.value.filter((format: string) => format !== 'en')
+			},
+			onSelect(e: Event) {
+				e.preventDefault()
+			}
+		})
+	}
+
+	if (calendarEvents.value.some((event: any) => event.languages.includes('fr'))) {
+		array.push({
 	label: 'French',
 	type: 'checkbox' as const,
-	checked: currentFormat.value.includes('FR'),
+			disabled: !calendarEvents.value.some((event: any) => event.languages.includes('fr')),
+			checked: dubbing.value.includes('fr'),
 	onUpdateChecked(checked: boolean) {
-		checked ? currentFormat.value.push('FR') : currentFormat.value = currentFormat.value.filter((format: string) => format !== 'FR')
+		checked ? dubbing.value.push('fr') : dubbing.value = dubbing.value.filter((format: string) => format !== 'fr')
 	},
-}] satisfies DropdownMenuItem[])
+			onSelect(e: Event) {
+				e.preventDefault()
+			}
+		})
+	}
+
+	return array
+})
 
 const isMonthView = computed(() => currentView.value === 'month')
 const isDayView = computed(() => currentView.value === 'day')
@@ -187,20 +257,64 @@ updateDateRange(calendarRange.start, calendarRange.end)
 
 const { data, refresh } = await useAsyncData('calendar-animes', async () => {
 	const schedules = await fetchAllAiringAnimes(airingAtGreater.value!, airingAtLesser.value!)
-	return schedules
+	return (schedules as any)?.Page?.airingSchedules
 })
 
-const calendarEvents = computed(() => {
-	if ((data.value as any)?.Page?.airingSchedules) {
-		return (data.value as any).Page.airingSchedules.map((item: any) => new AnimeCalEvent(item)).filter((event: any) => currentFormat.value.includes(event.media?.format))
+const { data: simuldubs, refresh: refreshSimuldubs } = await fetchSimuldubByDateRange({ start: new Date(calendarRange.start * 1000), end: new Date(calendarRange.end * 1000) })
+
+const calendarEvents = ref<Array<AnimeCalEvent>>([])
+watch(() => [data.value, simuldubs.value], () => {
+	if (data.value) {
+		const events = data.value.map((item: any) => new AnimeCalEvent(item))
+
+		if (simuldubs.value?.length) {
+			simuldubs.value.forEach((simuldub: any) => {
+				const matchingCalEvent = events.find((event: AnimeCalEvent) => event.media.id === simuldub.anilist_media_id)
+				if (matchingCalEvent) {
+					if (matchingCalEvent.start === new Date(simuldub.start_date)) {
+						matchingCalEvent.languages = simuldub.languages
+					} else {
+						const simuldubEvent = new SimuldubCalEvent({
+							...{ media: matchingCalEvent.media },
+							...simuldub,
+						})
+						events.push(simuldubEvent)
+					}
+				}
+			})
+		}
+
+		// TODO: faire en sorte que l'on ne perde pas les données mais qu'ils n'y ai pas non plus de doublons
+		calendarEvents.value = events
 	}
-	return []
+}, {
+	immediate: true,
+	deep: true
 })
+
+const filteredCalendarEvents = computed(() =>
+	calendarEvents.value.filter((event: any) => {
+		const formatMatch = currentFormat.value.includes(event.media?.format)
+		const languageMatch = event.languages.some((language: string) => dubbing.value.includes(language))
+
+		return formatMatch && languageMatch
+	})
+)
 
 const onViewChange = async (view: any) => {
 	refreshView(view)
-	await refresh()
+	nextTick(async () => {
+		await refresh()
+		await refreshSimuldubs()
+	})
+	setTimeout(() => {
+		vueCalRef.value?.view.scrollToCurrentTime()
+	}, 500)
 }
+
+onMounted(() => {
+	vueCalRef.value?.view.scrollToCurrentTime()
+})
 
 </script>
 

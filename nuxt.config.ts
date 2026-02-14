@@ -9,7 +9,7 @@ export default defineNuxtConfig({
 		"@pinia/nuxt",
 		"nuxt-graphql-client",
 		"pinia-plugin-persistedstate/nuxt",
-		"@nuxtjs/mdc"
+		"@nuxtjs/mdc",
 	],
 
 	components: [
@@ -27,7 +27,7 @@ export default defineNuxtConfig({
 
 	runtimeConfig: {
 		public: {
-			GQL_HOST: "https://graphql.anilist.co"
+			GQL_HOST: "https://graphql.anilist.co",
 		}
 	},
 

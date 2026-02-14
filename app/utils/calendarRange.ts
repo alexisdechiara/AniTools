@@ -1,4 +1,4 @@
-export type CalendarRangeType = 'week' | 'month' | 'year'
+export type CalendarRangeType = "week" | "month" | "year"
 
 export interface CalendarRange {
 	start: number
@@ -6,7 +6,7 @@ export interface CalendarRange {
 }
 
 export function getCalendarRange(
-	type: CalendarRangeType = 'week',
+	type: CalendarRangeType = "week",
 	date: Date = new Date()
 ): CalendarRange {
 	const current = new Date(date)
@@ -14,7 +14,7 @@ export function getCalendarRange(
 	let start: Date
 	let end: Date
 
-	if (type === 'week') {
+	if (type === "week") {
 		const day = current.getDay()
 		const diffToMonday = (day === 0 ? -6 : 1) - day
 
@@ -24,16 +24,12 @@ export function getCalendarRange(
 
 		end = new Date(start)
 		end.setDate(start.getDate() + 7)
-	}
-
-	else if (type === 'month') {
+	} else if (type === "month") {
 		start = new Date(current.getFullYear(), current.getMonth(), 1)
 		start.setHours(0, 0, 0, 0)
 
 		end = new Date(current.getFullYear(), current.getMonth() + 1, 1)
-	}
-
-	else {
+	} else {
 		start = new Date(current.getFullYear(), 0, 1)
 		start.setHours(0, 0, 0, 0)
 

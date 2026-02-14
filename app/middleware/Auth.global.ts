@@ -1,5 +1,5 @@
 // Définition des routes publiques qui ne nécessitent pas d'authentification
-const publicPaths = ["/login", "/calendar"]
+const publicPaths = ["/login", "/calendar", "/test"]
 // Routes qui fonctionnent avec et sans authentification
 const hybridPaths = ["/tierlist"]
 

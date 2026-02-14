@@ -31,11 +31,9 @@ export const useAiringSchedules = () => {
 
 	// Centrer le calendrier sur l'heure actuelle lorsqu'il est prêt
 	const onCalendarReady = () => {
-		nextTick(() => {
-			if (vueCalRef.value) {
-				vueCalRef.value.view.scrollToCurrentTime()
-			}
-		})
+		if (vueCalRef.value) {
+			vueCalRef.value.view.scrollToCurrentTime()
+		}
 	}
 
 	// Gérer le changement de vue du calendrier

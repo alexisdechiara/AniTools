@@ -12,6 +12,7 @@
 		"typecheck": "nuxt typecheck"
 	},
 	"dependencies": {
+		"@directus/sdk": "^21.1.0",
 		"@iconify-json/circle-flags": "^1.2.10",
 		"@iconify-json/lucide": "1.2.82",
 		"@iconify-json/simple-icons": "1.2.63",
@@ -22,6 +23,7 @@
 		"@unovis/ts": "^1.6.1",
 		"@unovis/vue": "^1.6.1",
 		"@vueuse/nuxt": "^14.0.0",
+		"country-to-iso": "^1.6.1",
 		"date-fns": "^4.1.0",
 		"embla-carousel-wheel-gestures": "^8.1.0",
 		"grid-layout-plus": "^1.1.1",
