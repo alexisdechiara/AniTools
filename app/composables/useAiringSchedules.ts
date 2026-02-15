@@ -1,6 +1,7 @@
 import type { GetAiringAnimesQuery } from "#gql/default"
 
 type AiringSchedule = NonNullable<NonNullable<GetAiringAnimesQuery["Page"]>["airingSchedules"]>[number]
+const AIRING_CACHE_TTL_MS = 5 * 60 * 1000
 
 export const useAiringSchedules = () => {
 	// ========== Layout des événements ==========
@@ -226,10 +227,21 @@ export const useAiringSchedules = () => {
 	// ========== Fonction pour récupérer tous les airing animes avec pagination ==========
 	async function fetchAiringAnimesByDateRange() {
 		const { airingAtGreater, airingAtLesser } = storeToRefs(useCalendarStore())
+		const gqlRequest = useGql()
+		const airingCache = useState<Record<string, { data: AiringSchedule[], expiresAt: number }>>(
+			"airing-animes-range-cache",
+			() => ({})
+		)
 
 		return await useAsyncData(
 			`airing-animes-${airingAtGreater.value}-${airingAtLesser.value}`,
 			async () => {
+				const cacheKey = `${airingAtGreater.value}-${airingAtLesser.value}`
+				const cached = airingCache.value[cacheKey]
+				if (cached && cached.expiresAt > Date.now()) {
+					return cached.data
+				}
+
 				let allSchedules: AiringSchedule[] = []
 				let hasNextPage = true
 				let page = 1
@@ -237,27 +249,25 @@ export const useAiringSchedules = () => {
 				const maxRetries = 3
 
 				while (hasNextPage && retryCount < maxRetries) {
-					console.log("Fetching")
-
 					try {
-						const { data: gqlData } = await useAsyncGql({
-							operation: "getAiringAnimes",
-							variables: { page, airingAtGreater: airingAtGreater.value, airingAtLesser: airingAtLesser.value }
+						const gqlData = await gqlRequest("getAiringAnimes", {
+							page,
+							airingAtGreater: airingAtGreater.value,
+							airingAtLesser: airingAtLesser.value
 						})
 
-						console.log("fetch animes page ", page)
-
-						if (gqlData.value?.Page?.airingSchedules) {
-							const newSchedules = gqlData.value.Page.airingSchedules as AiringSchedule[]
+						if (gqlData?.Page?.airingSchedules) {
+							const newSchedules = gqlData.Page.airingSchedules as AiringSchedule[]
 							allSchedules = [...allSchedules, ...newSchedules]
-							hasNextPage = (gqlData.value.Page.pageInfo?.hasNextPage as boolean) ?? false
+							hasNextPage = (gqlData.Page.pageInfo?.hasNextPage as boolean) ?? false
 							page++
 							retryCount = 0
 						} else {
 							hasNextPage = false
 						}
 					} catch (error) {
-						console.error(`Erreur lors de la récupération de la page ${page}:`, error)
+						const errorMessage = error instanceof Error ? error.message : String(error)
+						console.error(`Erreur lors de la récupération de la page ${page}: ${errorMessage}`)
 						retryCount++
 						if (retryCount >= maxRetries) {
 							console.error("Nombre maximum de tentatives atteint")
@@ -266,6 +276,11 @@ export const useAiringSchedules = () => {
 						// Attendre avant de réessayer
 						await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
 					}
+				}
+
+				airingCache.value[cacheKey] = {
+					data: allSchedules,
+					expiresAt: Date.now() + AIRING_CACHE_TTL_MS
 				}
 				return allSchedules
 			},

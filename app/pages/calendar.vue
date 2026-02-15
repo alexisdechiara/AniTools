@@ -142,11 +142,11 @@ const {
 	fetchAiringAnimesByDateRange
 } = useAiringSchedules()
 
-const { fetchSimuldubByDateRange, fetchAllSimuldub } = useSimuldub()
+const { fetchSimuldubByDateRange } = useSimuldub()
 
 // Récupérer les données
 const { data: airingSchedules } = await fetchAiringAnimesByDateRange()
-const { data: simuldubs } = await fetchAllSimuldub()
+const { data: simuldubs } = await fetchSimuldubByDateRange()
 
 // ========== Filtres ==========
 const items = computed(() => {
@@ -158,20 +158,35 @@ const filteredCalendarEvents = computed(() => {
 	let events: Array<AnimeCalEvent> = []
 	if (airingSchedules.value) {
 		events = airingSchedules.value.map((item: any) => new AnimeCalEvent(item))
+
 		if (simuldubs.value?.length) {
+			const eventsByMediaAndStart = new Map<string, AnimeCalEvent>()
+			events.forEach((event: AnimeCalEvent) => {
+				const key = `${event.media?.id}-${event.start.getTime()}`
+				eventsByMediaAndStart.set(key, event)
+			})
+
 			simuldubs.value.forEach((simuldub: any) => {
-				const matchingCalEvent = events.find((event: AnimeCalEvent) => event.media.id === simuldub.anilist_media_id)
+				const simuldubStartTime = new Date(simuldub.start_date).getTime()
+				if (Number.isNaN(simuldubStartTime)) return
+
+				const exactMatchKey = `${simuldub.anilist_media_id}-${simuldubStartTime}`
+				const matchingCalEvent = eventsByMediaAndStart.get(exactMatchKey)
 				if (matchingCalEvent) {
-					if (matchingCalEvent.start === new Date(simuldub.start_date)) {
-						matchingCalEvent.languages = simuldub.languages
-					} else {
-						const simuldubEvent = new SimuldubCalEvent({
-							...{ media: matchingCalEvent.media },
-							...simuldub,
-						})
-						events.push(simuldubEvent)
-					}
+					const mergedLanguages = new Set([...(matchingCalEvent.languages ?? []), ...(simuldub.languages ?? [])])
+					matchingCalEvent.languages = [...mergedLanguages]
+					return
 				}
+
+				const matchingByMedia = events.find((event: AnimeCalEvent) => event.media?.id === simuldub.anilist_media_id)
+				if (!matchingByMedia) return
+
+				const simuldubEvent = new SimuldubCalEvent({
+					...{ media: matchingByMedia.media },
+					...simuldub
+				})
+				events.push(simuldubEvent)
+				eventsByMediaAndStart.set(`${simuldubEvent.media?.id}-${simuldubEvent.start.getTime()}`, simuldubEvent)
 			})
 		}
 	}
@@ -179,9 +194,11 @@ const filteredCalendarEvents = computed(() => {
 	return events.filter((event: any) => {
 		const formatMatch = store.currentFormat.includes(event.media?.format)
 		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
-		const searchMatch = event.media?.title?.english?.toLowerCase().includes(searchQuery.value.toLowerCase())
-			|| event.media?.title?.romaji?.toLowerCase().includes(searchQuery.value.toLowerCase())
-			|| event.media?.title?.native?.toLowerCase().includes(searchQuery.value.toLowerCase())
+		const search = searchQuery.value.toLowerCase()
+		const englishTitle = event.media?.title?.english?.toLowerCase() ?? ""
+		const romajiTitle = event.media?.title?.romaji?.toLowerCase() ?? ""
+		const nativeTitle = event.media?.title?.native?.toLowerCase() ?? ""
+		const searchMatch = englishTitle.includes(search) || romajiTitle.includes(search) || nativeTitle.includes(search)
 		return formatMatch && languageMatch && searchMatch
 	})
 })
