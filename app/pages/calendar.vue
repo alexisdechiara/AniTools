@@ -59,15 +59,20 @@
 			<template #event="{ event }">
 				<AnimeDetailsPopover :data="event" :content="{ sideOffset: 32 }">
 					<div
-						class="calendar-event-card flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer hover:bg-(--anime-theme-color)/50 transition-colors"
+						class="calendar-event-card flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer transition-colors"
+						:class="event.isCancelled ? 'brightness-90 relative border-(--anime-theme-color)/10! bg-(--anime-theme-color)/5! hover:bg-(--anime-theme-color)/8!' : 'hover:bg-(--anime-theme-color)/50'"
 						:ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event, store.timeStep)">
-						<span class="font-medium text-default calendar-event-title">{{ event.title }}</span>
+						<UTooltip v-if="event.isCancelled" text="Cancelled" :delay-duration="0" :content="{ sideOffset: 16 }">
+							<Icon name="i-lucide-ban" class="size-[calc(100%-1rem)] bg-error absolute inset-2 z-50 opacity-50" />
+						</UTooltip>
+						<span class="font-medium text-default calendar-event-title" :class="event.isCancelled && 'opacity-25'">{{
+							event.title }}</span>
 						<span v-if="shouldShowPeriod(event, store.timeStep)" class="text-muted font-light"
-							:class="getPeriodTextClass(event, store.timeStep)">{{
+							:class="[event.isCancelled && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
 							event.start.format('HH:mm') }} - {{ event.end.format('HH:mm')
 							}}</span>
-						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2">
-
+						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2"
+							:class="event.isCancelled && 'opacity-25'">
 							<template v-if="event.streaming">
 								<UBadge v-for="platform in event.streaming" :key="platform" :label="platform"
 									:size="getBadgeSize(event, store.timeStep)" variant="subtle"
@@ -149,12 +154,7 @@ const { data: airingSchedules } = await fetchAiringAnimesByDateRange()
 const { data: simuldubs } = await fetchSimuldubByDateRange()
 
 // ========== Filtres ==========
-const items = computed(() => {
-	const availableLanguages = [...new Set(filteredCalendarEvents.value.flatMap((e: AnimeCalEvent) => e.languages ?? []))]
-	return store.getFilterMenuItems(availableLanguages)
-})
-
-const filteredCalendarEvents = computed(() => {
+const allCalendarEvents = computed(() => {
 	let events: Array<AnimeCalEvent> = []
 	if (airingSchedules.value) {
 		events = airingSchedules.value.map((item: any) => new AnimeCalEvent(item))
@@ -191,7 +191,16 @@ const filteredCalendarEvents = computed(() => {
 		}
 	}
 
-	return events.filter((event: any) => {
+	return events
+})
+
+const items = computed(() => {
+	const availableLanguages = [...new Set(allCalendarEvents.value.flatMap((e: AnimeCalEvent) => e.languages ?? []))]
+	return store.getFilterMenuItems(availableLanguages)
+})
+
+const filteredCalendarEvents = computed(() => {
+	return allCalendarEvents.value.filter((event: any) => {
 		const formatMatch = store.currentFormat.includes(event.media?.format)
 		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
 		const search = searchQuery.value.toLowerCase()

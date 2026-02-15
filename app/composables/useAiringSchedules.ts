@@ -6,7 +6,6 @@ const AIRING_CACHE_TTL_MS = 5 * 60 * 1000
 export const useAiringSchedules = () => {
 	// ========== Layout des événements ==========
 	const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
-	const EVENT_NARROW_WIDTH = 120
 	const EVENT_TINY_WIDTH = 92
 	const eventHeights = reactive<Record<string, number>>({})
 	const eventWidths = reactive<Record<string, number>>({})
@@ -113,22 +112,24 @@ export const useAiringSchedules = () => {
 		}
 
 		// Priorité: titre > période > badges.
-		let showBadges = width > EVENT_NARROW_WIDTH
-		let showPeriod = !(width <= EVENT_TINY_WIDTH || (width <= EVENT_NARROW_WIDTH && titleLength > 12))
+		// On démarre permissif, puis on retire des blocs uniquement si le budget réel ne suffit pas.
+		let showPeriod = true
+		let showBadges = width > 76
 
 		// Budget vertical estimé en px.
 		const verticalPadding = 8 // py-1
 		const rowGap = 2 // gap-0.5
 		const titleLinePx = clamp(9.4 + (fontScale * 2.3), 10, 14.5)
-		const periodRowPx = periodClass.includes("10px") ? 11 : periodClass.includes("11px") ? 12.5 : 14
-		const badgeRowPx = badgeSize === "xs" ? 14 : badgeSize === "sm" ? 16 : 18
+		const periodRowPx = periodClass.includes("10px") ? 10 : periodClass.includes("11px") ? 11.5 : 13
+		const badgeRowPx = badgeSize === "xs" ? 8 : badgeSize === "sm" ? 10 : 12
 		const available = Math.max(12, height - verticalPadding)
 
 		// Garde-fous explicites basés sur la hauteur réelle.
 		const minHeightForPeriod = verticalPadding + titleLinePx + periodRowPx + rowGap
-		const minHeightForBadges = verticalPadding + titleLinePx + badgeRowPx + rowGap
+		const minHeightForBadges = verticalPadding + titleLinePx + badgeRowPx
 		if (height < minHeightForPeriod) showPeriod = false
-		if (height < minHeightForBadges) showBadges = false
+		if (height < (minHeightForBadges - 2)) showBadges = false
+		if (width <= 66) showBadges = false
 
 		const computeTitleLines = (period: boolean, badges: boolean) => {
 			const extraRows = (period ? 1 : 0) + (badges ? 1 : 0)
@@ -152,10 +153,11 @@ export const useAiringSchedules = () => {
 			const linesWithBadges = computeTitleLines(showPeriod, true)
 			const linesWithoutBadges = computeTitleLines(showPeriod, false)
 			const noRoomForAnyTitle = linesWithBadges < 1
-			const tinyCardPenalty = width <= 140 && height <= 46 && linesWithoutBadges >= 1
-			const heavyTradeoffOnVeryNarrow = width <= 120 && linesWithBadges < 1 && linesWithoutBadges >= 1
+			const tinyCardPenalty = width <= 96 && height <= 40 && linesWithoutBadges >= 1
+			const heavyTradeoffOnVeryNarrow = width <= 80 && linesWithBadges < 1 && linesWithoutBadges >= 1
+			const forceBadgesOnRoomyCard = width >= 124 && height >= 38 && linesWithoutBadges >= 1
 
-			if (noRoomForAnyTitle || tinyCardPenalty || heavyTradeoffOnVeryNarrow) {
+			if ((noRoomForAnyTitle || tinyCardPenalty || heavyTradeoffOnVeryNarrow) && !forceBadgesOnRoomyCard) {
 				showBadges = false
 				possibleLines = computeTitleLines(showPeriod, showBadges)
 			}

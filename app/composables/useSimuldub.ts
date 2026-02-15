@@ -13,7 +13,7 @@ const formatDateToUTC = (date: string | Date): string => {
 }
 
 export const useSimuldub = () => {
-	const directus = createDirectus("http://anitools-directus-7bfe7d-62-72-18-119.traefik.me").with(rest({ credentials: "include" }))
+	const directus = createDirectus("https://api.anitools.geekly.blog").with(rest())
 
 	async function fetchSimuldubByDateRange(dateRange?: DateRange) {
 		const calendarStore = useCalendarStore()
@@ -37,7 +37,7 @@ export const useSimuldub = () => {
 					readItems("simuldub", {
 						filter: {
 							status: {
-								_or: [{ _eq: "published" }, { _eq: "draft" }]
+								_or: [{ _eq: "published" }, { _eq: "cancelled" }]
 							},
 							start_date: {
 								_gte: rangeStart.value,
@@ -76,7 +76,7 @@ export const useSimuldub = () => {
 				readItems("simuldub", {
 					filter: {
 						status: {
-							_or: [{ _eq: "published" }, { _eq: "draft" }]
+							_or: [{ _eq: "published" }, { _eq: "cancelled" }]
 						}
 					}
 				})

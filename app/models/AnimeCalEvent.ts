@@ -63,6 +63,8 @@ export class AnimeCalEvent implements VueCalEvent {
 }
 
 export class SimuldubCalEvent extends AnimeCalEvent {
+	isCancelled: boolean
+
 	constructor(data: any) {
 		super(data)
 		this.start = new Date(data.start_date)
@@ -74,5 +76,6 @@ export class SimuldubCalEvent extends AnimeCalEvent {
 		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
 		this.languages = data.languages.map(languageToCountry)
 		this.streaming = data.streaming
+		this.isCancelled = data.status === "cancelled"
 	}
 }
