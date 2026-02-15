@@ -27,6 +27,17 @@
 						</div>
 					</div>
 					<div class="flex gap-2 items-center">
+						<UInput ref="inputRef" v-model="searchQuery" icon="i-lucide-search" placeholder="Search..." variant="soft"
+							size="sm" color="neutral" @blur="closeSearch"
+							:ui="searchButtonToggle
+								? { base: 'w-64 transition-all placeholder:text-dimmed duration-300 ease-in-out bg-elevated', leading: 'ps-1' }
+								: { base: 'w-8 px-0 transition-all placeholder:text-transparent duration-300 ease-in-out bg-elevated', leading: 'ps-1' }">
+							<template #leading>
+								<UButton icon="i-lucide-search" @click="openSearch" size="xs" variant="link" color="neutral" :class="searchButtonToggle
+									? 'cursor-default text-muted'
+									: 'cursor-pointer text-default'" />
+							</template>
+						</UInput>
 						<UDropdownMenu :items="items" size="sm" :ui="{ item: 'cursor-pointer' }">
 							<UButton icon="i-lucide-list-filter" size="sm" color="neutral" variant="soft"
 								class="h-fit cursor-pointer" />
@@ -96,11 +107,30 @@ import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import { useCalendarStore } from '~/stores/Calendar'
 
-addDatePrototypes()
-
 const store = useCalendarStore()
 
 const vueCalRef = ref()
+const searchButtonToggle = ref(false)
+const searchQuery = ref('')
+const inputRef = ref<any>()
+
+function openSearch() {
+	searchButtonToggle.value = true
+	nextTick(() => {
+		const input = inputRef.value?.$el?.querySelector('input')
+		if (input) {
+			input.focus()
+		}
+	})
+}
+
+function closeSearch() {
+	if (searchQuery.value == '') {
+		searchButtonToggle.value = false
+	}
+}
+
+addDatePrototypes()
 
 const {
 	setEventCardRef,
@@ -149,7 +179,10 @@ const filteredCalendarEvents = computed(() => {
 	return events.filter((event: any) => {
 		const formatMatch = store.currentFormat.includes(event.media?.format)
 		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
-		return formatMatch && languageMatch
+		const searchMatch = event.media?.title?.english?.toLowerCase().includes(searchQuery.value.toLowerCase())
+			|| event.media?.title?.romaji?.toLowerCase().includes(searchQuery.value.toLowerCase())
+			|| event.media?.title?.native?.toLowerCase().includes(searchQuery.value.toLowerCase())
+		return formatMatch && languageMatch && searchMatch
 	})
 })
 
