@@ -22,7 +22,7 @@ const languageToCountry = (item: string) => {
 		case "japanese":
 			return "jp"
 		case "english":
-			return "us"
+			return "en"
 		case "french":
 			return "fr"
 		default:

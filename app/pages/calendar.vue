@@ -111,6 +111,7 @@ import 'vue-cal/style'
 import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import { useCalendarStore } from '~/stores/Calendar'
+import type { ProgressProps } from '#ui/types'
 
 const store = useCalendarStore()
 
@@ -150,10 +151,31 @@ const {
 const { fetchSimuldubByDateRange } = useSimuldub()
 
 // Récupérer les données
-const { data: airingSchedules } = await fetchAiringAnimesByDateRange()
+const { data: airingSchedules, pending: airingSchedulesPending } = await fetchAiringAnimesByDateRange()
 const { data: simuldubs } = await fetchSimuldubByDateRange()
 
-// ========== Filtres ==========
+const toast = useToast()
+const delayedPending = refDebounced(airingSchedulesPending, 500)
+
+watch(delayedPending, () => {
+	if (delayedPending.value) {
+		console.log("loading data");
+
+		toast.add({
+			id: 'loading-data',
+			title: 'Loading airing schedules and simuldubs',
+			icon: 'i-lucide-loader-circle',
+			close: false,
+			progress: false,
+			ui: {
+				icon: 'animate-spin'
+			}
+		})
+	} else {
+		toast.remove('loading-data')
+	}
+})
+
 const allCalendarEvents = computed(() => {
 	let events: Array<AnimeCalEvent> = []
 	if (airingSchedules.value) {
@@ -194,21 +216,30 @@ const allCalendarEvents = computed(() => {
 	return events
 })
 
+
+// ========== Filtres ==========
 const items = computed(() => {
 	const availableLanguages = [...new Set(allCalendarEvents.value.flatMap((e: AnimeCalEvent) => e.languages ?? []))]
 	return store.getFilterMenuItems(availableLanguages)
 })
 
 const filteredCalendarEvents = computed(() => {
+	const { lists } = storeToRefs(useEntriesStore())
 	return allCalendarEvents.value.filter((event: any) => {
 		const formatMatch = store.currentFormat.includes(event.media?.format)
+		let statusMatch = true
+		if (store.currentStatus.length > 0 && lists.value?.length) {
+			const filteredLists = lists.value?.filter((list: any) => store.currentStatus.length === 0 || store.currentStatus.includes(list.status)) || []
+			const allEntries = filteredLists.flatMap((list: any) => list.entries) || []
+			statusMatch = store.currentStatus.length === 0 || store.currentStatus.includes(String(allEntries.find((entry: any) => entry.media?.id === event.media?.id)?.status))
+		}
 		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
 		const search = searchQuery.value.toLowerCase()
 		const englishTitle = event.media?.title?.english?.toLowerCase() ?? ""
 		const romajiTitle = event.media?.title?.romaji?.toLowerCase() ?? ""
 		const nativeTitle = event.media?.title?.native?.toLowerCase() ?? ""
 		const searchMatch = englishTitle.includes(search) || romajiTitle.includes(search) || nativeTitle.includes(search)
-		return formatMatch && languageMatch && searchMatch
+		return formatMatch && statusMatch && languageMatch && searchMatch
 	})
 })
 

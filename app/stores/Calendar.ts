@@ -3,6 +3,9 @@ import { getTime } from "date-fns"
 import type { DropdownMenuItem } from "@nuxt/ui"
 
 export const useCalendarStore = defineStore("Calendar", () => {
+	const userStore = useUserStore()
+	const entriesStore = useEntriesStore()
+
 	// ========== Refs UI ==========
 	const currentView = ref("week")
 	const timeStep = ref(20)
@@ -16,6 +19,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 	// ========== Filtres ==========
 	const currentFormat = ref<string[]>(["TV", "ONA", "MOVIE"])
+	const currentStatus = ref<string[]>([])
 	const dubbing = ref<string[]>(["jp", "cn", "en", "fr"])
 
 	// ========== Getters ==========
@@ -55,6 +59,15 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		}
 	}
 
+	const toggleStatus = (format: string) => {
+		const index = currentStatus.value.indexOf(format)
+		if (index > -1) {
+			currentStatus.value.splice(index, 1)
+		} else {
+			currentStatus.value.push(format)
+		}
+	}
+
 	const toggleDubbing = (lang: string) => {
 		const index = dubbing.value.indexOf(lang)
 		if (index > -1) {
@@ -79,56 +92,85 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	// ========== Dropdown Menu Items ==========
 	const getFilterMenuItems = (availableLanguages: string[]): DropdownMenuItem[] => {
 		const formatItems: DropdownMenuItem[] = [
-			{ label: "Formats", type: "label" },
-			{ type: "separator" },
 			{
-				label: "TV",
-				type: "checkbox",
-				checked: currentFormat.value.includes("TV"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("TV"),
-				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "ONA",
-				type: "checkbox",
-				checked: currentFormat.value.includes("ONA"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("ONA"),
-				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "Movie",
-				type: "checkbox",
-				checked: currentFormat.value.includes("MOVIE"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("MOVIE"),
-				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "TV Short",
-				type: "checkbox",
-				checked: currentFormat.value.includes("TV_SHORT"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("TV_SHORT"),
-				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "OVA",
-				type: "checkbox",
-				checked: currentFormat.value.includes("OVA"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("OVA"),
-				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "Specials",
-				type: "checkbox",
-				checked: currentFormat.value.includes("SPECIAL"),
-				onUpdateChecked: (_checked: boolean) => toggleFormat("SPECIAL"),
-				onSelect: (e: Event) => e.preventDefault()
+				label: "Formats", children: [
+					{
+						label: "TV",
+						type: "checkbox",
+						checked: currentFormat.value.includes("TV"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("TV"),
+						onSelect: (e: Event) => e.preventDefault()
+					},
+					{
+						label: "ONA",
+						type: "checkbox",
+						checked: currentFormat.value.includes("ONA"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("ONA"),
+						onSelect: (e: Event) => e.preventDefault()
+					},
+					{
+						label: "Movie",
+						type: "checkbox",
+						checked: currentFormat.value.includes("MOVIE"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("MOVIE"),
+						onSelect: (e: Event) => e.preventDefault()
+					},
+					{
+						label: "TV Short",
+						type: "checkbox",
+						checked: currentFormat.value.includes("TV_SHORT"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("TV_SHORT"),
+						onSelect: (e: Event) => e.preventDefault()
+					},
+					{
+						label: "OVA",
+						type: "checkbox",
+						checked: currentFormat.value.includes("OVA"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("OVA"),
+						onSelect: (e: Event) => e.preventDefault()
+					},
+					{
+						label: "Specials",
+						type: "checkbox",
+						checked: currentFormat.value.includes("SPECIAL"),
+						onUpdateChecked: (_checked: boolean) => toggleFormat("SPECIAL"),
+						onSelect: (e: Event) => e.preventDefault()
+					}
+				]
 			}
+
 		]
 
-		const dubbingLabel: DropdownMenuItem[] = [
-			{ label: "Dubbing", type: "label" },
-			{ type: "separator" }
-		]
+		let statusItems: DropdownMenuItem[] = []
+		if (userStore.isAuthenticated && entriesStore.isInitialized) {
+			statusItems = [
+				{
+					label: "Status", children: [
+						{
+							label: "Watching",
+							type: "checkbox",
+							checked: currentStatus.value.includes("CURRENT"),
+							onUpdateChecked: (_checked: boolean) => toggleStatus("CURRENT"),
+							onSelect: (e: Event) => e.preventDefault()
+						},
+						{
+							label: "Planning",
+							type: "checkbox",
+							checked: currentStatus.value.includes("PLANNING"),
+							onUpdateChecked: (_checked: boolean) => toggleStatus("PLANNING"),
+							onSelect: (e: Event) => e.preventDefault()
+						},
+						{
+							label: "Paused",
+							type: "checkbox",
+							checked: currentStatus.value.includes("PAUSED"),
+							onUpdateChecked: (_checked: boolean) => toggleStatus("PAUSED"),
+							onSelect: (e: Event) => e.preventDefault()
+						}
+					]
+				}
+			]
+		}
 
 		const dubbingItems: DropdownMenuItem[] = [
 			{
@@ -171,7 +213,15 @@ export const useCalendarStore = defineStore("Calendar", () => {
 			})
 		}
 
-		return [...formatItems, ...dubbingLabel, ...dubbingItems]
+		const dubbingLabel: DropdownMenuItem[] = [
+			{
+				label: "Dubbing", children: [
+					...dubbingItems
+				]
+			}
+		]
+
+		return [...formatItems, ...statusItems, ...dubbingLabel]
 	}
 
 	// ========== Reset ==========
@@ -179,6 +229,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentView.value = "week"
 		timeStep.value = 20
 		currentFormat.value = ["TV", "ONA", "MOVIE"]
+		currentStatus.value = []
 		dubbing.value = ["jp", "cn", "en", "fr"]
 	}
 
@@ -194,6 +245,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 		// Filters
 		currentFormat,
+		currentStatus,
 		dubbing,
 
 		// Getters

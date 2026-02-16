@@ -1,7 +1,7 @@
 // Définition des routes publiques qui ne nécessitent pas d'authentification
-const publicPaths = ["/login", "/calendar", "/test"]
+const publicPaths = ["/login", "/test"]
 // Routes qui fonctionnent avec et sans authentification
-const hybridPaths = ["/tierlist"]
+const hybridPaths = ["/tierlist", "/calendar"]
 
 export default defineNuxtRouteMiddleware(async (to) => {
 	// Si c'est une route publique, on ne fait rien
