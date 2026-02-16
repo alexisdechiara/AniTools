@@ -144,18 +144,36 @@ const {
 	shouldShowPeriod,
 	getPeriodTextClass,
 	getBadgeSize,
-	getEventStyleVars,
-	fetchAiringAnimesByDateRange
+	getEventStyleVars
 } = useAiringSchedules()
 
-const { fetchSimuldubByDateRange } = useSimuldub()
+const { airingAtGreater, airingAtLesser, dateRange } = storeToRefs(store)
+const rangeStart = computed(() => dateRange.value.start.toISOString())
+const rangeEnd = computed(() => dateRange.value.end.toISOString())
 
-// Récupérer les données
-const { data: airingSchedules, pending: airingSchedulesPending } = await fetchAiringAnimesByDateRange()
-const { data: simuldubs } = await fetchSimuldubByDateRange()
+const { data: calendarData, status: calendarStatus } = await useFetch<{
+	airingSchedules: any[]
+	simuldubs: any[]
+}>("/api/calendar", {
+	query: computed(() => ({
+		airingAtGreater: airingAtGreater.value,
+		airingAtLesser: airingAtLesser.value,
+		rangeStart: rangeStart.value,
+		rangeEnd: rangeEnd.value
+	})),
+	watch: [airingAtGreater, airingAtLesser, rangeStart, rangeEnd],
+	default: () => ({
+		airingSchedules: [],
+		simuldubs: []
+	})
+})
+
+const airingSchedules = computed(() => calendarData.value?.airingSchedules ?? [])
+const simuldubs = computed(() => calendarData.value?.simuldubs ?? [])
 
 const toast = useToast()
-const delayedPending = refDebounced(airingSchedulesPending, 500)
+const isLoadingCalendar = computed(() => calendarStatus.value === "pending")
+const delayedPending = refDebounced(isLoadingCalendar, 500)
 
 watch(delayedPending, () => {
 	if (delayedPending.value) {
