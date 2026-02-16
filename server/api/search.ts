@@ -3,7 +3,7 @@ type AniListSearchMedia = {
 	title?: {
 		english?: string | null
 		romaji?: string | null
-		userPreferred?: string | null
+		native?: string | null
 	}
 }
 
@@ -15,7 +15,7 @@ query SearchAnime($search: String, $page: Int, $perPage: Int) {
       title {
         english
         romaji
-        userPreferred
+        native
       }
     }
   }
@@ -66,13 +66,11 @@ export default defineEventHandler(async (event) => {
 	const media = response.data?.Page?.media ?? []
 
 	const predictions = media.map((item) => {
-		const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || `Anime #${item.id}`
+		const title = item.title?.english || item.title?.romaji || item.title?.native || `Anime #${item.id}`
 
 		return {
-			id: item.id,
 			title,
-			structured_main_text: title,
-			structured_main_value: item.id
+			id: item.id
 		}
 	})
 

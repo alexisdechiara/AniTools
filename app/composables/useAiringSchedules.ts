@@ -179,6 +179,33 @@ export const useAiringSchedules = () => {
 	const shouldShowPeriod = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).showPeriod
 	const getPeriodTextClass = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).periodClass
 	const getBadgeSize = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): "xs" | "sm" | "md" => getEventLayout(event, timeStep).badgeSize
+	const hasValidEpisode = (event: { episode?: number }) => {
+		const episode = Number(event.episode)
+		return Number.isFinite(episode) && episode > 0
+	}
+	const shouldShowEpisode = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string, episode?: number }) => {
+		if (!hasValidEpisode(event)) return false
+		return true
+	}
+	const shouldShowEpisodeWithPeriod = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string, episode?: number }, timeStep: number) => {
+		const width = getMeasuredEventWidth(event)
+		const episode = Number(event.episode)
+		return shouldShowPeriod(event, timeStep) && Number.isFinite(width) && width >= (EVENT_TINY_WIDTH + 28) && Number.isFinite(episode) && episode > 0
+	}
+	const shouldShowEpisodeOnly = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string, episode?: number }, timeStep: number) => {
+		return shouldShowEpisode(event) && !shouldShowEpisodeWithPeriod(event, timeStep)
+	}
+	const shouldUseLongEpisodeLabel = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => {
+		const width = getMeasuredEventWidth(event)
+		if (!Number.isFinite(width)) return true
+		return width >= (EVENT_TINY_WIDTH + 24)
+	}
+	const getEpisodeLabel = (episode?: number, longLabel = false) => {
+		const value = Number(episode)
+		if (!Number.isFinite(value) || value <= 0) return ""
+		const prefix = longLabel ? "Episode " : "E"
+		return `${prefix}${String(Math.trunc(value)).padStart(2, "0")}`
+	}
 
 	const getEventDurationInMinutes = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }) => {
 		const start = new Date(event.start).getTime()
@@ -301,6 +328,11 @@ export const useAiringSchedules = () => {
 		setEventCardRef,
 		shouldShowBadges,
 		shouldShowPeriod,
+		shouldShowEpisode,
+		shouldShowEpisodeWithPeriod,
+		shouldShowEpisodeOnly,
+		shouldUseLongEpisodeLabel,
+		getEpisodeLabel,
 		getPeriodTextClass,
 		getBadgeSize,
 		getEventStyleVars

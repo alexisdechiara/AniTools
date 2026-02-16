@@ -67,9 +67,14 @@
 						</UTooltip>
 						<span class="font-medium text-default calendar-event-title" :class="event.isCancelled && 'opacity-25'">{{
 							event.title }}</span>
-						<span v-if="shouldShowPeriod(event, store.timeStep)" class="text-muted font-light"
+						<span v-if="shouldShowPeriod(event, store.timeStep) || shouldShowEpisode(event)"
+							class="text-muted font-light"
 							:class="[event.isCancelled && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
-							event.start.format('HH:mm') }} - {{ event.end.format('HH:mm')
+	shouldShowEpisodeWithPeriod(event, store.timeStep)
+		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${event.start.format('HH:mm')} - ${event.end.format('HH:mm')}`
+		: shouldShowEpisodeOnly(event, store.timeStep)
+			? getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))
+			: `${event.start.format('HH:mm')} - ${event.end.format('HH:mm')}`
 							}}</span>
 						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2"
 							:class="event.isCancelled && 'opacity-25'">
@@ -142,6 +147,11 @@ const {
 	setEventCardRef,
 	shouldShowBadges,
 	shouldShowPeriod,
+	shouldShowEpisode,
+	shouldShowEpisodeWithPeriod,
+	shouldShowEpisodeOnly,
+	shouldUseLongEpisodeLabel,
+	getEpisodeLabel,
 	getPeriodTextClass,
 	getBadgeSize,
 	getEventStyleVars
@@ -201,16 +211,25 @@ const allCalendarEvents = computed(() => {
 
 		if (simuldubs.value?.length) {
 			const eventsByMediaAndStart = new Map<string, AnimeCalEvent>()
+			const getMergeKey = (mediaId?: number, startTime?: number, episode?: number) => `${mediaId ?? ""}-${startTime ?? ""}-${episode ?? ""}`
 			events.forEach((event: AnimeCalEvent) => {
-				const key = `${event.media?.id}-${event.start.getTime()}`
+				const eventMediaId = Number(event.media?.id)
+				if (!Number.isFinite(eventMediaId)) return
+				const key = getMergeKey(eventMediaId, event.start.getTime(), event.episode)
 				eventsByMediaAndStart.set(key, event)
 			})
 
 			simuldubs.value.forEach((simuldub: any) => {
+				const simuldubMediaId = Number(simuldub.anilist_media_id)
 				const simuldubStartTime = new Date(simuldub.start_date).getTime()
-				if (Number.isNaN(simuldubStartTime)) return
+				const simuldubEpisode = Number(simuldub.episode)
+				if (!Number.isFinite(simuldubMediaId) || Number.isNaN(simuldubStartTime)) return
 
-				const exactMatchKey = `${simuldub.anilist_media_id}-${simuldubStartTime}`
+				const exactMatchKey = getMergeKey(
+					simuldubMediaId,
+					simuldubStartTime,
+					Number.isFinite(simuldubEpisode) ? simuldubEpisode : undefined
+				)
 				const matchingCalEvent = eventsByMediaAndStart.get(exactMatchKey)
 				if (matchingCalEvent) {
 					const mergedLanguages = new Set([...(matchingCalEvent.languages ?? []), ...(simuldub.languages ?? [])])
@@ -218,7 +237,12 @@ const allCalendarEvents = computed(() => {
 					return
 				}
 
-				const matchingByMedia = events.find((event: AnimeCalEvent) => event.media?.id === simuldub.anilist_media_id)
+				const matchingByMedia = events.find((event: AnimeCalEvent) => {
+					const eventMediaId = Number(event.media?.id)
+					if (!Number.isFinite(eventMediaId) || eventMediaId !== simuldubMediaId) return false
+					if (!Number.isFinite(simuldubEpisode)) return true
+					return event.episode === simuldubEpisode
+				}) ?? events.find((event: AnimeCalEvent) => Number(event.media?.id) === simuldubMediaId)
 				if (!matchingByMedia) return
 
 				const simuldubEvent = new SimuldubCalEvent({
@@ -226,7 +250,12 @@ const allCalendarEvents = computed(() => {
 					...simuldub
 				})
 				events.push(simuldubEvent)
-				eventsByMediaAndStart.set(`${simuldubEvent.media?.id}-${simuldubEvent.start.getTime()}`, simuldubEvent)
+				const simuldubEventMediaId = Number(simuldubEvent.media?.id)
+				if (!Number.isFinite(simuldubEventMediaId)) return
+				eventsByMediaAndStart.set(
+					getMergeKey(simuldubEventMediaId, simuldubEvent.start.getTime(), simuldubEvent.episode),
+					simuldubEvent
+				)
 			})
 		}
 	}
