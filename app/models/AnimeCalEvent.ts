@@ -50,7 +50,7 @@ export class AnimeCalEvent implements VueCalEvent {
 
 		this.start = new Date(airingAtMs)
 		this.end = new Date(airingAtMs + durationMs)
-		this.title = data.media?.title?.english || data.media?.title?.romaji || "Unknown Title"
+		this.title = data.media?.title?.userPreferred || data.media?.title?.english || data.media?.title?.romaji || data.media?.title?.native || "Unknown Title"
 		this.content = `Episode ${data.episode}`
 		this.class = "anime-event"
 		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
@@ -63,7 +63,7 @@ export class AnimeCalEvent implements VueCalEvent {
 }
 
 export class SimuldubCalEvent extends AnimeCalEvent {
-	isCancelled: boolean
+	status: string
 
 	constructor(data: any) {
 		super(data)
@@ -73,9 +73,10 @@ export class SimuldubCalEvent extends AnimeCalEvent {
 		} else if (data.media.duration) {
 			this.end = add(new Date(this.start), { minutes: data.media.duration })
 		}
+		this.title = data.title || data.media?.title?.userPreferred || data.media?.title?.english || data.media?.title?.romaji || data.media?.title?.native || "Unknown Title"
 		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
 		this.languages = data.languages.map(languageToCountry)
 		this.streaming = data.streaming
-		this.isCancelled = data.status === "cancelled"
+		this.status = data.status ?? "unconfirmed"
 	}
 }

@@ -3,8 +3,7 @@
 		<vue-cal ref="vueCalRef" v-model:view="store.currentView" :time-step="store.timeStep" time-at-cursor week-numbers
 			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="store.handleWheel"
 			:time-cell-height="store.currentView === 'day' ? 96 : store.currentView === 'week' ? 64 : 48"
-			@ready="onCalendarReady"
-			@view-change="onViewChange">
+			@ready="onCalendarReady" @view-change="onViewChange">
 			<template #header="{ view, availableViews }">
 				<div class="flex items-center bg-default px-6 h-16">
 					<div class="flex items-center gap-2 mr-auto">
@@ -59,25 +58,65 @@
 			<template #event="{ event }">
 				<AnimeDetailsPopover :data="event" :content="{ sideOffset: 32 }">
 					<div
-						class="calendar-event-card flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer transition-colors"
-						:class="event.isCancelled ? 'brightness-90 relative border-(--anime-theme-color)/10! bg-(--anime-theme-color)/5! hover:bg-(--anime-theme-color)/8!' : 'hover:bg-(--anime-theme-color)/50'"
-						:ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event, store.timeStep)">
-						<UTooltip v-if="event.isCancelled" text="Cancelled" :delay-duration="0" :content="{ sideOffset: 16 }">
-							<Icon name="i-lucide-ban" class="size-[calc(100%-1rem)] bg-error absolute inset-2 z-50 opacity-50" />
+						class="calendar-event-card relative flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer transition-colors"
+						:class="[
+							isCancelled(event)
+								? 'brightness-90 border-(--anime-theme-color)/10! bg-(--anime-theme-color)/5! hover:bg-(--anime-theme-color)/8!'
+								: 'hover:bg-(--anime-theme-color)/50',
+							isUnconfirmed(event) ? 'opacity-50' : ''
+						]" :ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event, store.timeStep)">
+						<UTooltip v-if="isCancelled(event)" text="Cancelled" :delay-duration="0" :content="{ sideOffset: 16 }">
+							<Icon name="i-lucide-circle-x" class="size-[calc(100%-1rem)] bg-error absolute inset-2 z-50 opacity-50" />
 						</UTooltip>
-						<span class="font-medium text-default calendar-event-title" :class="event.isCancelled && 'opacity-25'">{{
+						<UTooltip v-if="isUnconfirmed(event)" text="Unconfirmed" :delay-duration="0" :content="{ sideOffset: 8 }">
+							<div class="size-full absolute inset-0" />
+						</UTooltip>
+						<span class="font-medium text-default calendar-event-title" :class="isCancelled(event) && 'opacity-25'">{{
 							event.title }}</span>
 						<span v-if="shouldShowPeriod(event, store.timeStep) || shouldShowEpisode(event)"
 							class="text-muted font-light"
-							:class="[event.isCancelled && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
-	shouldShowEpisodeWithPeriod(event, store.timeStep)
-		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${event.start.format('HH:mm')} - ${event.end.format('HH:mm')}`
+							:class="[isCancelled(event) && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
+								shouldShowEpisodeWithPeriod(event, store.timeStep)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${event.start.format('HH:mm')} -
+							${event.end.format('HH:mm')}`
 		: shouldShowEpisodeOnly(event, store.timeStep)
 			? getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))
 			: `${event.start.format('HH:mm')} - ${event.end.format('HH:mm')}`
 							}}</span>
 						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2"
-							:class="event.isCancelled && 'opacity-25'">
+							:class="isCancelled(event) && 'opacity-25'">
 							<template v-if="event.streaming">
 								<UBadge v-for="platform in event.streaming" :key="platform" :label="platform"
 									:size="getBadgeSize(event, store.timeStep)" variant="subtle"
@@ -85,8 +124,7 @@
 									:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
 							</template>
 							<UBadge v-else-if="event.media?.format" :label="event.media?.format"
-								:size="getBadgeSize(event, store.timeStep)"
-								variant="subtle"
+								:size="getBadgeSize(event, store.timeStep)" variant="subtle"
 								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
 								:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
 							<template v-if="event.languages">
@@ -184,6 +222,14 @@ const simuldubs = computed(() => calendarData.value?.simuldubs ?? [])
 const toast = useToast()
 const isLoadingCalendar = computed(() => calendarStatus.value === "pending")
 const delayedPending = refDebounced(isLoadingCalendar, 500)
+
+function isCancelled(event: { status?: string }) {
+	return event.status === "cancelled"
+}
+
+function isUnconfirmed(event: { status?: string }) {
+	return event.status === "unconfirmed"
+}
 
 watch(delayedPending, () => {
 	if (delayedPending.value) {
@@ -405,6 +451,7 @@ onMounted(() => {
 		}
 	}
 }
+
 .calendar-event-title {
 	--event-width-font-bonus: 0;
 	--event-title-line-height: 1.18;

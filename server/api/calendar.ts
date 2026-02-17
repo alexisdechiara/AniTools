@@ -232,7 +232,7 @@ async function fetchSimuldubs(rangeStart: string, rangeEnd: string) {
 		readItems("simuldub", {
 			filter: {
 				status: {
-					_or: [{ _eq: "published" }, { _eq: "cancelled" }]
+					_neq: "archived"
 				},
 				start_date: {
 					_gte: rangeStart,

@@ -15,17 +15,15 @@ useHead({
   },
 });
 
-const title = "Nuxt Dashboard Template";
+const title = "AniTools";
 const description =
-  "A professional dashboard template built with Nuxt UI, featuring multiple pages, data visualization, and comprehensive management capabilities for creating powerful admin interfaces.";
+	"The awesome anime tools";
 
 useSeoMeta({
   title,
   description,
   ogTitle: title,
-  ogDescription: description,
-  ogImage: "https://ui4.nuxt.com/assets/templates/nuxt/dashboard-light.png",
-  twitterImage: "https://ui4.nuxt.com/assets/templates/nuxt/dashboard-light.png",
+	ogDescription: description,
   twitterCard: "summary_large_image",
 });
 </script>
