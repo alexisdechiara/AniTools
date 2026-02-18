@@ -15,8 +15,17 @@ interface VueCalEvent {
 	deletable?: boolean
 }
 
-const languageToCountry = (item: string) => {
-	switch (item.toLowerCase()) {
+const languageToCountry = (item?: string | null): string | undefined => {
+	if (typeof item !== "string") {
+		return undefined
+	}
+
+	const normalizedItem = item.trim().toLowerCase()
+	if (!normalizedItem) {
+		return undefined
+	}
+
+	switch (normalizedItem) {
 		case "chinese":
 			return "cn"
 		case "japanese":
@@ -26,7 +35,7 @@ const languageToCountry = (item: string) => {
 		case "french":
 			return "fr"
 		default:
-			return item.toLowerCase()
+			return normalizedItem
 	}
 }
 
@@ -58,7 +67,8 @@ export class AnimeCalEvent implements VueCalEvent {
 		this.episode = data.episode
 		this.timeUntilAiring = data.timeUntilAiring
 		this.airingAt = data.airingAt
-		this.languages = [languageToCountry(data.media?.countryOfOrigin)]
+		const originLanguage = languageToCountry(data.media?.countryOfOrigin)
+		this.languages = originLanguage ? [originLanguage] : []
 	}
 }
 
@@ -70,12 +80,16 @@ export class SimuldubCalEvent extends AnimeCalEvent {
 		this.start = new Date(data.start_date)
 		if (data.end_date) {
 			this.end = new Date(data.end_date)
-		} else if (data.media.duration) {
+		} else if (data.media?.duration) {
 			this.end = add(new Date(this.start), { minutes: data.media.duration })
 		}
 		this.title = data.title || data.media?.title?.userPreferred || data.media?.title?.english || data.media?.title?.romaji || data.media?.title?.native || "Unknown Title"
 		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
-		this.languages = data.languages.map(languageToCountry)
+		const rawLanguages: Array<string | null | undefined> = Array.isArray(data.languages) ? data.languages : []
+		const mappedLanguages = rawLanguages
+			.map(language => languageToCountry(language))
+			.filter((language): language is string => typeof language === "string")
+		this.languages = [...new Set(mappedLanguages)]
 		this.streaming = data.streaming
 		this.status = data.status ?? "unconfirmed"
 	}

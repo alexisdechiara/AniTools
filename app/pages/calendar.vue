@@ -154,7 +154,6 @@ import 'vue-cal/style'
 import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import { useCalendarStore } from '~/stores/Calendar'
-import type { ProgressProps } from '#ui/types'
 
 const store = useCalendarStore()
 
@@ -218,6 +217,64 @@ const { data: calendarData, status: calendarStatus } = await useFetch<{
 
 const airingSchedules = computed(() => calendarData.value?.airingSchedules ?? [])
 const simuldubs = computed(() => calendarData.value?.simuldubs ?? [])
+
+const airingMediaIds = computed(() => {
+	const ids = new Set<number>()
+	airingSchedules.value.forEach((item: any) => {
+		const mediaId = Number(item?.media?.id)
+		if (!Number.isFinite(mediaId)) return
+		ids.add(mediaId)
+	})
+	return ids
+})
+
+const missingSimuldubMediaIds = computed(() => {
+	const missingIds = new Set<number>()
+	simuldubs.value.forEach((simuldub: any) => {
+		const mediaId = Number(simuldub?.anilist_media_id)
+		if (!Number.isFinite(mediaId)) return
+		if (airingMediaIds.value.has(mediaId)) return
+		missingIds.add(mediaId)
+	})
+	return [...missingIds]
+})
+
+const { data: missingSimuldubMedias } = await useAsyncData(
+	"calendar-simuldub-missing-medias",
+	async () => {
+		const mediaIds = missingSimuldubMediaIds.value
+		if (!mediaIds.length) return []
+
+		try {
+			const { data } = await useAsyncGql({
+				operation: "getMediasByIds",
+				variables: {
+					mediaIds,
+					perPage: mediaIds.length
+				}
+			})
+			return data.value?.Page?.media ?? []
+		} catch (error) {
+			console.error("Failed to fetch missing simuldub medias:", error)
+			return []
+		}
+	},
+	{
+		watch: [missingSimuldubMediaIds],
+		default: () => []
+	}
+)
+
+const missingSimuldubMediaById = computed(() => {
+	const map = new Map<number, any>()
+	const medias = missingSimuldubMedias.value ?? []
+	medias.forEach((media: any) => {
+		const mediaId = Number(media?.id)
+		if (!Number.isFinite(mediaId)) return
+		map.set(mediaId, media)
+	})
+	return map
+})
 
 const toast = useToast()
 const isLoadingCalendar = computed(() => calendarStatus.value === "pending")
@@ -289,10 +346,11 @@ const allCalendarEvents = computed(() => {
 					if (!Number.isFinite(simuldubEpisode)) return true
 					return event.episode === simuldubEpisode
 				}) ?? events.find((event: AnimeCalEvent) => Number(event.media?.id) === simuldubMediaId)
-				if (!matchingByMedia) return
+				const sourceMedia = matchingByMedia?.media ?? missingSimuldubMediaById.value.get(simuldubMediaId)
+				if (!sourceMedia) return
 
 				const simuldubEvent = new SimuldubCalEvent({
-					...{ media: matchingByMedia.media },
+					...{ media: sourceMedia },
 					...simuldub
 				})
 				events.push(simuldubEvent)

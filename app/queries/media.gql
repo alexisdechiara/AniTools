@@ -125,3 +125,123 @@ query getMediaById(
     }
   }
 }
+
+query getMediasByIds(
+	$mediaIds: [Int!]!
+	$scoreFormat: ScoreFormat = POINT_100
+	$perPage: Int = 50
+) {
+	Page(perPage: $perPage) {
+		media(id_in: $mediaIds) {
+			id
+			title {
+				romaji
+				english
+				native
+				userPreferred
+			}
+			nextAiringEpisode {
+				airingAt
+				episode
+			}
+			rankings {
+				allTime
+				context
+				season
+				type
+				year
+				rank
+			}
+			siteUrl
+			description
+			format
+			status
+			season
+			seasonYear
+			startDate {
+				year
+				month
+				day
+			}
+			endDate {
+				year
+				month
+				day
+			}
+			episodes
+			duration
+			bannerImage
+			coverImage {
+				medium
+				large
+				extraLarge
+				color
+			}
+			averageScore
+			meanScore
+			favourites
+			isFavourite
+			genres
+			tags {
+				name
+				category
+				description
+				isAdult
+				isGeneralSpoiler
+				isMediaSpoiler
+			}
+			studios(isMain: true) {
+				edges {
+					isMain
+					node {
+						name
+						siteUrl
+					}
+				}
+			}
+			externalLinks {
+				site
+				url
+				language
+				color
+			}
+			trailer {
+				id
+				site
+				thumbnail
+			}
+			relations {
+				edges {
+					relationType
+					node {
+						id
+						format
+						title {
+							english
+							romaji
+							native
+							userPreferred
+						}
+					}
+				}
+			}
+			mediaListEntry {
+				status
+				score(format: $scoreFormat)
+				repeat
+				progress
+				updatedAt
+				startedAt {
+					year
+					month
+					day
+				}
+				completedAt {
+					year
+					month
+					day
+				}
+			}
+		}
+	}
+}
