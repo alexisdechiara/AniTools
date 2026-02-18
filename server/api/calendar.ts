@@ -1,157 +1,16 @@
 import { createDirectus, readItems, rest } from "@directus/sdk"
+import type { GetAiringAnimesQuery } from "#gql/default"
 
-type AiringSchedule = Record<string, any>
+type AiringSchedule = NonNullable<NonNullable<GetAiringAnimesQuery["Page"]>["airingSchedules"]>[number]
 type SimuldubItem = Record<string, any>
 
 const AIRING_CACHE_TTL_MS = 5 * 60 * 1000
 const SIMULDUB_CACHE_TTL_MS = 5 * 60 * 1000
 const MAX_RETRIES = 3
-
-const GET_AIRING_ANIMES_QUERY = `
-query getAiringAnimes(
-  $page: Int,
-  $airingAtGreater: Int,
-  $airingAtLesser: Int
-) {
-  Page(page: $page, perPage: 100) {
-    pageInfo {
-      hasNextPage
-    }
-    airingSchedules(
-      airingAt_greater: $airingAtGreater,
-      airingAt_lesser: $airingAtLesser
-    ) {
-      airingAt
-      episode
-      media {
-        id
-        countryOfOrigin
-        title {
-          romaji
-          english
-          native
-          userPreferred
-        }
-        nextAiringEpisode {
-          airingAt
-          episode
-        }
-        rankings {
-          allTime
-          context
-          season
-          type
-          year
-          rank
-        }
-        siteUrl
-        description
-        format
-        status
-        season
-        seasonYear
-        startDate {
-          year
-          month
-          day
-        }
-        endDate {
-          year
-          month
-          day
-        }
-        episodes
-        duration
-        bannerImage
-        coverImage {
-          medium
-          large
-          extraLarge
-          color
-        }
-        averageScore
-        meanScore
-        favourites
-        isFavourite
-        genres
-        tags {
-          name
-          category
-          description
-          isAdult
-          isGeneralSpoiler
-          isMediaSpoiler
-        }
-        studios(isMain: true) {
-          edges {
-            isMain
-            node {
-              name
-              siteUrl
-            }
-          }
-        }
-        externalLinks {
-          site
-          url
-          language
-          color
-        }
-        trailer {
-          id
-          site
-          thumbnail
-        }
-        relations {
-          edges {
-            relationType
-            node {
-              id
-              format
-              title {
-                english
-                romaji
-                native
-                userPreferred
-              }
-            }
-          }
-        }
-        studios(isMain: true) {
-          edges {
-            isMain
-            node {
-              name
-              siteUrl
-            }
-          }
-        }
-        mediaListEntry {
-          status
-          score(format: POINT_100)
-          repeat
-          progress
-          updatedAt
-          startedAt {
-            year
-            month
-            day
-          }
-          completedAt {
-            year
-            month
-            day
-          }
-        }
-      }
-    }
-  }
-}
-`
+const DEFAULT_DIRECTUS_URL = "https://api.anitools.geekly.blog"
 
 const airingCache = new Map<string, { data: AiringSchedule[], expiresAt: number }>()
 const simuldubCache = new Map<string, { data: SimuldubItem[], expiresAt: number }>()
-const directus = createDirectus("https://api.anitools.geekly.blog").with(rest())
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -162,8 +21,6 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 		return cached.data
 	}
 
-	const runtimeConfig = useRuntimeConfig()
-	const gqlHost = runtimeConfig.public.GQL_HOST
 	let allSchedules: AiringSchedule[] = []
 	let hasNextPage = true
 	let page = 1
@@ -171,34 +28,13 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 
 	while (hasNextPage && retryCount < MAX_RETRIES) {
 		try {
-			const response = await $fetch<{
-				data?: {
-					Page?: {
-						pageInfo?: { hasNextPage?: boolean }
-						airingSchedules?: AiringSchedule[]
-					}
-				}
-				errors?: Array<{ message?: string }>
-			}>(gqlHost, {
-				method: "POST",
-				body: {
-					query: GET_AIRING_ANIMES_QUERY,
-					variables: {
-						page,
-						airingAtGreater,
-						airingAtLesser
-					}
-				}
+			const response = await GqlGetAiringAnimes({
+				page,
+				airingAtGreater,
+				airingAtLesser
 			})
 
-			if (response.errors?.length) {
-				throw createError({
-					statusCode: 502,
-					statusMessage: response.errors[0]?.message || "GraphQL request failed"
-				})
-			}
-
-			const pageData = response.data?.Page
+			const pageData = response.Page
 			const schedules = pageData?.airingSchedules ?? []
 			allSchedules = [...allSchedules, ...schedules]
 			hasNextPage = pageData?.pageInfo?.hasNextPage ?? false
@@ -221,13 +57,14 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 	return allSchedules
 }
 
-async function fetchSimuldubs(rangeStart: string, rangeEnd: string) {
+async function fetchSimuldubs(rangeStart: string, rangeEnd: string, directusUrl: string) {
 	const cacheKey = `${rangeStart}-${rangeEnd}`
 	const cached = simuldubCache.get(cacheKey)
 	if (cached && cached.expiresAt > Date.now()) {
 		return cached.data
 	}
 
+	const directus = createDirectus(directusUrl).with(rest())
 	const simuldubs = await directus.request(
 		readItems("simuldub", {
 			filter: {
@@ -251,11 +88,13 @@ async function fetchSimuldubs(rangeStart: string, rangeEnd: string) {
 }
 
 export default defineEventHandler(async (event) => {
+	const runtimeConfig = useRuntimeConfig(event)
 	const query = getQuery(event)
 	const airingAtGreater = Number(query.airingAtGreater)
 	const airingAtLesser = Number(query.airingAtLesser)
 	const rangeStart = String(query.rangeStart || "")
 	const rangeEnd = String(query.rangeEnd || "")
+	const directusUrl = runtimeConfig.public.directusUrl || DEFAULT_DIRECTUS_URL
 
 	if (!Number.isFinite(airingAtGreater) || !Number.isFinite(airingAtLesser) || !rangeStart || !rangeEnd) {
 		throw createError({
@@ -266,7 +105,7 @@ export default defineEventHandler(async (event) => {
 
 	const [airingSchedules, simuldubs] = await Promise.all([
 		fetchAiringSchedules(airingAtGreater, airingAtLesser),
-		fetchSimuldubs(rangeStart, rangeEnd)
+		fetchSimuldubs(rangeStart, rangeEnd, directusUrl)
 	])
 
 	return {

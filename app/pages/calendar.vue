@@ -50,7 +50,7 @@
 			<template #weekday-heading="{ label, date }">
 				<UButton size="sm" color="neutral" variant="soft" class="rounded-full uppercase m-2"
 					:class="!store.isMonthView && 'cursor-pointer'"
-					@click="!store.isMonthView ? $refs.vueCalRef?.view.switch('day', date) : ''">
+					@click="!store.isMonthView ? vueCalRef?.view.switch('day', date) : ''">
 					{{ date.format("dddd") }}
 					<strong v-if="!store.isMonthView" class="font-bold">{{ date.format('DD') }}</strong>
 				</UButton>
@@ -137,7 +137,7 @@
 			</template>
 			<template v-if="store.isMonthView" #cell="{ cell }">
 				<div class="relative flex flex-col items-end size-full cursor-pointer hover:bg-muted p-2"
-					@click="$refs.vueCalRef?.view.switch('week', cell.start)">
+					@click="vueCalRef?.view.switch('week', cell.start)">
 					<UBadge variant="soft" color="neutral" class="rounded-full size-fit">
 						{{ cell.start.format("DD") }}
 					</UBadge>
@@ -156,6 +156,17 @@ import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import { useCalendarStore } from '~/stores/Calendar'
 
 const store = useCalendarStore()
+const seo = {
+	title: "Anime Calendar",
+	description: "Track upcoming anime episodes and simuldubs in a live calendar."
+}
+
+useSeoMeta({
+	title: seo.title,
+	description: seo.description,
+	ogTitle: seo.title,
+	ogDescription: seo.description
+})
 
 const vueCalRef = ref()
 const searchButtonToggle = ref(false)

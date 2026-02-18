@@ -31,6 +31,18 @@ definePageMeta({
 });
 
 const route = useRoute();
+const seo = {
+	title: "Login",
+	description: "Sign in to AniTools with your AniList username."
+};
+
+useSeoMeta({
+	title: seo.title,
+	description: seo.description,
+	ogTitle: seo.title,
+	ogDescription: seo.description
+});
+
 const toast = useToast();
 const username = ref("");
 

@@ -107,6 +107,17 @@
 import { VueDraggable } from "vue-draggable-plus"
 import type { CommandPaletteItem, DropdownMenuItem } from '@nuxt/ui'
 import { tierlistFormats, tierlistGenres, tierlistSeasons, tierlistYears } from "~/utils/tierlist-data"
+const seo = {
+	title: "Anime Tier List",
+	description: "Build and manage your anime tier list with filters, search and drag-and-drop ranking."
+}
+
+useSeoMeta({
+	title: seo.title,
+	description: seo.description,
+	ogTitle: seo.title,
+	ogDescription: seo.description
+})
 
 const { isInspectorEnabled, toggleInspector, initializeInspector } = useInspector()
 

@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import type { MetricSort } from "~/stores/Statistics"
+
 const year = useRoute().params.year as string;
 const yearNumber = parseInt(year, 10);
+const genresSort = ref<MetricSort>("count");
+const tagsSort = ref<MetricSort>("count");
 </script>
 
 <template>
@@ -19,8 +23,8 @@ const yearNumber = parseInt(year, 10);
       <MeanScoreBarCard class="col-span-3 row-span-2" />
     </div>
     <div class="grid grid-cols-4 gap-4 my-8">
-      <ListCard class="col-span-1 row-span-2" title="Genres" />
-      <ListCard class="col-span-1 row-span-2" title="Genres" />
+      <ListCard class="col-span-1 row-span-2" title="Genres" :list="[]" v-model:sort="genresSort" />
+      <ListCard class="col-span-1 row-span-2" title="Tags" :list="[]" v-model:sort="tagsSort" />
       <HighlightCard class="col-span-2 row-span-2" />
       <ActivityOverviewCard :year="yearNumber" class="col-span-full" />
     </div>

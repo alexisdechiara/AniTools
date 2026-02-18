@@ -1,26 +1,6 @@
-type AniListSearchMedia = {
-	id: number
-	title?: {
-		english?: string | null
-		romaji?: string | null
-		native?: string | null
-	}
-}
+import type { SearchQuery } from "#gql/default"
 
-const SEARCH_ANIME_QUERY = `
-query SearchAnime($search: String, $page: Int, $perPage: Int) {
-  Page(page: $page, perPage: $perPage) {
-    media(search: $search, type: ANIME) {
-      id
-      title {
-        english
-        romaji
-        native
-      }
-    }
-  }
-}
-`
+type AniListSearchMedia = NonNullable<NonNullable<NonNullable<SearchQuery["anime"]>["results"]>[number]>
 
 export default defineEventHandler(async (event) => {
 	const query = getQuery(event)
@@ -34,36 +14,20 @@ export default defineEventHandler(async (event) => {
 		}
 	}
 
-	const runtimeConfig = useRuntimeConfig()
-	const gqlHost = runtimeConfig.public.GQL_HOST
-
-	const response = await $fetch<{
-		data?: {
-			Page?: {
-				media?: AniListSearchMedia[]
-			}
-		}
-		errors?: Array<{ message?: string }>
-	}>(gqlHost, {
-		method: "POST",
-		body: {
-			query: SEARCH_ANIME_QUERY,
-			variables: {
-				search: rawSearch,
-				page: 1,
-				perPage: 10
-			}
-		}
-	})
-
-	if (response.errors?.length) {
+	let media: AniListSearchMedia[] = []
+	try {
+		const response = await GqlSearch({
+			search: rawSearch,
+			isAdult: false
+		})
+		media = (response.anime?.results ?? []).filter((item: unknown): item is AniListSearchMedia => Boolean(item))
+	} catch (error) {
 		throw createError({
 			statusCode: 502,
-			statusMessage: response.errors[0]?.message || "AniList search failed"
+			statusMessage: "AniList search failed",
+			cause: error
 		})
 	}
-
-	const media = response.data?.Page?.media ?? []
 
 	const predictions = media.map((item) => {
 		const title = item.title?.english || item.title?.romaji || item.title?.native || `Anime #${item.id}`

@@ -4,10 +4,14 @@ import type { NuxtError } from "#app"
 defineProps<{
 	error: NuxtError
 }>()
-
-useSeoMeta({
+const seo = {
 	title: "Page not found",
 	description: "We are sorry but this page could not be found."
+}
+
+useSeoMeta({
+	title: seo.title,
+	description: seo.description
 })
 
 useHead({
