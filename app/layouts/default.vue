@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from "@nuxt/ui"
 
-const toast = useToast()
-
 const open = ref(false)
 
 const links = [[{
@@ -72,56 +70,52 @@ const links = [[{
 	onSelect: () => {
 		open.value = false
 	}
-}, {
-	label: "Create",
-	icon: "i-lucide-circle-fading-plus",
-	to: "/create",
-	disabled: true,
-	onSelect: () => {
-		open.value = false
-	}
-}, {
+	},
+	// {
+	// 	label: "Create",
+	// 	icon: "i-lucide-circle-fading-plus",
+	// 	to: "/create",
+	// 	disabled: true,
+	// 	onSelect: () => {
+	// 		open.value = false
+	// 	}
+	//},
+	{
 	label: "Calendar",
 	icon: "i-lucide-calendar-days",
 	to: "/calendar",
 	onSelect: () => {
 		open.value = false
 	}
-}, {
-	label: "Explore",
-	icon: "i-lucide-telescope",
-	to: "/explore",
-	disabled: true,
-	onSelect: () => {
-		open.value = false
-	}
-}, {
-	label: "Podium",
-	icon: "i-lucide-trophy",
-	to: "/podium",
-	disabled: true,
-	onSelect: () => {
-		open.value = false
-	}
-}, {
-	label: "Timeline",
-	icon: "i-lucide-chart-no-axes-gantt",
-	to: "/timeline",
-	disabled: true,
-	onSelect: () => {
-		open.value = false
-	}
-}], [{
-	label: "Feedback",
-	icon: "i-lucide-message-circle",
-	to: "https://github.com/nuxt-ui-templates/dashboard",
-	target: "_blank"
-}, {
-	label: "Help & Support",
-	icon: "i-lucide-info",
-	to: "https://github.com/nuxt-ui-templates/dashboard",
-	target: "_blank"
-		}]] satisfies NavigationMenuItem[][]
+	},
+	// {
+	// 	label: "Explore",
+	// 	icon: "i-lucide-telescope",
+	// 	to: "/explore",
+	// 	disabled: true,
+	// 	onSelect: () => {
+	// 		open.value = false
+	// 	}
+	// },
+	// {
+	// 	label: "Podium",
+	// 	icon: "i-lucide-trophy",
+	// 	to: "/podium",
+	// 	disabled: true,
+	// 	onSelect: () => {
+	// 		open.value = false
+	// 	}
+	// },
+	// {
+	// 	label: "Timeline",
+	// 	icon: "i-lucide-chart-no-axes-gantt",
+	// 	to: "/timeline",
+	// 	disabled: true,
+	// 	onSelect: () => {
+	// 		open.value = false
+	// 	}
+	// }
+]] satisfies NavigationMenuItem[][]
 </script>
 
 <template>
@@ -150,16 +144,17 @@ const links = [[{
           orientation="vertical"
           tooltip
           popover
+					:ui="{ childItem: 'first:pt-2' }"
         />
 
-        <UNavigationMenu
+				<!-- <UNavigationMenu
           :collapsed="collapsed"
           :items="links[1]"
           orientation="vertical"
           tooltip
           variant="link"
           class="mt-auto"
-        />
+        /> -->
       </template>
 
       <template #footer="{ collapsed }">

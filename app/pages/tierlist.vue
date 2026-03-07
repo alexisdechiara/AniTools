@@ -1,106 +1,109 @@
 <template>
-	<UContainer class="overflow-auto">
-		<UHeader title="" :ui="{ center: 'grow w-xs' }">
-			<div class="flex items-center gap-2 w-full">
-				<UModal v-model:open="openSearch">
-					<UButton label="Search animes..." color="neutral" variant="outline" block icon="i-lucide-search">
-						<template #trailing>
-							<div class="hidden lg:flex items-center gap-0.5 ms-auto">
-								<UKbd value="meta" variant="subtle" />
-								<UKbd value="k" variant="subtle" />
+	<UDashboardPanel id="tierlist">
+		<UContainer>
+			<UHeader title="" :ui="{ center: 'grow w-xs' }">
+				<div class="flex items-center gap-2 w-full">
+					<UModal v-model:open="openSearch">
+						<UButton label="Search animes..." color="neutral" variant="outline" block icon="i-lucide-search">
+							<template #trailing>
+								<div class="hidden lg:flex items-center gap-0.5 ms-auto">
+									<UKbd value="meta" variant="subtle" />
+									<UKbd value="k" variant="subtle" />
+								</div>
+							</template>
+						</UButton>
+						<template #content>
+							<UCommandPalette v-model:search-term="searchTerm" @input="onStopTyping" :loading="loadingSearch"
+								:groups="groups" placeholder="Search users..."
+								:ui="{ item: 'items-center', itemDescription: 'text-xs' }">
+								<template #item-leading="{ item }">
+									<NuxtImg :src="item.avatar?.src" class="size-10 rounded-md object-cover" />
+								</template>
+								<template #item-trailing="{ item }">
+									<UButton icon="i-lucide-plus" variant="ghost" color="neutral" class="rounded-full cursor-pointer"
+										@click.prevent="addAnime(item)" />
+								</template>
+							</UCommandPalette>
+						</template>
+					</UModal>
+					<UPopover>
+						<UButton icon="i-lucide-list-filter" variant="outline" color="neutral" size="md"
+							:ui="{ base: 'p-2', leadingIcon: 'size-4' }" />
+						<template #content>
+							<div class="flex flex-col px-4 py-6 gap-y-2">
+								<UFormField label="Search" class="mb-2">
+									<UInput v-model="filterTitle" placeholder="Title" class="w-full" />
+								</UFormField>
+								<UFormField label="Filters" class="mb-2">
+									<div class="flex flex-col gap-y-2">
+										<USelectMenu v-model="filterGenres" multiple :items="tierlistGenres" placeholder="Genres"
+											variant="outline" :ui="{ base: 'w-full' }" />
+										<USelectMenu v-model="filterYears" multiple :items="tierlistYears" value-key="value"
+											placeholder="Year" variant="outline" :ui="{ base: 'w-full' }" />
+										<USelect v-model="filterSeasons" multiple :items="tierlistSeasons" value-key="value"
+											placeholder="Season" variant="outline" :ui="{ base: 'w-full' }" />
+										<USelect v-model="filterFormats" multiple :items="tierlistFormats" value-key="value"
+											placeholder="Format" variant="outline" :ui="{ base: 'w-full' }" />
+									</div>
+								</UFormField>
+								<UFormField label="Score">
+									<USlider v-model="filterScore" :min="0" :max="100" :step="1" :ui="{ root: 'w-full' }" />
+								</UFormField>
 							</div>
 						</template>
-					</UButton>
-					<template #content>
-						<UCommandPalette v-model:search-term="searchTerm" @input="onStopTyping" :loading="loadingSearch"
-							:groups="groups" placeholder="Search users..." :ui="{ item: 'items-center', itemDescription: 'text-xs' }">
-							<template #item-leading="{ item }">
-								<NuxtImg :src="item.avatar?.src" class="size-10 rounded-md object-cover" />
-							</template>
-							<template #item-trailing="{ item }">
-								<UButton icon="i-lucide-plus" variant="ghost" color="neutral" class="rounded-full cursor-pointer"
-									@click.prevent="addAnime(item)" />
-							</template>
-						</UCommandPalette>
-					</template>
-				</UModal>
-				<UPopover>
-					<UButton icon="i-lucide-list-filter" variant="outline" color="neutral" size="md"
-						:ui="{ base: 'p-2', leadingIcon: 'size-4' }" />
-					<template #content>
-						<div class="flex flex-col px-4 py-6 gap-y-2">
-							<UFormField label="Search" class="mb-2">
-								<UInput v-model="filterTitle" placeholder="Title" class="w-full" />
-							</UFormField>
-							<UFormField label="Filters" class="mb-2">
-								<div class="flex flex-col gap-y-2">
-									<USelectMenu v-model="filterGenres" multiple :items="tierlistGenres" placeholder="Genres"
-										variant="outline" :ui="{ base: 'w-full' }" />
-									<USelectMenu v-model="filterYears" multiple :items="tierlistYears" value-key="value"
-										placeholder="Year" variant="outline" :ui="{ base: 'w-full' }" />
-									<USelect v-model="filterSeasons" multiple :items="tierlistSeasons" value-key="value"
-										placeholder="Season" variant="outline" :ui="{ base: 'w-full' }" />
-									<USelect v-model="filterFormats" multiple :items="tierlistFormats" value-key="value"
-										placeholder="Format" variant="outline" :ui="{ base: 'w-full' }" />
-								</div>
-							</UFormField>
-							<UFormField label="Score">
-								<USlider v-model="filterScore" :min="0" :max="100" :step="1" :ui="{ root: 'w-full' }" />
-							</UFormField>
-						</div>
-					</template>
-				</UPopover>
-			</div>
-			<template #left>
-				<UDropdownMenu :items="settingsItems" :content="{ align: 'start' }">
-					<UButton icon="i-lucide-ellipsis-vertical" variant="ghost" color="neutral" class="cursor-pointer" />
-				</UDropdownMenu>
-				<SlideoverSettings v-model:open="openSlideover" />
-			</template>
-			<template #right>
-				<UButton :icon="isInspectorEnabled ? 'i-lucide-scan-eye' : 'i-lucide-scan'" class="cursor-pointer"
-					:variant="isInspectorEnabled ? 'solid' : 'ghost'" color="neutral" size="md" @click="toggleInspector" />
-			</template>
-		</UHeader>
-		<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
-			<VueDraggable v-model="tiers" group="tier-list" handle=".grip-handle" ghostClass="opacity-50"
-				class="flex flex-col" :class="[gapSizeClass]" :animation="300" :force-fallback="false" :fallback-on-body="true"
-				:swap-threshold="0.65" :delay="0" :delay-on-touch-start="false">
-				<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
-					:isLast="index === tiers.length - 1" />
-			</VueDraggable>
-			<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
-				:class="[selectedBackground, rowCornerClass]">
-				<DraggableTier v-model="unrankedTier" />
-			</div>
+					</UPopover>
+				</div>
+				<template #left>
+					<UDropdownMenu :items="settingsItems" :content="{ align: 'start' }">
+						<UButton icon="i-lucide-ellipsis-vertical" variant="ghost" color="neutral" class="cursor-pointer" />
+					</UDropdownMenu>
+					<SlideoverSettings v-model:open="openSlideover" />
+				</template>
+				<template #right>
+					<UButton :icon="isInspectorEnabled ? 'i-lucide-scan-eye' : 'i-lucide-scan'" class="cursor-pointer"
+						:variant="isInspectorEnabled ? 'solid' : 'ghost'" color="neutral" size="md" @click="toggleInspector" />
+				</template>
+			</UHeader>
+			<div class="flex flex-col mx-12 my-8" :class="[gapSizeClass]">
+				<VueDraggable v-model="tiers" group="tier-list" handle=".grip-handle" ghostClass="opacity-50"
+					class="flex flex-col" :class="[gapSizeClass]" :animation="300" :force-fallback="false"
+					:fallback-on-body="true" :swap-threshold="0.65" :delay="0" :delay-on-touch-start="false">
+					<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
+						:isLast="index === tiers.length - 1" />
+				</VueDraggable>
+				<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
+					:class="[selectedBackground, rowCornerClass]">
+					<DraggableTier v-model="unrankedTier" />
+				</div>
 
-			<UEmpty v-else ref="emptyDropZone" variant="outline" icon="i-lucide-file-question-mark" title="No animes left"
-				class="mt-8"
-				:ui="{ root: `border border-default border-dashed ring-0 min-h-32 flex items-center justify-center transition-colors ${isDragOver ? 'border-primary bg-primary/5' : ''}` }"
-				@drop="handleAnimeDrop" @dragover="handleDragOver" @dragleave="handleDragLeave"
-				description="If you want to add an anime, drop it here or choose one of the actions below." :actions="[
-					{
-						icon: 'i-lucide-search',
-						label: 'Search',
-						color: 'neutral',
-						variant: 'subtle',
-						onClick: () => {
-							openSearch = true
-						}
-					}, {
-						icon: 'i-lucide-cloud-download',
-						label: 'Import from AniList',
-						onClick: () => {
-							openImport = true
-						}
-	},
-				]" />
-		</div>
-	</UContainer>
-	<AnimesImportModal v-model:open="openImport" />
-	<InspectorOverlay />
-	<InspectorCursorTooltip />
-	<InspectorPopup />
+				<UEmpty v-else ref="emptyDropZone" variant="outline" icon="i-lucide-file-question-mark" title="No animes left"
+					class="mt-8"
+					:ui="{ root: `border border-default border-dashed ring-0 min-h-32 flex items-center justify-center transition-colors ${isDragOver ? 'border-primary bg-primary/5' : ''}` }"
+					@drop="handleAnimeDrop" @dragover="handleDragOver" @dragleave="handleDragLeave"
+					description="If you want to add an anime, drop it here or choose one of the actions below." :actions="[
+						{
+							icon: 'i-lucide-search',
+							label: 'Search',
+							color: 'neutral',
+							variant: 'subtle',
+							onClick: () => {
+								openSearch = true
+							}
+						}, {
+							icon: 'i-lucide-cloud-download',
+							label: 'Import from AniList',
+							onClick: () => {
+								openImport = true
+							}
+						},
+					]" />
+			</div>
+		</UContainer>
+		<AnimesImportModal v-model:open="openImport" />
+		<InspectorOverlay />
+		<InspectorCursorTooltip />
+		<InspectorPopup />
+	</UDashboardPanel>
 </template>
 
 <script lang="ts" setup>

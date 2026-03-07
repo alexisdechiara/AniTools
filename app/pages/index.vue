@@ -18,7 +18,7 @@ const layout = ref<Array<CardItem>>([
 	{ x: 6, y: 0, w: 3, h: 1, i: '3', componentId: ComponentType.EpisodesWatchedCard, componentProps: { title: 'Episodes Watched' } },
 	{ x: 0, y: 2, w: 9, h: 3, i: '4', componentId: ComponentType.MeanScoreBarCard },
 	{ x: 9, y: 0, w: 3, h: 4, i: '5', componentId: ComponentType.StatusDonutCard },
-	{ x: 0, y: 5, w: 12, h: 2, i: '6', componentId: ComponentType.ActivityOverviewCard, componentProps: { year: new Date().getFullYear() } },
+	// { x: 0, y: 5, w: 12, h: 2, i: '6', componentId: ComponentType.ActivityOverviewCard, componentProps: { year: new Date().getFullYear() } },
 	{ x: 0, y: 7, w: 3, h: 3, i: '7', componentId: ComponentType.NextEpisodesCard },
 ]);
 </script>
