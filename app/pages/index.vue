@@ -11,6 +11,11 @@ definePageMeta({
 })
 
 const { getUsername } = useUserStore()
+const { load: loadOverview } = useAniListOverviewData()
+
+onMounted(() => {
+	void loadOverview()
+})
 
 
 interface CardItem extends LayoutItem {

@@ -86,6 +86,8 @@ export interface AniListMediaSummary {
 		large: string | null
 		medium: string | null
 	} | null
+	bannerImage: string | null
+	description: string | null
 	format: string | null
 	status: string | null
 	episodes: number | null
@@ -99,18 +101,64 @@ export interface AniListMediaSummary {
 	averageScore: number | null
 	meanScore: number | null
 	popularity: number | null
+	favourites: number | null
 	isFavourite: boolean
+	isAdult: boolean | null
+	tags: Array<{
+		id: number
+		name: string
+		category: string | null
+		rank: number | null
+		isAdult: boolean
+		isGeneralSpoiler: boolean
+		isMediaSpoiler: boolean
+	}>
 	nextAiringEpisode: {
 		airingAt: number
 		episode: number
 		timeUntilAiring: number
 	} | null
 	siteUrl: string | null
-	studios: Array<{
-		id: number
-		isAnimationStudio: boolean
-		name: string
+	studios: {
+		edges: Array<{
+			isMain: boolean
+			node: {
+				id: number
+				isAnimationStudio: boolean
+				name: string
+				siteUrl: string | null
+			}
+		}>
+	} | null
+	rankings: Array<{
+		allTime: boolean | null
+		context: string
+		rank: number
+		season: string | null
+		type: string
+		year: number | null
 	}>
+	externalLinks: Array<{
+		color: string | null
+		language: string | null
+		site: string
+		url: string | null
+	}>
+	trailer: {
+		id: string | null
+		site: string | null
+		thumbnail: string | null
+	} | null
+	relations: {
+		edges: Array<{
+			relationType: string | null
+			node: {
+				id: number
+				format: string | null
+				title: AniListMediaSummary["title"]
+			} | null
+		}>
+	} | null
 }
 
 export interface AniListAnimeListEntry {

@@ -6,6 +6,12 @@ definePageMeta({
 	auth: FEATURE_REGISTRY.statistics.access,
 	indexable: FEATURE_REGISTRY.statistics.indexable
 })
+
+const { load: loadOverview } = useAniListOverviewData()
+
+onMounted(() => {
+	void loadOverview()
+})
 </script>
 
 <template>

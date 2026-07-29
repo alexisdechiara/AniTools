@@ -1,91 +1,159 @@
-import { ScoreFormat, MediaType } from "#gql/default"
 import { defineStore } from "pinia"
-import type { GetAllEntriesQuery } from "#gql/default"
+import type {
+	AniListAnimeListEntry,
+	AniListAnimeListResponse,
+	AniListSource
+} from "~~/shared/types/anilist"
+import {
+	collectAniListAnimeEntries,
+	groupAnimeEntries,
+	sortAnimeEntriesByScore,
+	type AnimeListGroup
+} from "~/utils/anilist-list"
 
-type MediaListCollection = NonNullable<GetAllEntriesQuery["MediaListCollection"]>
-export type AnimesType = NonNullable<MediaListCollection["lists"]>
-type AnimeList = NonNullable<AnimesType[number]>
-export type AnimeListEntry = NonNullable<NonNullable<AnimeList["entries"]>[number]>
+export type AnimeListEntry = AniListAnimeListEntry
+export type { AnimeListGroup } from "~/utils/anilist-list"
+
+export type AnimesType = AnimeListGroup[]
+
+function take<T>(items: T[], limit?: number): T[] {
+	return limit === undefined ? items : items.slice(0, Math.max(0, limit))
+}
 
 export const useEntriesStore = defineStore("Entries", () => {
 	const user = useUserStore()
-	const lists = ref<AnimesType>([])
+	const entries = ref<AnimeListEntry[]>([])
+	const source = ref<AniListSource | null>(null)
 	const isInitialized = ref(false)
+	const loading = ref(false)
+	const error = ref<string | null>(null)
+	const loadedIdentity = ref<string | null>(null)
+	let pendingRequest: Promise<AnimeListEntry[]> | null = null
 
-	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists.value> {
-		return new Promise((resolve) => {
-			useAsyncGql({
-				operation: "getAllEntries",
-				variables: {
-					userId: userId || user.getId,
-					type: MediaType.ANIME,
-					format: format || user.getMediaListOptions.scoreFormat || ScoreFormat.POINT_100
-				}
-			})
-				.then(({ data }) => {
-					if (data.value?.MediaListCollection?.lists) {
-						lists.value = data.value.MediaListCollection.lists
-					} else {
-						lists.value = []
-					}
-					isInitialized.value = true
-					resolve(lists.value)
-				})
-				.catch((error) => {
-					console.error("Erreur lors de la récupération des lists:", error)
-					lists.value = []
-					isInitialized.value = true
-					resolve(lists.value)
-				})
-		})
+	const identity = computed(() => {
+		if (!user.isAuthenticated || !user.getUsername) return null
+		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
+	})
+
+	const lists = computed<AnimeListGroup[]>(() => groupAnimeEntries(entries.value))
+
+	async function fetchAllAnimes(force = false): Promise<AnimeListEntry[]> {
+		const currentIdentity = identity.value
+		if (!currentIdentity) {
+			$reset()
+			return []
+		}
+		if (!force && isInitialized.value && loadedIdentity.value === currentIdentity) {
+			return entries.value
+		}
+		if (pendingRequest) return pendingRequest
+
+		pendingRequest = (async () => {
+			loading.value = true
+			error.value = null
+			if (loadedIdentity.value !== currentIdentity) {
+				entries.value = []
+				isInitialized.value = false
+			}
+
+			try {
+				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const username = user.authMode === "public" ? user.getUsername : undefined
+				const collected = await collectAniListAnimeEntries(page =>
+					fetcher<AniListAnimeListResponse>("/api/anilist/anime-list", {
+						query: {
+							...(username ? { username } : {}),
+							page,
+							perPage: 50,
+							sort: "score"
+						}
+					})
+				)
+
+				source.value = collected.source
+				entries.value = collected.entries
+				loadedIdentity.value = currentIdentity
+				isInitialized.value = true
+				return entries.value
+			} catch (caughtError) {
+				entries.value = []
+				source.value = null
+				loadedIdentity.value = currentIdentity
+				isInitialized.value = false
+				error.value = caughtError instanceof Error
+					? caughtError.message
+					: "Unable to load the AniList anime list."
+				throw caughtError
+			} finally {
+				loading.value = false
+				pendingRequest = null
+			}
+		})()
+
+		return pendingRequest
 	}
 
-	const getNextAiringAnimesEpisodes = computed(() => {
-		if (!lists.value) return []
-		return lists.value?.flatMap(list => list?.entries || []).filter(entry => entry?.media?.nextAiringEpisode && entry?.media?.nextAiringEpisode?.airingAt)
-	})
+	const getNextAiringAnimesEpisodes = computed(() =>
+		entries.value
+			.filter(entry => entry.media?.nextAiringEpisode?.airingAt)
+			.toSorted((left, right) =>
+				(left.media?.nextAiringEpisode?.airingAt ?? 0)
+				- (right.media?.nextAiringEpisode?.airingAt ?? 0)
+			)
+	)
 
-	const getAllAnimes = computed(() => {
-		if (!lists.value) return []
-		return lists.value.flatMap(list => list?.entries || []).sort((a, b) => (b?.score || 0) - (a?.score || 0))
-	})
+	const getAllAnimes = computed(() => sortAnimeEntriesByScore(entries.value))
 
-	function getAnimesByStatus(status: string[], limit?: number) {
-		return lists.value?.filter(list => status.includes(list!.status!))?.flatMap(list => list?.entries || []).slice(0, limit) ?? []
+	function getAnimesByStatus(statuses: string[], limit?: number) {
+		return take(
+			getAllAnimes.value.filter(entry => entry.status && statuses.includes(entry.status)),
+			limit
+		)
 	}
 
 	function getAnimesByGenres(genres: string[], limit?: number) {
-		return getAllAnimes.value
-			.filter((entry): entry is NonNullable<typeof entry> => {
-				return Boolean(entry?.media?.genres?.some(genre => genres.includes(genre ?? "")))
-			})
-			.slice(0, limit)
+		return take(
+			getAllAnimes.value.filter(entry =>
+				entry.media?.genres.some(genre => genres.includes(genre))
+			),
+			limit
+		)
 	}
 
 	function getAnimeByTags(tags: string[], limit?: number) {
-		return getAllAnimes.value
-			.filter((entry): entry is NonNullable<typeof entry> => {
-				return Boolean(entry?.media?.tags?.some(tag => tags.includes(tag?.name ?? "")))
-			})
-			.slice(0, limit)
+		return take(
+			getAllAnimes.value.filter(entry =>
+				entry.media?.tags.some(tag => tags.includes(tag.name))
+			),
+			limit
+		)
 	}
 
 	function getAnimesByMediaIds(ids: number[], limit?: number) {
-		return getAllAnimes.value
-			.filter((entry): entry is NonNullable<typeof entry> => {
-				return Boolean(entry?.media?.id && ids.includes(entry.media.id))
-			})
-			.slice(0, limit)
+		const mediaIds = new Set(ids)
+		return take(
+			getAllAnimes.value.filter(entry => entry.media && mediaIds.has(entry.media.id)),
+			limit
+		)
 	}
 
 	function $reset() {
-		lists.value = []
+		entries.value = []
+		source.value = null
 		isInitialized.value = false
+		loading.value = false
+		error.value = null
+		loadedIdentity.value = null
+		pendingRequest = null
 	}
 
 	return {
+		entries,
 		lists,
+		source,
 		isInitialized,
+		loading,
+		error,
 		fetchAllAnimes,
 		getAllAnimes,
 		getNextAiringAnimesEpisodes,

@@ -1,6 +1,7 @@
 // app/stores/User.ts
 import { ScoreFormat, UserTitleLanguage } from "#gql/default"
 import { defineStore } from "pinia"
+import type { AniListProfileResponse } from "~~/shared/types/anilist"
 
 interface UserOptions {
 	titleLanguage?: UserTitleLanguage | null
@@ -54,7 +55,10 @@ export const useUserStore = defineStore("User", () => {
 	const avatar = ref<userAvatar>()
 	const updatedAt = ref<number>()
 	const authMode = ref<AuthMode>(null)
+	const publicUsername = ref<string | null>(null)
 	const sessionChecked = ref(false)
+	const loading = ref(false)
+	const error = ref<string | null>(null)
 	const options = ref<UserOptions>({
 		titleLanguage: UserTitleLanguage.ENGLISH,
 		displayAdultContent: false,
@@ -79,6 +83,7 @@ export const useUserStore = defineStore("User", () => {
 		}
 		updatedAt.value = user.updatedAt || undefined
 		authMode.value = mode
+		publicUsername.value = mode === "public" ? user.name : null
 
 		if (user.options) {
 			options.value = {
@@ -101,22 +106,21 @@ export const useUserStore = defineStore("User", () => {
 
 	// Actions
 	async function fetchUserData(userName: string) {
+		const normalizedUsername = userName.trim()
+		if (!normalizedUsername) {
+			throw new Error("Enter an AniList username.")
+		}
+
+		loading.value = true
+		error.value = null
+
 		try {
-			const { data } = await useAsyncGql({
-				operation: "auth",
-				variables: { username: userName }
+			const fetcher = import.meta.server ? useRequestFetch() : $fetch
+			const response = await fetcher<AniListProfileResponse>("/api/anilist/profile", {
+				query: { username: normalizedUsername }
 			})
-
-			if (!data?.value?.User) {
-				throw new Error("User not found")
-			}
-
-			const user = data.value.User
-
-			applyUser({
-				...user,
-				name: userName
-			}, "public")
+			applyUser(response.profile, "public")
+			sessionChecked.value = true
 
 			// Retourner les références du store pour un traitement immédiat
 			return {
@@ -127,9 +131,13 @@ export const useUserStore = defineStore("User", () => {
 				options: options.value,
 				mediaListOptions: mediaListOptions.value
 			}
-		} catch (error) {
-			console.error("Error fetching user data:", error)
-			throw error
+		} catch (caughtError) {
+			error.value = caughtError instanceof Error
+				? caughtError.message
+				: "Unable to load this AniList profile."
+			throw caughtError
+		} finally {
+			loading.value = false
 		}
 	}
 
@@ -139,7 +147,10 @@ export const useUserStore = defineStore("User", () => {
 		avatar.value = undefined
 		updatedAt.value = undefined
 		authMode.value = null
+		publicUsername.value = null
 		sessionChecked.value = true
+		loading.value = false
+		error.value = null
 		options.value = {
 			titleLanguage: UserTitleLanguage.ENGLISH,
 			displayAdultContent: false,
@@ -167,6 +178,13 @@ export const useUserStore = defineStore("User", () => {
 
 			if (authMode.value === "oauth") {
 				$reset()
+			} else if (publicUsername.value) {
+				const savedUsername = publicUsername.value
+				try {
+					await fetchUserData(savedUsername)
+				} catch {
+					$reset()
+				}
 			}
 			return false
 		} catch {
@@ -182,8 +200,11 @@ export const useUserStore = defineStore("User", () => {
 		avatar,
 		updatedAt,
 		authMode,
+		publicUsername,
 		options,
 		mediaListOptions,
+		loading,
+		error,
 
 		// Getters
 		isAuthenticated,
@@ -207,7 +228,8 @@ export const useUserStore = defineStore("User", () => {
 		storage: piniaPluginPersistedstate.localStorage(),
 		pick: [
 			"options",
-			"mediaListOptions"
+			"mediaListOptions",
+			"publicUsername"
 		]
 	}
 })

@@ -12,8 +12,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 	}
 
 	const userStore = useUserStore()
-	const statisticsStore = useStatisticsStore()
-	const entriesStore = useEntriesStore()
 
 	try {
 		await userStore.restoreSession()
@@ -31,21 +29,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 					redirect: to.fullPath
 				}
 			})
-		}
-
-		const userId = userStore.getId
-
-		if (userId) {
-			const pendingRequests: Promise<unknown>[] = []
-
-			if (!statisticsStore.isInitialized) {
-				pendingRequests.push(statisticsStore.fetchStatistics(userId))
-			}
-			if (!entriesStore.isInitialized) {
-				pendingRequests.push(entriesStore.fetchAllAnimes(userId))
-			}
-
-			await Promise.all(pendingRequests)
 		}
 
 		return

@@ -69,6 +69,8 @@ const MEDIA_SUMMARY_FIELDS = `
 	idMal
 	title { romaji english native userPreferred }
 	coverImage { extraLarge large medium color }
+	bannerImage
+	description
 	format
 	status
 	episodes
@@ -82,11 +84,38 @@ const MEDIA_SUMMARY_FIELDS = `
 	averageScore
 	meanScore
 	popularity
+	favourites
 	isFavourite
+	isAdult
+	tags {
+		id
+		name
+		category
+		rank
+		isAdult
+		isGeneralSpoiler
+		isMediaSpoiler
+	}
 	nextAiringEpisode { airingAt episode timeUntilAiring }
 	siteUrl
 	studios(isMain: true) {
-		nodes { id name isAnimationStudio }
+		edges {
+			isMain
+			node { id name isAnimationStudio siteUrl }
+		}
+	}
+	rankings { allTime context rank season type year }
+	externalLinks { color language site url }
+	trailer { id site thumbnail }
+	relations {
+		edges {
+			relationType
+			node {
+				id
+				format
+				title { romaji english native userPreferred }
+			}
+		}
 	}
 `
 
@@ -366,6 +395,8 @@ const mediaSchema = z.object({
 		large: httpUrlSchema.nullable(),
 		medium: httpUrlSchema.nullable()
 	}).nullable(),
+	bannerImage: httpUrlSchema.nullable(),
+	description: z.string().max(100_000).nullable(),
 	format: z.string().max(64).nullable(),
 	status: z.string().max(64).nullable(),
 	episodes: z.number().int().nonnegative().nullable(),
@@ -379,7 +410,18 @@ const mediaSchema = z.object({
 	averageScore: z.number().min(0).max(100).nullable(),
 	meanScore: z.number().min(0).max(100).nullable(),
 	popularity: z.number().int().nonnegative().nullable(),
+	favourites: z.number().int().nonnegative().nullable(),
 	isFavourite: z.boolean(),
+	isAdult: z.boolean().nullable(),
+	tags: z.array(z.object({
+		id: z.number().int().positive(),
+		name: z.string().min(1).max(200),
+		category: z.string().max(200).nullable(),
+		rank: z.number().int().nullable(),
+		isAdult: z.boolean(),
+		isGeneralSpoiler: z.boolean(),
+		isMediaSpoiler: z.boolean()
+	}).nullable()).max(100).nullable(),
 	nextAiringEpisode: z.object({
 		airingAt: z.number().int().nonnegative(),
 		episode: z.number().int().positive(),
@@ -387,11 +429,44 @@ const mediaSchema = z.object({
 	}).nullable(),
 	siteUrl: httpUrlSchema.nullable(),
 	studios: z.object({
-		nodes: z.array(z.object({
-			id: z.number().int().positive(),
-			name: z.string().min(1).max(200),
-			isAnimationStudio: z.boolean()
+		edges: z.array(z.object({
+			isMain: z.boolean(),
+			node: z.object({
+				id: z.number().int().positive(),
+				name: z.string().min(1).max(200),
+				isAnimationStudio: z.boolean(),
+				siteUrl: httpUrlSchema.nullable()
+			}).nullable()
 		}).nullable()).max(50).nullable()
+	}).nullable(),
+	rankings: z.array(z.object({
+		allTime: z.boolean().nullable(),
+		context: z.string().max(500),
+		rank: z.number().int().positive(),
+		season: z.string().max(32).nullable(),
+		type: z.string().max(64),
+		year: z.number().int().nullable()
+	}).nullable()).max(100).nullable(),
+	externalLinks: z.array(z.object({
+		color: z.string().max(64).nullable(),
+		language: z.string().max(64).nullable(),
+		site: z.string().min(1).max(200),
+		url: httpUrlSchema.nullable()
+	}).nullable()).max(100).nullable(),
+	trailer: z.object({
+		id: z.string().max(200).nullable(),
+		site: z.string().max(100).nullable(),
+		thumbnail: httpUrlSchema.nullable()
+	}).nullable(),
+	relations: z.object({
+		edges: z.array(z.object({
+			relationType: z.string().max(64).nullable(),
+			node: z.object({
+				id: z.number().int().positive(),
+				format: z.string().max(64).nullable(),
+				title: titleSchema.nullable()
+			}).nullable()
+		}).nullable()).max(100).nullable()
 	}).nullable()
 })
 
@@ -642,8 +717,26 @@ function normalizeMedia(
 	return {
 		...media,
 		genres: (media.genres ?? []).filter((genre): genre is string => genre !== null),
-		studios: (media.studios?.nodes ?? [])
-			.filter((studio): studio is NonNullable<typeof studio> => studio !== null)
+		tags: (media.tags ?? [])
+			.filter((tag): tag is NonNullable<typeof tag> => tag !== null),
+		studios: media.studios
+			? {
+					edges: (media.studios.edges ?? [])
+						.flatMap(edge => edge?.node
+							? [{ isMain: edge.isMain, node: edge.node }]
+							: [])
+				}
+			: null,
+		rankings: (media.rankings ?? [])
+			.filter((ranking): ranking is NonNullable<typeof ranking> => ranking !== null),
+		externalLinks: (media.externalLinks ?? [])
+			.filter((link): link is NonNullable<typeof link> => link !== null),
+		relations: media.relations
+			? {
+					edges: (media.relations.edges ?? [])
+						.filter((edge): edge is NonNullable<typeof edge> => edge !== null)
+				}
+			: null
 	}
 }
 

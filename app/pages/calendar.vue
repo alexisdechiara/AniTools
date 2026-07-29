@@ -162,6 +162,12 @@ definePageMeta({
 })
 
 const store = useCalendarStore()
+const userStore = useUserStore()
+const entriesStore = useEntriesStore()
+const {
+	getAllAnimes: animeEntries,
+	isInitialized: entriesInitialized
+} = storeToRefs(entriesStore)
 const seo = {
 	title: "Anime Calendar",
 	description: "Track upcoming anime episodes and simuldubs in a live calendar."
@@ -392,14 +398,12 @@ const items = computed(() => {
 })
 
 const filteredCalendarEvents = computed(() => {
-	const { lists } = storeToRefs(useEntriesStore())
-	return allCalendarEvents.value.filter((event: any) => {
+	return allCalendarEvents.value.filter((event: AnimeCalEvent) => {
 		const formatMatch = store.currentFormat.includes(event.media?.format)
 		let statusMatch = true
-		if (store.currentStatus.length > 0 && lists.value?.length) {
-			const filteredLists = lists.value?.filter((list: any) => store.currentStatus.length === 0 || store.currentStatus.includes(list.status)) || []
-			const allEntries = filteredLists.flatMap((list: any) => list.entries) || []
-			statusMatch = store.currentStatus.length === 0 || store.currentStatus.includes(String(allEntries.find((entry: any) => entry.media?.id === event.media?.id)?.status))
+		if (store.currentStatus.length > 0 && entriesInitialized.value) {
+			const listEntry = animeEntries.value.find(entry => entry.media?.id === event.media?.id)
+			statusMatch = Boolean(listEntry?.status && store.currentStatus.includes(listEntry.status))
 		}
 		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
 		const search = searchQuery.value.toLowerCase()
@@ -425,6 +429,10 @@ const onViewChange = async (view: any) => {
 }
 
 onMounted(() => {
+	if (userStore.isAuthenticated && !entriesInitialized.value) {
+		void entriesStore.fetchAllAnimes().catch(() => undefined)
+	}
+
 	setTimeout(() => {
 		vueCalRef.value?.view?.scrollToCurrentTime()
 	}, 500)

@@ -37,7 +37,6 @@
 </template>
 
 <script lang="ts" setup>
-import { ScoreFormat } from "#gql/default";
 import { FEATURE_REGISTRY } from "#shared/config/features";
 const { isLoading, start } = useLoadingIndicator();
 
@@ -100,20 +99,20 @@ const loadPublicProfile = async () => {
 			throw new Error("User not found");
 		}
 
-		// Utiliser l'ID de l'utilisateur pour charger les statistiques
-		await fetchStatistics(userData.id);
-		await fetchAllAnimes(
-			userData.id,
-			userData.mediaListOptions?.scoreFormat || ScoreFormat.POINT_100
-		);
+		await Promise.all([
+			fetchStatistics(),
+			fetchAllAnimes()
+		]);
 
 		// Rediriger vers la page d'accueil ou l'URL de redirection
 		const redirectTo = route.query.redirect?.toString() || "/";
 		await navigateTo(redirectTo, { replace: true });
-	} catch (error: any) {
+	} catch (error: unknown) {
 		toast.add({
 			title: "Profile error",
-			description: error.message || "An error occurred during login",
+			description: error instanceof Error
+				? error.message
+				: "An error occurred while loading the profile.",
 			color: "error",
 			icon: "i-lucide-circle-alert",
 		});

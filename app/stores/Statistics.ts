@@ -1,5 +1,9 @@
 import { defineStore } from "pinia"
-import type { UserStatisticsQuery } from "#gql/default"
+import type {
+	AniListSource,
+	AniListStatistics,
+	AniListStatisticsResponse
+} from "~~/shared/types/anilist"
 import {
 	selectBestScoreAnime,
 	selectLongestWatchAnime,
@@ -8,140 +12,141 @@ import {
 } from "~/utils/statistics"
 import type { StatisticMetric as MetricSort } from "~/utils/statistics"
 
-type statistics = NonNullable<NonNullable<NonNullable<UserStatisticsQuery["User"]>["statistics"]>["anime"]>
-
 export type { StatisticMetric as MetricSort } from "~/utils/statistics"
 
 export const useStatisticsStore = defineStore("Statistics", () => {
+	const user = useUserStore()
 	const { getAllAnimes: animes } = storeToRefs(useEntriesStore())
-
-	const meanScore = ref<statistics["meanScore"]>()
-	const minutesWatched = ref<statistics["minutesWatched"]>()
-	const episodesWatched = ref<statistics["episodesWatched"]>()
-	const count = ref<statistics["count"]>()
-	const statuses = ref<statistics["statuses"]>()
-	const scores = ref<statistics["scores"]>()
-	const startYears = ref<statistics["startYears"]>()
-	const releaseYears = ref<statistics["releaseYears"]>()
-	const genres = ref<statistics["genres"]>()
-	const tags = ref<statistics["tags"]>()
-	const countries = ref<statistics["countries"]>()
-	const studios = ref<statistics["studios"]>()
-	const formats = ref<statistics["formats"]>()
-	const lengths = ref<statistics["lengths"]>()
+	const statistics = ref<AniListStatistics | null>(null)
+	const source = ref<AniListSource | null>(null)
 	const genresSort = ref<MetricSort>("count")
 	const tagsSort = ref<MetricSort>("count")
 	const formatsSort = ref<MetricSort>("count")
 	const countriesSort = ref<MetricSort>("count")
 	const statusSort = ref<MetricSort>("count")
 	const studiosSort = ref<MetricSort>("count")
-
 	const isInitialized = ref(false)
 	const loading = ref(false)
 	const error = ref<string | null>(null)
+	const loadedIdentity = ref<string | null>(null)
+	let pendingRequest: Promise<boolean> | null = null
 
-	async function fetchStatistics(userId: number): Promise<boolean> {
-		if (!userId) return false
-		loading.value = true
-		error.value = null
+	const identity = computed(() => {
+		if (!user.isAuthenticated || !user.getUsername) return null
+		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
+	})
 
-		try {
-			const { data } = await useAsyncGql({
-				operation: "userStatistics",
-				variables: { userId }
-			})
+	const meanScore = computed(() => statistics.value?.meanScore)
+	const minutesWatched = computed(() => statistics.value?.minutesWatched)
+	const episodesWatched = computed(() => statistics.value?.episodesWatched)
+	const count = computed(() => statistics.value?.count)
+	const statuses = computed(() => statistics.value?.statuses)
+	const scores = computed(() => statistics.value?.scores)
+	const startYears = computed(() => statistics.value?.startYears)
+	const releaseYears = computed(() => statistics.value?.releaseYears)
+	const genres = computed(() => statistics.value?.genres)
+	const tags = computed(() => statistics.value?.tags)
+	const countries = computed(() => statistics.value?.countries)
+	const studios = computed(() => statistics.value?.studios)
+	const formats = computed(() => statistics.value?.formats)
+	const lengths = computed(() => statistics.value?.lengths)
 
-			const animeStats = data.value?.User?.statistics?.anime
-			if (!animeStats) return false
-			isInitialized.value = true
-			meanScore.value = animeStats.meanScore
-			minutesWatched.value = animeStats.minutesWatched
-			episodesWatched.value = animeStats.episodesWatched
-			count.value = animeStats.count
-			statuses.value = animeStats.statuses
-			scores.value = animeStats.scores
-			startYears.value = animeStats.startYears
-			releaseYears.value = animeStats.releaseYears
-			genres.value = animeStats.genres
-			tags.value = animeStats.tags
-			countries.value = animeStats.countries
-			studios.value = animeStats.studios
-			formats.value = animeStats.formats
-			lengths.value = animeStats.lengths
-			return true
-		} catch (err) {
-			console.error("Error fetching statistics:", err)
-			error.value = "Une erreur est survenue lors du chargement des statistiques."
+	async function fetchStatistics(force = false): Promise<boolean> {
+		const currentIdentity = identity.value
+		if (!currentIdentity) {
+			$reset()
 			return false
-		} finally {
-			loading.value = false
 		}
+		if (!force && isInitialized.value && loadedIdentity.value === currentIdentity) {
+			return true
+		}
+		if (pendingRequest) return pendingRequest
+
+		pendingRequest = (async () => {
+			loading.value = true
+			error.value = null
+			if (loadedIdentity.value !== currentIdentity) {
+				statistics.value = null
+				isInitialized.value = false
+			}
+
+			try {
+				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const username = user.authMode === "public" ? user.getUsername : undefined
+				const response = await fetcher<AniListStatisticsResponse>("/api/anilist/statistics", {
+					query: username ? { username } : undefined
+				})
+
+				statistics.value = response.statistics
+				source.value = response.source
+				loadedIdentity.value = currentIdentity
+				isInitialized.value = true
+				return true
+			} catch (caughtError) {
+				statistics.value = null
+				source.value = null
+				loadedIdentity.value = currentIdentity
+				isInitialized.value = false
+				error.value = caughtError instanceof Error
+					? caughtError.message
+					: "Unable to load AniList statistics."
+				return false
+			} finally {
+				loading.value = false
+				pendingRequest = null
+			}
+		})()
+
+		return pendingRequest
 	}
 
-	function getSortedGenres(sort: MetricSort = genresSort.value, limit: number = 5) {
+	function getSortedGenres(sort: MetricSort = genresSort.value, limit = 5) {
 		return sortStatistics(genres.value, sort, limit)
 	}
 
-	function getSortedTags(sort: MetricSort = tagsSort.value, limit: number = 5) {
+	function getSortedTags(sort: MetricSort = tagsSort.value, limit = 5) {
 		return sortStatistics(tags.value, sort, limit)
 	}
 
-	function getSortedFormats(sort: MetricSort = formatsSort.value, limit: number = 6) {
+	function getSortedFormats(sort: MetricSort = formatsSort.value, limit = 6) {
 		return sortStatistics(formats.value, sort, limit)
 	}
 
-	function getSortedCountries(sort: MetricSort = countriesSort.value, limit: number = 4) {
+	function getSortedCountries(sort: MetricSort = countriesSort.value, limit = 4) {
 		return sortStatistics(countries.value, sort, limit)
 	}
 
-	function getSortedStatus(sort: MetricSort = statusSort.value, limit: number = 5) {
+	function getSortedStatus(sort: MetricSort = statusSort.value, limit = 5) {
 		return sortStatistics(statuses.value, sort, limit)
 	}
 
-	function getSortedStudios(sort: MetricSort = studiosSort.value, limit: number = 5) {
+	function getSortedStudios(sort: MetricSort = studiosSort.value, limit = 5) {
 		return sortStatistics(studios.value, sort, limit)
 	}
 
-	const getBestScoreAnime = computed(() => {
-		return selectBestScoreAnime(animes.value)
-	})
-
-	const getLongestAnime = computed(() => {
-		return selectLongestWatchAnime(animes.value)
-	})
-
-	const getMostWatchedAnime = computed(() => {
-		return selectMostRewatchedAnime(animes.value)
-	})
+	const getBestScoreAnime = computed(() => selectBestScoreAnime(animes.value))
+	const getLongestAnime = computed(() => selectLongestWatchAnime(animes.value))
+	const getMostWatchedAnime = computed(() => selectMostRewatchedAnime(animes.value))
 
 	function $reset() {
-		meanScore.value = undefined
-		minutesWatched.value = undefined
-		episodesWatched.value = undefined
-		count.value = undefined
-		statuses.value = undefined
-		scores.value = undefined
-		startYears.value = undefined
-		releaseYears.value = undefined
-		genres.value = undefined
-		tags.value = undefined
-		countries.value = undefined
-		studios.value = undefined
-		formats.value = undefined
-		lengths.value = undefined
+		statistics.value = null
+		source.value = null
 		genresSort.value = "count"
 		tagsSort.value = "count"
 		formatsSort.value = "count"
 		countriesSort.value = "count"
 		statusSort.value = "count"
 		studiosSort.value = "count"
-
 		isInitialized.value = false
 		loading.value = false
 		error.value = null
+		loadedIdentity.value = null
+		pendingRequest = null
 	}
 
 	return {
+		statistics,
+		source,
 		meanScore,
 		minutesWatched,
 		episodesWatched,
