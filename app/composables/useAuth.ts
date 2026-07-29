@@ -1,3 +1,5 @@
+import { getSafeInternalPath } from "~/utils/navigation"
+
 export const useAuth = () => {
 	const entriesStore = useEntriesStore()
 	const userStore = useUserStore()
@@ -6,7 +8,8 @@ export const useAuth = () => {
 	const route = useRoute()
 
 	function loginWithAniList(returnTo = route.query.redirect?.toString() || "/") {
-		const target = `/auth/anilist?returnTo=${encodeURIComponent(returnTo)}`
+		const safeReturnTo = getSafeInternalPath(returnTo, "/")
+		const target = `/auth/anilist?returnTo=${encodeURIComponent(safeReturnTo)}`
 		return navigateTo(target, { external: true })
 	}
 

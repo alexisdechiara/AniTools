@@ -5,6 +5,31 @@ export interface CalendarRange {
 	end: Date
 }
 
+export interface CalendarViewRangeInput {
+	extendedEnd?: Date
+	extendedStart?: Date
+	fullRangeEnd?: Date
+	fullRangeStart?: Date
+}
+
+function isValidDate(value: unknown): value is Date {
+	return value instanceof Date && Number.isFinite(value.getTime())
+}
+
+export function getCalendarViewRange(view: CalendarViewRangeInput): CalendarRange | null {
+	const start = view.extendedStart ?? view.fullRangeStart
+	const end = view.extendedEnd ?? view.fullRangeEnd
+
+	if (!isValidDate(start) || !isValidDate(end) || end <= start) {
+		return null
+	}
+
+	return {
+		start: new Date(start),
+		end: new Date(end)
+	}
+}
+
 export function getCalendarRange(
 	type: CalendarRangeType = "week",
 	date: Date = new Date()
@@ -37,7 +62,7 @@ export function getCalendarRange(
 	}
 
 	return {
-		start: start,
-		end: end
+		start,
+		end
 	}
 }

@@ -3,12 +3,13 @@ import * as z from "zod"
 
 const MAX_CALENDAR_RANGE_SECONDS = 42 * 24 * 60 * 60
 const MAX_SEARCH_LENGTH = 100
+const GRAPHQL_INT_MAX = 2_147_483_647
 
 const calendarQuerySchema = z.object({
-	airingAtGreater: z.coerce.number().int().nonnegative(),
-	airingAtLesser: z.coerce.number().int().nonnegative(),
-	rangeStart: z.string().min(1).max(64),
-	rangeEnd: z.string().min(1).max(64)
+	airingAtGreater: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
+	airingAtLesser: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
+	rangeStart: z.string().datetime({ offset: true }),
+	rangeEnd: z.string().datetime({ offset: true })
 }).superRefine((query, context) => {
 	if (query.airingAtLesser <= query.airingAtGreater) {
 		context.addIssue({
@@ -58,6 +59,24 @@ const calendarQuerySchema = z.object({
 			context.addIssue({
 				code: "custom",
 				message: "Calendar ranges cannot exceed 42 days",
+				path: ["rangeEnd"]
+			})
+		}
+
+		const normalizedStart = Math.floor(start / 1_000)
+		const normalizedEnd = Math.floor(end / 1_000)
+		if (Math.abs(normalizedStart - query.airingAtGreater) > 1) {
+			context.addIssue({
+				code: "custom",
+				message: "rangeStart must match airingAtGreater",
+				path: ["rangeStart"]
+			})
+		}
+
+		if (Math.abs(normalizedEnd - query.airingAtLesser) > 1) {
+			context.addIssue({
+				code: "custom",
+				message: "rangeEnd must match airingAtLesser",
 				path: ["rangeEnd"]
 			})
 		}

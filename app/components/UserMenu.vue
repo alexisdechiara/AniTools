@@ -32,6 +32,7 @@ const colors = [
 const neutrals = ["slate", "gray", "zinc", "neutral", "stone"];
 
 const user = useUserStore();
+const accountLabel = computed(() => user.isAuthenticated ? user.username : "Guest");
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [
@@ -165,11 +166,12 @@ const items = computed<DropdownMenuItem[][]>(() => [
     <UButton
       v-bind="{
         avatar: user.avatar,
-        label: collapsed ? undefined : user.username || 'Guest',
+        label: collapsed ? undefined : accountLabel,
         trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down',
       }"
       color="neutral"
       variant="ghost"
+			:aria-label="`Open account menu for ${accountLabel}`"
       block
       :square="collapsed"
       class="data-[state=open]:bg-elevated"

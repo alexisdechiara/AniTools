@@ -1,31 +1,31 @@
 <script setup lang="ts">
+import {
+	normalizeSiteUrl,
+	serializeJsonLd
+} from "~/utils/seo"
+
 const colorMode = useColorMode()
 const route = useRoute()
 const site = useSiteConfig()
 
 const color = computed(() => (colorMode.value === "dark" ? "#1b1718" : "white"))
-const siteUrl = computed(() => String(site.url || "https://anitools.vercel.app").replace(/\/+$/, ""))
+const siteUrl = computed(() => normalizeSiteUrl(site.url))
 const canonicalUrl = computed(() => `${siteUrl.value}${route.path}`)
 const ogImageUrl = computed(() => `${siteUrl.value}/og-default.svg`)
 const seo = {
 	title: "AniTools",
-	description: "Anime tracking tools, calendar and tier list."
+	description: "Explore anime releases and turn AniList data into calendars, statistics, rewinds and tier lists."
 }
 const websiteSchema = computed(() =>
-	JSON.stringify({
+	serializeJsonLd({
 		"@context": "https://schema.org",
 		"@type": "WebSite",
 		name: "AniTools",
-		url: siteUrl.value,
-		potentialAction: {
-			"@type": "SearchAction",
-			target: `${siteUrl.value}/calendar`,
-			"query-input": "required name=search_term_string"
-		}
+		url: siteUrl.value
 	})
 )
 const appSchema = computed(() =>
-	JSON.stringify({
+	serializeJsonLd({
 		"@context": "https://schema.org",
 		"@type": "WebApplication",
 		name: "AniTools",
@@ -59,20 +59,30 @@ useSeoMeta({
 	title: seo.title,
 	description: seo.description,
 	ogSiteName: "AniTools",
+	ogType: "website",
+	ogUrl: () => canonicalUrl.value,
 	ogTitle: seo.title,
 	ogDescription: seo.description,
 	ogImage: () => ogImageUrl.value,
 	twitterCard: "summary_large_image",
 	twitterTitle: seo.title,
 	twitterDescription: seo.description,
-	twitterImage: () => ogImageUrl.value
+	twitterImage: () => ogImageUrl.value,
+	robots: () => route.meta.indexable === false
+		? "noindex, nofollow"
+		: "index, follow"
 })
 </script>
 
 <template>
 	<UApp>
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
-  </UApp>
+		<a
+			href="#main-content"
+			class="fixed left-3 top-3 z-[100] -translate-y-24 rounded-md bg-primary px-4 py-2 font-medium text-inverted shadow-lg transition-transform focus:translate-y-0">
+			Skip to content
+		</a>
+		<NuxtLayout>
+			<NuxtPage />
+		</NuxtLayout>
+	</UApp>
 </template>

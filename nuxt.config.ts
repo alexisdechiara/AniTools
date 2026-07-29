@@ -90,7 +90,7 @@ export default defineNuxtConfig({
 		metaTag: false,
 		sitemap: ["/sitemap.xml"],
 		allow: ["/calendar", "/tierlist"],
-		disallow: ["/login", "/statistics", "/rewind"]
+		disallow: ["/create", "/explore", "/login", "/statistics", "/rewind", "/timeline"]
 	},
 
 	"routeRules": {
@@ -139,7 +139,7 @@ export default defineNuxtConfig({
 
 	"site": {
 		name: "AniTools",
-		description: "Anime tracking tools, calendar and tier list.",
+		description: "Explore anime releases and turn AniList data into calendars, statistics, rewinds and tier lists.",
 		defaultLocale: "en"
 	},
 
@@ -149,6 +149,6 @@ export default defineNuxtConfig({
 			changefreq: "weekly",
 			priority: 0.7
 		},
-		include: ["/calendar", "/tierlist", "/"]
+		include: ["/calendar", "/tierlist"]
 	}
 })

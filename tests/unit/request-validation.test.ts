@@ -37,6 +37,18 @@ describe("parseCalendarQuery", () => {
 			airingAtLesser: String(100 + day),
 			rangeStart: "not-a-date",
 			rangeEnd: "2026-08-05T00:00:00.000Z"
+		},
+		{
+			airingAtGreater: "1785283200",
+			airingAtLesser: String(1785283200 + (7 * day)),
+			rangeStart: "2026-07-30T00:00:00.000Z",
+			rangeEnd: "2026-08-06T00:00:00.000Z"
+		},
+		{
+			airingAtGreater: String(2_147_483_648),
+			airingAtLesser: String(2_147_483_648 + day),
+			rangeStart: "2038-01-19T03:14:08.000Z",
+			rangeEnd: "2038-01-20T03:14:08.000Z"
 		}
 	])("rejects invalid and excessive ranges", (query) => {
 		expect(() => parseCalendarQuery(query)).toThrow()

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { getCalendarRange } from "../../app/utils/calendarRange"
+import {
+	getCalendarRange,
+	getCalendarViewRange
+} from "../../app/utils/calendarRange"
 
 describe("getCalendarRange", () => {
 	it("returns a Monday-based week with an exclusive end", () => {
@@ -30,5 +33,39 @@ describe("getCalendarRange", () => {
 
 		expect(range.start).toEqual(new Date(2026, 0, 1))
 		expect(range.end).toEqual(new Date(2027, 0, 1))
+	})
+})
+
+describe("getCalendarViewRange", () => {
+	it("supports the current Vue Cal full-range fields", () => {
+		const fullRangeStart = new Date(2026, 6, 27)
+		const fullRangeEnd = new Date(2026, 7, 3)
+
+		expect(getCalendarViewRange({ fullRangeStart, fullRangeEnd })).toEqual({
+			start: fullRangeStart,
+			end: fullRangeEnd
+		})
+	})
+
+	it("keeps compatibility with extended-range fields", () => {
+		const extendedStart = new Date(2026, 6, 1)
+		const extendedEnd = new Date(2026, 7, 1)
+
+		expect(getCalendarViewRange({ extendedStart, extendedEnd })).toEqual({
+			start: extendedStart,
+			end: extendedEnd
+		})
+	})
+
+	it("rejects missing, invalid and inverted ranges", () => {
+		expect(getCalendarViewRange({})).toBeNull()
+		expect(getCalendarViewRange({
+			fullRangeStart: new Date("invalid"),
+			fullRangeEnd: new Date()
+		})).toBeNull()
+		expect(getCalendarViewRange({
+			fullRangeStart: new Date(2026, 7, 2),
+			fullRangeEnd: new Date(2026, 7, 1)
+		})).toBeNull()
 	})
 })

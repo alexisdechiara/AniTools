@@ -1,8 +1,20 @@
 import { defineStore } from "pinia"
 import { getTime } from "date-fns"
 import type { DropdownMenuItem } from "@nuxt/ui"
+import {
+	getCalendarViewRange,
+	type CalendarViewRangeInput
+} from "~/utils/calendarRange"
 
 type CalendarView = "day" | "week" | "month"
+
+const DUBBING_LABELS: Readonly<Record<string, string>> = {
+	cn: "Chinese",
+	en: "English",
+	fr: "French",
+	jp: "Japanese",
+	kr: "Korean"
+}
 
 export const useCalendarStore = defineStore("Calendar", () => {
 	const userStore = useUserStore()
@@ -35,8 +47,11 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		dateRange.end = end
 	}
 
-	const setDateRangeFromView = (view: { extendedStart: Date, extendedEnd: Date }) => {
-		updateDateRange(view.extendedStart, view.extendedEnd)
+	const setDateRangeFromView = (view: CalendarViewRangeInput) => {
+		const range = getCalendarViewRange(view)
+		if (range) {
+			updateDateRange(range.start, range.end)
+		}
 	}
 
 	// ========== Actions UI ==========
@@ -80,12 +95,10 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	}
 
 	const setAvailableDubbingOptions = (availableLanguages: string[]) => {
-		// Garde uniquement les langues disponibles dans les événements actuels
-		dubbing.value = dubbing.value.filter(lang => availableLanguages.includes(lang))
-		// Ajoute les langues par défaut si elles sont disponibles mais pas encore sélectionnées
-		const defaultLanguages = ["jp", "cn", "en", "fr"]
-		defaultLanguages.forEach((lang) => {
-			if (availableLanguages.includes(lang) && !dubbing.value.includes(lang)) {
+		const normalizedLanguages = [...new Set(availableLanguages)]
+		dubbing.value = dubbing.value.filter(lang => normalizedLanguages.includes(lang))
+		normalizedLanguages.forEach((lang) => {
+			if (!dubbing.value.includes(lang)) {
 				dubbing.value.push(lang)
 			}
 		})
@@ -174,46 +187,17 @@ export const useCalendarStore = defineStore("Calendar", () => {
 			]
 		}
 
-		const dubbingItems: DropdownMenuItem[] = [
-			{
-				label: "Japanese",
-				type: "checkbox",
-				disabled: !availableLanguages.includes("jp"),
-				checked: dubbing.value.includes("jp"),
-				onUpdateChecked: (_checked: boolean) => toggleDubbing("jp"),
+		const dubbingItems: DropdownMenuItem[] = [...new Set(availableLanguages)]
+			.sort((left, right) =>
+				(DUBBING_LABELS[left] ?? left).localeCompare(DUBBING_LABELS[right] ?? right)
+			)
+			.map(language => ({
+				label: DUBBING_LABELS[language] ?? language.toUpperCase(),
+				type: "checkbox" as const,
+				checked: dubbing.value.includes(language),
+				onUpdateChecked: (_checked: boolean) => toggleDubbing(language),
 				onSelect: (e: Event) => e.preventDefault()
-			},
-			{
-				label: "Chinese",
-				type: "checkbox",
-				disabled: !availableLanguages.includes("cn"),
-				checked: dubbing.value.includes("cn"),
-				onUpdateChecked: (_checked: boolean) => toggleDubbing("cn"),
-				onSelect: (e: Event) => e.preventDefault()
-			}
-		]
-
-		if (availableLanguages.includes("en")) {
-			dubbingItems.push({
-				label: "English",
-				type: "checkbox",
-				disabled: !availableLanguages.includes("en"),
-				checked: dubbing.value.includes("en"),
-				onUpdateChecked: (_checked: boolean) => toggleDubbing("en"),
-				onSelect: (e: Event) => e.preventDefault()
-			})
-		}
-
-		if (availableLanguages.includes("fr")) {
-			dubbingItems.push({
-				label: "French",
-				type: "checkbox",
-				disabled: !availableLanguages.includes("fr"),
-				checked: dubbing.value.includes("fr"),
-				onUpdateChecked: (_checked: boolean) => toggleDubbing("fr"),
-				onSelect: (e: Event) => e.preventDefault()
-			})
-		}
+			}))
 
 		const dubbingLabel: DropdownMenuItem[] = [
 			{

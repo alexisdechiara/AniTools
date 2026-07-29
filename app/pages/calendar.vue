@@ -1,47 +1,84 @@
 <template>
-	<UDashboardPanel id="calendar" class="h-screen">
+	<UDashboardPanel id="calendar" class="relative h-dvh min-w-0">
+		<div class="sr-only" aria-live="polite">
+			{{ calendarStatusMessage }}
+		</div>
+
+		<div
+			v-if="calendarError"
+			class="absolute inset-x-3 top-20 z-50 flex flex-wrap items-center gap-3 rounded-lg border border-error/30 bg-error/10 p-3 text-sm shadow-sm backdrop-blur sm:inset-x-auto sm:right-6 sm:max-w-md"
+			role="alert">
+			<Icon name="lucide:circle-alert" class="size-5 shrink-0 text-error" aria-hidden="true" />
+			<p class="min-w-0 flex-1">The calendar could not be loaded.</p>
+			<UButton
+				label="Try again"
+				size="xs"
+				color="error"
+				variant="soft"
+				@click="refreshCalendar" />
+		</div>
+		<div
+			v-else-if="hasCalendarWarning && !warningDismissed"
+			class="absolute inset-x-3 top-20 z-50 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm shadow-sm backdrop-blur sm:inset-x-auto sm:right-6 sm:max-w-md"
+			role="status">
+			<Icon name="lucide:triangle-alert" class="size-5 shrink-0 text-warning" aria-hidden="true" />
+			<p class="flex-1">Simuldub details are temporarily unavailable. AniList broadcasts are still shown.</p>
+			<UButton
+				icon="i-lucide-x"
+				size="xs"
+				color="neutral"
+				variant="ghost"
+				aria-label="Dismiss calendar warning"
+				@click="warningDismissed = true" />
+		</div>
+
 		<vue-cal ref="vueCalRef" v-model:view="store.currentView" :time-step="store.timeStep" time-at-cursor week-numbers
+			aria-label="Anime release calendar"
 			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="store.handleWheel"
 			:time-cell-height="store.currentView === 'day' ? 96 : store.currentView === 'week' ? 64 : 48"
 			@ready="onCalendarReady" @view-change="onViewChange">
 			<template #header="{ view, availableViews }">
-				<div class="flex items-center bg-default px-6 h-16">
-					<div class="flex items-center gap-2 mr-auto">
-						<h2 class="text-2xl font-light inline-flex text-dimmed me-4 gap-2">
+				<div class="flex min-h-16 flex-wrap items-center gap-2 bg-default p-3 sm:flex-nowrap sm:px-6">
+					<div class="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
+						<h1 class="me-auto inline-flex min-w-0 items-baseline gap-1 text-lg font-light text-dimmed sm:me-4 sm:gap-2 sm:text-2xl">
 							<strong class="font-bold capitalize text-default">
 								{{ view.now.format('MMMM') }}
 							</strong>
 							{{ view.now.format('YYYY') }}
-							<span class="text-primary text-sm ms-2 flex items-center -tracking-widest ">
+							<span class="ms-1 hidden items-center text-sm -tracking-widest text-primary sm:flex">
 								{{ store.isWeekView ? `W ${view.now.getWeek()}` : store.isDayView ? view.now.format(`DD{S}`) : '' }}
 							</span>
-						</h2>
+						</h1>
 						<UButton label="Today" size="xs" color="neutral" variant="soft" @click="view.goToToday()"
 							class="cursor-pointer" />
-						<div class="flex items-center gap-2">
+						<div class="flex items-center gap-1 sm:gap-2">
 							<UButton icon="i-lucide-chevron-left" size="xs" variant="ghost" color="neutral" class="cursor-pointer"
+								aria-label="Previous period"
 								@click="view.previous()" />
 							<UButton icon="i-lucide-chevron-right" size="xs" variant="ghost" color="neutral" class="cursor-pointer"
+								aria-label="Next period"
 								@click="view.next()" />
 						</div>
 					</div>
-					<div class="flex gap-2 items-center">
+					<div class="flex w-full min-w-0 items-center justify-end gap-2 overflow-x-auto sm:w-auto sm:overflow-visible">
 						<UInput ref="inputRef" v-model="searchQuery" icon="i-lucide-search" placeholder="Search..." variant="soft"
-							size="sm" color="neutral" @blur="closeSearch"
+							size="sm" color="neutral" aria-label="Search calendar events" name="calendar-search"
+							@blur="closeSearch" @keyup.esc="clearSearch"
 							:ui="searchButtonToggle
-								? { base: 'w-64 transition-all placeholder:text-dimmed duration-300 ease-in-out bg-elevated', leading: 'ps-1' }
+								? { base: 'w-48 sm:w-64 transition-all placeholder:text-dimmed duration-300 ease-in-out bg-elevated', leading: 'ps-1' }
 								: { base: 'w-8 px-0 transition-all placeholder:text-transparent duration-300 ease-in-out bg-elevated', leading: 'ps-1' }">
 							<template #leading>
-								<UButton icon="i-lucide-search" @click="openSearch" size="xs" variant="link" color="neutral" :class="searchButtonToggle
+								<UButton icon="i-lucide-search" aria-label="Open calendar search" @click="openSearch" size="xs" variant="link" color="neutral" :class="searchButtonToggle
 									? 'cursor-default text-muted'
 									: 'cursor-pointer text-default'" />
 							</template>
 						</UInput>
 						<UDropdownMenu :items="items" size="sm" :ui="{ item: 'cursor-pointer' }">
 							<UButton icon="i-lucide-list-filter" size="sm" color="neutral" variant="soft"
-								class="h-fit cursor-pointer" />
+								aria-label="Filter calendar events" class="h-fit cursor-pointer" />
 						</UDropdownMenu>
 						<UTabs v-model="store.currentView" size="xs" class="w-fit" color="neutral"
+							aria-label="Calendar view"
 							:ui="{ root: 'gap-0', trigger: 'cursor-pointer' }"
 							:items="Object.keys(availableViews).map((viewKey: string) => ({ label: String(viewKey).charAt(0).toUpperCase() + String(viewKey).slice(1), value: viewKey }))" />
 					</div>
@@ -57,8 +94,10 @@
 			</template>
 			<template #event="{ event }">
 				<AnimeDetailsPopover :data="event" :content="{ sideOffset: 32 }">
-					<div
-						class="calendar-event-card relative flex flex-col gap-0.5 size-full justify-center py-1 px-1.5 bg-(--anime-theme-color)/25 border-l-4 border-(--anime-theme-color) rounded-lg cursor-pointer transition-colors"
+					<button
+						type="button"
+						:aria-label="getEventAriaLabel(event)"
+						class="calendar-event-card relative flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-lg border-l-4 border-(--anime-theme-color) bg-(--anime-theme-color)/25 px-1.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
 						:class="[
 							isCancelled(event)
 								? 'brightness-90 border-(--anime-theme-color)/10! bg-(--anime-theme-color)/5! hover:bg-(--anime-theme-color)/8!'
@@ -66,7 +105,7 @@
 							isUnconfirmed(event) ? 'opacity-50' : ''
 						]" :ref="(el) => setEventCardRef(event, el as Element)" :style="getEventStyleVars(event, store.timeStep)">
 						<UTooltip v-if="isCancelled(event)" text="Cancelled" :delay-duration="0" :content="{ sideOffset: 16 }">
-							<Icon name="i-lucide-circle-x" class="size-[calc(100%-1rem)] bg-error absolute inset-2 z-50 opacity-50" />
+							<Icon name="lucide:circle-x" class="size-[calc(100%-1rem)] bg-error absolute inset-2 z-50 opacity-50" />
 						</UTooltip>
 						<UTooltip v-if="isUnconfirmed(event)" text="Unconfirmed" :delay-duration="0" :content="{ sideOffset: 8 }">
 							<div class="size-full absolute inset-0" />
@@ -77,38 +116,6 @@
 							class="text-muted font-light"
 							:class="[isCancelled(event) && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
 								shouldShowEpisodeWithPeriod(event, store.timeStep)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${event.start.format('HH:mm')} -
 							${event.end.format('HH:mm')}`
 		: shouldShowEpisodeOnly(event, store.timeStep)
@@ -128,32 +135,48 @@
 								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
 								:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
 							<template v-if="event.languages">
-								<Icon v-for="language in event.languages" :key="language" :name="`i-circle-flags-${language}`"
-									class="size-3" />
+								<Icon v-for="language in event.languages" :key="language" :name="`circle-flags:${language}`"
+									class="size-3" aria-hidden="true" />
 							</template>
 						</div>
-					</div>
+					</button>
 				</AnimeDetailsPopover>
 			</template>
 			<template v-if="store.isMonthView" #cell="{ cell }">
-				<div class="relative flex flex-col items-end size-full cursor-pointer hover:bg-muted p-2"
-					@click="vueCalRef?.view.switch('week', cell.start)">
+				<button type="button" :aria-label="`Open week of ${cell.start.format('MMMM DD')}`"
+					class="relative flex size-full cursor-pointer flex-col items-end p-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+					@click="vueCalRef?.view?.switch('week', cell.start)">
 					<UBadge variant="soft" color="neutral" class="rounded-full size-fit">
 						{{ cell.start.format("DD") }}
 					</UBadge>
-				</div>
+				</button>
 			</template>
 		</vue-cal>
+
+		<div
+			v-if="showEmptyState"
+			class="pointer-events-none absolute bottom-4 right-4 z-40 max-w-xs rounded-lg border border-default bg-default/95 px-4 py-3 text-sm text-muted shadow-sm"
+			role="status">
+			No events match the current search and filters.
+		</div>
 	</UDashboardPanel>
 </template>
 
 <script lang="ts" setup>
-import { VueCal, addDatePrototypes } from 'vue-cal'
-import 'vue-cal/style'
-import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
-import { useAiringSchedules } from '~/composables/useAiringSchedules'
-import { useCalendarStore } from '~/stores/Calendar'
+import { VueCal, addDatePrototypes, type VueCalView } from "vue-cal"
+import "vue-cal/style"
 import { FEATURE_REGISTRY } from "#shared/config/features"
+import { useAiringSchedules } from "~/composables/useAiringSchedules"
+import { useCalendarStore } from "~/stores/Calendar"
+import type {
+	CalendarApiResponse,
+	CalendarEvent,
+	CalendarMedia
+} from "~/types/calendar"
+import {
+	buildCalendarEvents,
+	chunkCalendarMediaIds
+} from "~/utils/calendar-events"
 
 definePageMeta({
 	feature: "calendar",
@@ -180,15 +203,18 @@ useSeoMeta({
 	ogDescription: seo.description
 })
 
-const vueCalRef = ref()
+addDatePrototypes()
+
+const vueCalRef = ref<{ view: VueCalView } | null>(null)
 const searchButtonToggle = ref(false)
-const searchQuery = ref('')
-const inputRef = ref<any>()
+const searchQuery = ref("")
+const warningDismissed = ref(false)
+const inputRef = ref<{ $el?: HTMLElement } | null>(null)
 
 function openSearch() {
 	searchButtonToggle.value = true
 	nextTick(() => {
-		const input = inputRef.value?.$el?.querySelector('input')
+		const input = inputRef.value?.$el?.querySelector("input")
 		if (input) {
 			input.focus()
 		}
@@ -196,12 +222,15 @@ function openSearch() {
 }
 
 function closeSearch() {
-	if (searchQuery.value == '') {
+	if (searchQuery.value === "") {
 		searchButtonToggle.value = false
 	}
 }
 
-addDatePrototypes()
+function clearSearch() {
+	searchQuery.value = ""
+	searchButtonToggle.value = false
+}
 
 const {
 	setEventCardRef,
@@ -221,10 +250,12 @@ const { airingAtGreater, airingAtLesser, dateRange } = storeToRefs(store)
 const rangeStart = computed(() => dateRange.value.start.toISOString())
 const rangeEnd = computed(() => dateRange.value.end.toISOString())
 
-const { data: calendarData, status: calendarStatus } = await useFetch<{
-	airingSchedules: any[]
-	simuldubs: any[]
-}>("/api/calendar", {
+const {
+	data: calendarData,
+	error: calendarError,
+	refresh: refreshCalendarData,
+	status: calendarStatus
+} = await useFetch<CalendarApiResponse>("/api/calendar", {
 	query: computed(() => ({
 		airingAtGreater: airingAtGreater.value,
 		airingAtLesser: airingAtLesser.value,
@@ -234,18 +265,19 @@ const { data: calendarData, status: calendarStatus } = await useFetch<{
 	watch: [airingAtGreater, airingAtLesser, rangeStart, rangeEnd],
 	default: () => ({
 		airingSchedules: [],
-		simuldubs: []
+		simuldubs: [],
+		warnings: []
 	})
 })
 
-const airingSchedules = computed(() => calendarData.value?.airingSchedules ?? [])
-const simuldubs = computed(() => calendarData.value?.simuldubs ?? [])
+const airingSchedules = computed(() => calendarData.value.airingSchedules)
+const simuldubs = computed(() => calendarData.value.simuldubs)
 
 const airingMediaIds = computed(() => {
 	const ids = new Set<number>()
-	airingSchedules.value.forEach((item: any) => {
-		const mediaId = Number(item?.media?.id)
-		if (!Number.isFinite(mediaId)) return
+	airingSchedules.value.forEach((item) => {
+		const mediaId = Number(item.media?.id)
+		if (!Number.isSafeInteger(mediaId) || mediaId <= 0) return
 		ids.add(mediaId)
 	})
 	return ids
@@ -253,34 +285,39 @@ const airingMediaIds = computed(() => {
 
 const missingSimuldubMediaIds = computed(() => {
 	const missingIds = new Set<number>()
-	simuldubs.value.forEach((simuldub: any) => {
-		const mediaId = Number(simuldub?.anilist_media_id)
-		if (!Number.isFinite(mediaId)) return
+	simuldubs.value.forEach((simuldub) => {
+		const mediaId = Number(simuldub.anilist_media_id)
+		if (!Number.isSafeInteger(mediaId) || mediaId <= 0) return
 		if (airingMediaIds.value.has(mediaId)) return
 		missingIds.add(mediaId)
 	})
 	return [...missingIds]
 })
 
-const { data: missingSimuldubMedias } = await useAsyncData(
+const gqlRequest = useGql()
+const {
+	data: missingSimuldubMedias,
+	error: missingSimuldubMediaError
+} = await useAsyncData<CalendarMedia[]>(
 	"calendar-simuldub-missing-medias",
 	async () => {
-		const mediaIds = missingSimuldubMediaIds.value
-		if (!mediaIds.length) return []
+		const mediaChunks = chunkCalendarMediaIds(missingSimuldubMediaIds.value)
+		const medias: CalendarMedia[] = []
 
-		try {
-			const { data } = await useAsyncGql({
-				operation: "getMediasByIds",
-				variables: {
-					mediaIds,
-					perPage: mediaIds.length
-				}
+		for (const mediaIds of mediaChunks) {
+			const response = await gqlRequest("getMediasByIds", {
+				mediaIds,
+				perPage: mediaIds.length
 			})
-			return data.value?.Page?.media ?? []
-		} catch (error) {
-			console.error("Failed to fetch missing simuldub medias:", error)
-			return []
+
+			for (const media of response.Page?.media ?? []) {
+				if (media && Number.isSafeInteger(media.id) && media.id > 0) {
+					medias.push(media)
+				}
+			}
 		}
+
+		return medias
 	},
 	{
 		watch: [missingSimuldubMediaIds],
@@ -289,12 +326,9 @@ const { data: missingSimuldubMedias } = await useAsyncData(
 )
 
 const missingSimuldubMediaById = computed(() => {
-	const map = new Map<number, any>()
-	const medias = missingSimuldubMedias.value ?? []
-	medias.forEach((media: any) => {
-		const mediaId = Number(media?.id)
-		if (!Number.isFinite(mediaId)) return
-		map.set(mediaId, media)
+	const map = new Map<number, CalendarMedia>()
+	missingSimuldubMedias.value.forEach((media) => {
+		map.set(media.id, media)
 	})
 	return map
 })
@@ -311,131 +345,133 @@ function isUnconfirmed(event: { status?: string }) {
 	return event.status === "unconfirmed"
 }
 
-watch(delayedPending, () => {
-	if (delayedPending.value) {
-		console.log("loading data");
-
+watch(delayedPending, (pending) => {
+	if (pending) {
 		toast.add({
-			id: 'loading-data',
-			title: 'Loading airing schedules and simuldubs',
-			icon: 'i-lucide-loader-circle',
+			id: "loading-calendar-data",
+			title: "Loading airing schedules and simuldubs",
+			icon: "i-lucide-loader-circle",
 			close: false,
 			progress: false,
 			ui: {
-				icon: 'animate-spin'
+				icon: "animate-spin"
 			}
 		})
 	} else {
-		toast.remove('loading-data')
+		toast.remove("loading-calendar-data")
 	}
 })
 
-const allCalendarEvents = computed(() => {
-	let events: Array<AnimeCalEvent> = []
-	if (airingSchedules.value) {
-		events = airingSchedules.value.map((item: any) => new AnimeCalEvent(item))
+const allCalendarEvents = computed(() =>
+	buildCalendarEvents(
+		airingSchedules.value,
+		simuldubs.value,
+		missingSimuldubMediaById.value
+	)
+)
 
-		if (simuldubs.value?.length) {
-			const eventsByMediaAndStart = new Map<string, AnimeCalEvent>()
-			const getMergeKey = (mediaId?: number, startTime?: number, episode?: number) => `${mediaId ?? ""}-${startTime ?? ""}-${episode ?? ""}`
-			events.forEach((event: AnimeCalEvent) => {
-				const eventMediaId = Number(event.media?.id)
-				if (!Number.isFinite(eventMediaId)) return
-				const key = getMergeKey(eventMediaId, event.start.getTime(), event.episode)
-				eventsByMediaAndStart.set(key, event)
-			})
+const availableLanguages = computed(() =>
+	[...new Set(allCalendarEvents.value.flatMap(event => event.languages))]
+)
 
-			simuldubs.value.forEach((simuldub: any) => {
-				const simuldubMediaId = Number(simuldub.anilist_media_id)
-				const simuldubStartTime = new Date(simuldub.start_date).getTime()
-				const simuldubEpisode = Number(simuldub.episode)
-				if (!Number.isFinite(simuldubMediaId) || Number.isNaN(simuldubStartTime)) return
+watch(availableLanguages, (languages) => {
+	store.setAvailableDubbingOptions(languages)
+}, { immediate: true })
 
-				const exactMatchKey = getMergeKey(
-					simuldubMediaId,
-					simuldubStartTime,
-					Number.isFinite(simuldubEpisode) ? simuldubEpisode : undefined
-				)
-				const matchingCalEvent = eventsByMediaAndStart.get(exactMatchKey)
-				if (matchingCalEvent) {
-					const mergedLanguages = new Set([...(matchingCalEvent.languages ?? []), ...(simuldub.languages ?? [])])
-					matchingCalEvent.languages = [...mergedLanguages]
-					return
-				}
-
-				const matchingByMedia = events.find((event: AnimeCalEvent) => {
-					const eventMediaId = Number(event.media?.id)
-					if (!Number.isFinite(eventMediaId) || eventMediaId !== simuldubMediaId) return false
-					if (!Number.isFinite(simuldubEpisode)) return true
-					return event.episode === simuldubEpisode
-				}) ?? events.find((event: AnimeCalEvent) => Number(event.media?.id) === simuldubMediaId)
-				const sourceMedia = matchingByMedia?.media ?? missingSimuldubMediaById.value.get(simuldubMediaId)
-				if (!sourceMedia) return
-
-				const simuldubEvent = new SimuldubCalEvent({
-					...{ media: sourceMedia },
-					...simuldub
-				})
-				events.push(simuldubEvent)
-				const simuldubEventMediaId = Number(simuldubEvent.media?.id)
-				if (!Number.isFinite(simuldubEventMediaId)) return
-				eventsByMediaAndStart.set(
-					getMergeKey(simuldubEventMediaId, simuldubEvent.start.getTime(), simuldubEvent.episode),
-					simuldubEvent
-				)
-			})
-		}
-	}
-
-	return events
-})
-
-
-// ========== Filtres ==========
-const items = computed(() => {
-	const availableLanguages = [...new Set(allCalendarEvents.value.flatMap((e: AnimeCalEvent) => e.languages ?? []))]
-	return store.getFilterMenuItems(availableLanguages)
-})
+const items = computed(() => store.getFilterMenuItems(availableLanguages.value))
 
 const filteredCalendarEvents = computed(() => {
-	return allCalendarEvents.value.filter((event: AnimeCalEvent) => {
-		const formatMatch = store.currentFormat.includes(event.media?.format)
+	const search = searchQuery.value.trim().toLocaleLowerCase()
+
+	return allCalendarEvents.value.filter((event) => {
+		const format = event.media.format
+		const formatMatch = !format || store.currentFormat.includes(format)
 		let statusMatch = true
 		if (store.currentStatus.length > 0 && entriesInitialized.value) {
-			const listEntry = animeEntries.value.find(entry => entry.media?.id === event.media?.id)
+			const listEntry = animeEntries.value.find(entry => entry.media?.id === event.media.id)
 			statusMatch = Boolean(listEntry?.status && store.currentStatus.includes(listEntry.status))
 		}
-		const languageMatch = (event.languages ?? []).some((language: string) => store.dubbing.includes(language))
-		const search = searchQuery.value.toLowerCase()
-		const englishTitle = event.media?.title?.english?.toLowerCase() ?? ""
-		const romajiTitle = event.media?.title?.romaji?.toLowerCase() ?? ""
-		const nativeTitle = event.media?.title?.native?.toLowerCase() ?? ""
-		const searchMatch = englishTitle.includes(search) || romajiTitle.includes(search) || nativeTitle.includes(search)
+		const languageMatch = event.languages.length === 0
+			|| event.languages.some(language => store.dubbing.includes(language))
+		const searchableTitles = [
+			event.title,
+			event.media.title?.english,
+			event.media.title?.romaji,
+			event.media.title?.native
+		]
+			.filter((title): title is string => Boolean(title))
+			.map(title => title.toLocaleLowerCase())
+		const searchMatch = !search || searchableTitles.some(title => title.includes(search))
 		return formatMatch && statusMatch && languageMatch && searchMatch
 	})
 })
 
-// ========== Gestion des vues et refresh ==========
+const hasCalendarWarning = computed(() =>
+	calendarData.value.warnings.includes("simuldubs_unavailable")
+	|| Boolean(missingSimuldubMediaError.value && missingSimuldubMediaIds.value.length)
+)
+const showEmptyState = computed(() =>
+	calendarStatus.value !== "pending"
+	&& !calendarError.value
+	&& filteredCalendarEvents.value.length === 0
+)
+const calendarStatusMessage = computed(() => {
+	if (calendarStatus.value === "pending") return "Loading calendar events."
+	if (calendarError.value) return "The calendar could not be loaded."
+	if (hasCalendarWarning.value) {
+		return `Loaded ${filteredCalendarEvents.value.length} events without simuldub details.`
+	}
+	return `Loaded ${filteredCalendarEvents.value.length} calendar events.`
+})
+
+function getEventAriaLabel(event: CalendarEvent) {
+	const details = [
+		event.title,
+		event.episode ? `episode ${event.episode}` : null,
+		event.status === "cancelled" ? "cancelled" : null,
+		event.status === "unconfirmed" ? "unconfirmed" : null
+	].filter((value): value is string => Boolean(value))
+
+	return details.join(", ")
+}
+
+async function refreshCalendar() {
+	await refreshCalendarData()
+}
+
 const onCalendarReady = () => {
 	vueCalRef.value?.view?.scrollToCurrentTime()
 }
 
-const onViewChange = async (view: any) => {
-	store.setDateRangeFromView(view)
+let scrollTimer: ReturnType<typeof setTimeout> | undefined
 
-	setTimeout(() => {
+const scheduleScrollToCurrentTime = () => {
+	if (scrollTimer) clearTimeout(scrollTimer)
+	scrollTimer = setTimeout(() => {
 		vueCalRef.value?.view?.scrollToCurrentTime()
 	}, 500)
 }
 
+const onViewChange = (view: VueCalView) => {
+	store.setDateRangeFromView(view)
+	scheduleScrollToCurrentTime()
+}
+
 onMounted(() => {
+	if (window.matchMedia("(max-width: 639px)").matches && store.currentView === "week") {
+		store.currentView = "day"
+	}
+
 	if (userStore.isAuthenticated && !entriesInitialized.value) {
 		void entriesStore.fetchAllAnimes().catch(() => undefined)
 	}
 
-	setTimeout(() => {
-		vueCalRef.value?.view?.scrollToCurrentTime()
-	}, 500)
+	scheduleScrollToCurrentTime()
+})
+
+onBeforeUnmount(() => {
+	if (scrollTimer) clearTimeout(scrollTimer)
+	toast.remove("loading-calendar-data")
 })
 </script>
 
@@ -443,10 +479,10 @@ onMounted(() => {
 .vuecal.vuecal--default-theme {
 	--vuecal-primary-color: transparent !important;
 	--vuecal-event-border-color: transparent !important;
-	--vuecal-height: 100vh !important;
-	--vuecal-weekday-bar-height: 3rem !important;
-	--vuecal-schedules-bar-height: 0rem !important;
-	--vuecal-min-cell-width: 1rem !important;
+	--vuecal-height: 100dvh !important;
+	--vuecal-weekday-bar-size: 3rem !important;
+	--vuecal-schedules-bar-size: 0rem !important;
+	--vuecal-min-cell-size: 1rem !important;
 
 	--vuecal-border-color: var(--ui-border);
 	--vuecal-header-color: transparent;
@@ -507,7 +543,7 @@ onMounted(() => {
 	}
 
 	.vuecal__scrollable {
-		overflow-x: hidden !important;
+		overflow-x: auto !important;
 		overflow-y: auto !important;
 	}
 
@@ -515,6 +551,12 @@ onMounted(() => {
 		position: relative;
 		background-color: var(--ui-bg);
 		border-top-left-radius: var(--radius-2xl);
+	}
+}
+
+@media (max-width: 639px) {
+	.vuecal--week-view {
+		--vuecal-min-cell-size: 7rem !important;
 	}
 }
 

@@ -11,7 +11,7 @@ const { items: links } = useAppNavigation({
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
+  <UDashboardGroup unit="rem" class="min-h-dvh">
     <UDashboardSidebar
       id="default"
       v-model:open="open"
@@ -31,6 +31,7 @@ const { items: links } = useAppNavigation({
         <UNavigationMenu
           :collapsed="collapsed"
           :items="links"
+          aria-label="Primary navigation"
           orientation="vertical"
           tooltip
           popover
@@ -43,6 +44,8 @@ const { items: links } = useAppNavigation({
       </template>
     </UDashboardSidebar>
 
-    <slot />
+		<main id="main-content" tabindex="-1" class="min-w-0 flex-1 overflow-hidden outline-none">
+			<slot />
+		</main>
   </UDashboardGroup>
 </template>

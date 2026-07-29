@@ -1,27 +1,17 @@
-import { add } from "date-fns"
+import type {
+	CalendarAiringSchedule,
+	CalendarEvent,
+	CalendarMedia,
+	CalendarSimuldubItem
+} from "~/types/calendar"
 
-interface VueCalEvent {
-	start: Date
-	end: Date
-	id?: string
-	title?: string
-	content?: string
-	class?: string
-	background?: number
-	schedule?: number
-	allDay?: boolean
-	resizable?: boolean
-	draggable?: boolean
-	deletable?: boolean
-}
-
-const languageToCountry = (item?: string | null): string | undefined => {
+export const languageToCountry = (item?: unknown): string | undefined => {
 	if (typeof item !== "string") {
 		return undefined
 	}
 
 	const normalizedItem = item.trim().toLowerCase()
-	if (!normalizedItem) {
+	if (!normalizedItem || !/^[a-z0-9-]{2,24}$/.test(normalizedItem)) {
 		return undefined
 	}
 
@@ -39,58 +29,95 @@ const languageToCountry = (item?: string | null): string | undefined => {
 	}
 }
 
-export class AnimeCalEvent implements VueCalEvent {
+function getMediaTitle(media: CalendarMedia) {
+	return media.title?.userPreferred
+		|| media.title?.english
+		|| media.title?.romaji
+		|| media.title?.native
+		|| `Anime #${media.id}`
+}
+
+function getDurationInMilliseconds(media: CalendarMedia) {
+	const duration = Number(media.duration)
+	const durationMinutes = Number.isFinite(duration) && duration > 0
+		? Math.min(duration, 24 * 60)
+		: 24
+
+	return durationMinutes * 60 * 1000
+}
+
+function normalizeStringList(items: readonly string[] | null | undefined) {
+	if (!Array.isArray(items)) return []
+
+	return [...new Set(
+		items
+			.map(item => item.trim())
+			.filter(item => item.length > 0)
+	)]
+}
+
+export class AnimeCalEvent implements CalendarEvent {
 	start: Date
 	end: Date
 	id: string
-	title?: string
-	content?: string
-	class?: string
-	media: any
-	episode?: number
+	title: string
+	content: string
+	media: CalendarMedia
+	episode: number
 	timeUntilAiring?: number
-	airingAt?: number
-	languages?: string[]
-	streaming?: string[]
+	airingAt: number
+	languages: string[]
+	streaming: string[]
 
-	constructor(data: any) {
+	constructor(data: CalendarAiringSchedule & { media: CalendarMedia }) {
 		const airingAtMs = data.airingAt * 1000
-		const durationMs = (data.media?.duration || 24) * 60 * 1000
+		const durationMs = getDurationInMilliseconds(data.media)
 
 		this.start = new Date(airingAtMs)
 		this.end = new Date(airingAtMs + durationMs)
-		this.title = data.media?.title?.userPreferred || data.media?.title?.english || data.media?.title?.romaji || data.media?.title?.native || "Unknown Title"
+		this.title = getMediaTitle(data.media)
 		this.content = `Episode ${data.episode}`
-		this.class = "anime-event"
-		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
+		this.id = `airing-${data.media.id}-${data.episode}-${this.start.getTime()}`
 		this.media = data.media
 		this.episode = data.episode
-		this.timeUntilAiring = data.timeUntilAiring
+		this.timeUntilAiring = data.timeUntilAiring ?? undefined
 		this.airingAt = data.airingAt
-		const originLanguage = languageToCountry(data.media?.countryOfOrigin)
+		const originLanguage = languageToCountry(data.media.countryOfOrigin)
 		this.languages = originLanguage ? [originLanguage] : []
+		this.streaming = []
 	}
 }
 
-export class SimuldubCalEvent extends AnimeCalEvent {
-	status: string
+export class SimuldubCalEvent implements CalendarEvent {
+	start: Date
+	end: Date
+	id: string
+	title: string
+	content: string
+	media: CalendarMedia
+	episode?: number
+	languages: string[]
+	streaming: string[]
+	status: CalendarSimuldubItem["status"]
 
-	constructor(data: any) {
-		super(data)
+	constructor(data: CalendarSimuldubItem & { media: CalendarMedia }) {
 		this.start = new Date(data.start_date)
-		if (data.end_date) {
-			this.end = new Date(data.end_date)
-		} else if (data.media?.duration) {
-			this.end = add(new Date(this.start), { minutes: data.media.duration })
-		}
-		this.title = data.title || data.media?.title?.userPreferred || data.media?.title?.english || data.media?.title?.romaji || data.media?.title?.native || "Unknown Title"
-		this.id = `${data.media?.id}-${data.episode}-${this.start.getTime()}-${this.end.getTime()}`
-		const rawLanguages: Array<string | null | undefined> = Array.isArray(data.languages) ? data.languages : []
-		const mappedLanguages = rawLanguages
+		const candidateEnd = data.end_date ? new Date(data.end_date) : null
+		this.end = candidateEnd
+			&& Number.isFinite(candidateEnd.getTime())
+			&& candidateEnd > this.start
+			? candidateEnd
+			: new Date(this.start.getTime() + getDurationInMilliseconds(data.media))
+		this.media = data.media
+		this.episode = data.episode ?? undefined
+		this.title = data.title?.trim() || getMediaTitle(data.media)
+		this.content = this.episode ? `Episode ${this.episode}` : "Simuldub"
+		this.id = `simuldub-${data.id}-${data.media.id}-${this.episode ?? "unknown"}-${this.start.getTime()}`
+		const mappedLanguages = data.languages
 			.map(language => languageToCountry(language))
 			.filter((language): language is string => typeof language === "string")
 		this.languages = [...new Set(mappedLanguages)]
-		this.streaming = data.streaming
-		this.status = data.status ?? "unconfirmed"
+		this.streaming = normalizeStringList(data.streaming)
+		this.status = data.status
 	}
 }

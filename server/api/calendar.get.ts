@@ -1,25 +1,15 @@
 import { createDirectus, readItems, rest } from "@directus/sdk"
 import type { GetAiringAnimesQuery } from "#gql/default"
-import * as z from "zod"
+import { isError } from "h3"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseCalendarQuery } from "~~/server/utils/request-validation"
 import { withTimeout } from "~~/server/utils/with-timeout"
+import {
+	parseSimuldubItems,
+	type ValidatedSimuldubItem
+} from "~~/server/utils/calendar-data"
 
 type AiringSchedule = NonNullable<NonNullable<GetAiringAnimesQuery["Page"]>["airingSchedules"]>[number]
-
-const simuldubItemSchema = z.object({
-	id: z.union([z.number(), z.string()]),
-	status: z.enum(["published", "cancelled"]),
-	title: z.string().nullable().optional(),
-	start_date: z.string(),
-	end_date: z.string().nullable().optional(),
-	episode: z.coerce.number().int().positive().nullable().optional(),
-	languages: z.array(z.string()).catch([]),
-	streaming: z.array(z.string()).catch([]),
-	anilist_media_id: z.union([z.number(), z.string()]).nullable().optional()
-})
-
-type SimuldubItem = z.infer<typeof simuldubItemSchema>
 
 const AIRING_CACHE_TTL_MS = 5 * 60 * 1000
 const SIMULDUB_CACHE_TTL_MS = 5 * 60 * 1000
@@ -29,7 +19,7 @@ const MAX_RETRIES = 3
 const DEFAULT_DIRECTUS_URL = "https://api.anitools.geekly.blog"
 
 const airingCache = new Map<string, { data: AiringSchedule[], expiresAt: number }>()
-const simuldubCache = new Map<string, { data: SimuldubItem[], expiresAt: number }>()
+const simuldubCache = new Map<string, { data: ValidatedSimuldubItem[], expiresAt: number }>()
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -142,17 +132,11 @@ async function fetchSimuldubs(rangeStart: string, rangeEnd: string, directusUrl:
 		"Simuldub request timed out"
 	)
 
-	const validatedSimuldubs = z.array(simuldubItemSchema).safeParse(simuldubs)
-	if (!validatedSimuldubs.success) {
-		throw createError({
-			statusCode: 502,
-			statusMessage: "Invalid simuldub response"
-		})
-	}
+	const validatedSimuldubs = parseSimuldubItems(simuldubs)
 
-	cacheResult(simuldubCache, cacheKey, validatedSimuldubs.data, SIMULDUB_CACHE_TTL_MS)
+	cacheResult(simuldubCache, cacheKey, validatedSimuldubs, SIMULDUB_CACHE_TTL_MS)
 
-	return validatedSimuldubs.data
+	return validatedSimuldubs
 }
 
 export default defineEventHandler(async (event) => {
@@ -171,13 +155,27 @@ export default defineEventHandler(async (event) => {
 	} = parseCalendarQuery(getQuery(event))
 	const directusUrl = runtimeConfig.public.directusUrl || DEFAULT_DIRECTUS_URL
 
-	const [airingSchedules, simuldubs] = await Promise.all([
+	const [airingResult, simuldubResult] = await Promise.allSettled([
 		fetchAiringSchedules(airingAtGreater, airingAtLesser),
 		fetchSimuldubs(rangeStart, rangeEnd, directusUrl)
 	])
 
+	if (airingResult.status === "rejected") {
+		if (isError(airingResult.reason) && airingResult.reason.statusCode === 504) {
+			throw airingResult.reason
+		}
+
+		throw createError({
+			statusCode: 502,
+			statusMessage: "AniList calendar is temporarily unavailable"
+		})
+	}
+
 	return {
-		airingSchedules,
-		simuldubs
+		airingSchedules: airingResult.value,
+		simuldubs: simuldubResult.status === "fulfilled" ? simuldubResult.value : [],
+		warnings: simuldubResult.status === "rejected"
+			? ["simuldubs_unavailable"] as const
+			: []
 	}
 })
