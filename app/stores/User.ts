@@ -203,5 +203,11 @@ export const useUserStore = defineStore("User", () => {
 		$reset
 	}
 }, {
-	persist: true
+	persist: {
+		storage: piniaPluginPersistedstate.localStorage(),
+		pick: [
+			"options",
+			"mediaListOptions"
+		]
+	}
 })

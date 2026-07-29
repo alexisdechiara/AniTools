@@ -112,10 +112,11 @@
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="favouritesText" description="Favourites" />
 							</div>
 							<div class="grid grid-cols-12 gap-2 justify-between w-full">
-								<iframe v-if="data.media.trailer" :src="'https://www.youtube.com/embed/' +
-									data.media.trailer.id +
-									'?autoplay=0&autohide=1'
-									" allow="autoplay" frameborder="0" class="rounded-lg w-full h-34"
+								<iframe v-if="trailerUrl" :src="trailerUrl" title="Anime trailer"
+									loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+									sandbox="allow-scripts allow-same-origin allow-presentation"
+									allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+									allowfullscreen class="rounded-lg w-full h-34"
 									:class="nbLinks < 4 ? 'col-span-11' : 'col-span-10'" />
 								<div class="grid auto-cols-max grid-flow-col grid-rows-5 gap-1 min-w-min h-fit flex-1 overflow-hidden"
 									:class="nbLinks < 4 ? 'col-span-1' : 'col-span-2'">
@@ -224,6 +225,17 @@ const popularRankText = computed(() => {
 
 const meanScoreText = computed(() => (media.value?.meanScore ? `${media.value.meanScore.toFixed(0)} %` : '-'));
 const favouritesText = computed(() => media.value?.favourites || '-');
+const trailerUrl = computed(() => {
+	const trailer = media.value?.trailer
+	const id = typeof trailer?.id === "string" ? trailer.id.trim() : ""
+	const site = typeof trailer?.site === "string" ? trailer.site.toLowerCase() : ""
+
+	if (site !== "youtube" || !/^[\w-]{6,32}$/.test(id)) {
+		return null
+	}
+
+	return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=0`
+})
 
 const animeThemeColor = computed(() => props.data?.media?.coverImage?.color || 'var(--ui-color-primary-400)');
 const sanitizedDescription = computed(() => (props.data?.media?.description || '').replace(/(<([^>]+)>)/ig, ''));
@@ -329,5 +341,4 @@ watch(popoverEl, (el) => {
 	}
 });
 </script>
-
 

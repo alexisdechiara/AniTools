@@ -508,5 +508,18 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		unrankAll
 	}
 }, {
-	persist: true
+	persist: {
+		storage: piniaPluginPersistedstate.localStorage(),
+		pick: [
+			"currentTemplate",
+			"tiers",
+			"unrankedTier",
+			"gapSize",
+			"headingCorner",
+			"rowCorner",
+			"colWidth",
+			"selectedBackground",
+			"nbCol"
+		]
+	}
 })

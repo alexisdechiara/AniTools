@@ -62,7 +62,6 @@ query getAiringAnimes(
         averageScore
         meanScore
         favourites
-        isFavourite
         genres
         tags {
           name
@@ -108,33 +107,6 @@ query getAiringAnimes(
           }
         }
 
-				studios(isMain: true) {
-					edges {
-						isMain
-						node {
-							name
-							siteUrl
-						}
-					}
-				}
-
-        mediaListEntry {
-          status
-          score(format: POINT_100)
-          repeat
-          progress
-          updatedAt
-          startedAt {
-            year
-            month
-            day
-          }
-          completedAt {
-            year
-            month
-            day
-          }
-        }
       }
     }
   }

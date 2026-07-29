@@ -1,6 +1,7 @@
 <template>
 	<UTooltip :text="props.site" :delay-duration="0" :content="{ side: 'right', sideOffset: 4 }">
-		<NuxtLink :to="url" target="_blank" :style="{ '--simple-icons-color': color || 'black' }"
+		<NuxtLink v-if="safeUrl" :to="safeUrl" target="_blank" rel="noopener noreferrer"
+			:aria-label="`Open ${site} in a new tab`" :style="{ '--simple-icons-color': color || 'black' }"
 			class="bg-(--simple-icons-color) rounded-sm flex justify-center items-center size-6">
 			<Icon :name="getSiteIcon()" :class="{ 'p-1': padding }" class="text-inverted" />
 		</NuxtLink>
@@ -24,6 +25,14 @@ const props = defineProps({
 })
 
 const padding = ref(true)
+const safeUrl = computed(() => {
+	try {
+		const parsed = new URL(props.url)
+		return parsed.protocol === "https:" ? parsed.toString() : null
+	} catch {
+		return null
+	}
+})
 
 const getSiteIcon = () => {
 	if (props.site) {

@@ -1,3 +1,33 @@
+const isProduction = process.env.NODE_ENV === "production"
+const contentSecurityPolicy = [
+	"default-src 'self'",
+	"base-uri 'self'",
+	"object-src 'none'",
+	"frame-ancestors 'none'",
+	"form-action 'self'",
+	`script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
+	"style-src 'self' 'unsafe-inline'",
+	"font-src 'self' data:",
+	"img-src 'self' data: blob: https://s4.anilist.co",
+	"media-src 'self' blob:",
+	`connect-src 'self' https://graphql.anilist.co https://api.anitools.geekly.blog${isProduction ? "" : " http: ws: wss:"}`,
+	"frame-src https://www.youtube-nocookie.com https://www.youtube.com",
+	"worker-src 'self' blob:"
+].join("; ")
+
+const securityHeaders: Record<string, string> = {
+	"Content-Security-Policy": contentSecurityPolicy,
+	"Cross-Origin-Opener-Policy": "same-origin",
+	"Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+	"Referrer-Policy": "strict-origin-when-cross-origin",
+	"X-Content-Type-Options": "nosniff",
+	"X-Frame-Options": "DENY"
+}
+
+if (isProduction) {
+	securityHeaders["Strict-Transport-Security"] = "max-age=31536000"
+}
+
 export default defineNuxtConfig({
 	"compatibilityDate": "2026-07-29",
 
@@ -21,12 +51,17 @@ export default defineNuxtConfig({
 	},
 
 	"graphql-client": {
+		tokenStorage: false,
 		clients: {
 			default: {
 				host: process.env.NUXT_PUBLIC_ANILIST_URL || "https://graphql.anilist.co",
 				proxyCookies: false
 			}
 		}
+	},
+
+	"image": {
+		domains: ["s4.anilist.co"]
 	},
 
 	"icon": {
@@ -55,18 +90,12 @@ export default defineNuxtConfig({
 		metaTag: false,
 		sitemap: ["/sitemap.xml"],
 		allow: ["/calendar", "/tierlist"],
-		disallow: ["/login", "/settings", "/statistics", "/customers", "/inbox", "/rewind"]
+		disallow: ["/login", "/statistics", "/rewind"]
 	},
 
 	"routeRules": {
 		"/**": {
-			headers: {
-				"X-Frame-Options": "DENY",
-				"X-Content-Type-Options": "nosniff",
-				"Referrer-Policy": "strict-origin-when-cross-origin",
-				"Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-				"Cross-Origin-Opener-Policy": "same-origin"
-			}
+			headers: securityHeaders
 		},
 		"/api/calendar": {
 			swr: 60,
@@ -87,7 +116,8 @@ export default defineNuxtConfig({
 		},
 		"/auth/**": {
 			headers: {
-				"Cache-Control": "private, no-store"
+				"Cache-Control": "private, no-store",
+				"Referrer-Policy": "no-referrer"
 			}
 		}
 	},
