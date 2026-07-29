@@ -24,7 +24,7 @@
 		"test:e2e:ui": "playwright test --ui"
 	},
 	"dependencies": {
-		"@directus/sdk": "^23.0.0",
+		"@directus/sdk": "^24.0.0",
 		"@iconify-json/circle-flags": "^1.2.10",
 		"@iconify-json/lucide": "^1.2.120",
 		"@iconify-json/simple-icons": "^1.2.92",
