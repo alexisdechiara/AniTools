@@ -13,7 +13,7 @@
 				@click.stop="selectItem" @mouseover.stop="setHovered(`header-${index}`, 'header', 'Tier Header')"
 				@mouseleave="clearHovered" />
 
-			<UTextarea autoresize v-model.lazy="tier.name" variant="none"
+			<UTextarea v-model.lazy="tierName" autoresize variant="none"
 				:ui="{ root: 'size-full', base: 'text-center text-lg font-semibold text-inverted bg-transparent flex-wrap place-content-center' }" />
 			<div
 				class="absolute flex flex-col -left-8 h-full items-center justify-center opacity-0 hover:opacity-100 group-hover/control:opacity-100 transition-opacity pointer-events-auto z-20">
@@ -32,7 +32,7 @@
 				@click.stop="selectItem" @mouseover.stop="setHovered(`content-${index}`, 'content', 'Tier Content')"
 				@mouseleave="clearHovered" />
 
-			<DraggableTier v-model="tier.entries"
+			<DraggableTier v-model="tierEntries"
 				:class="[isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']" />
 		</div>
 	</div>
@@ -43,7 +43,7 @@ interface Tier {
 	name: string
 	color: string
 	range: Array<number>
-	entries: Array<any>
+	entries: Array<unknown>
 }
 
 const props = defineProps<{
@@ -52,6 +52,20 @@ const props = defineProps<{
 	isFirst: boolean,
 	isLast: boolean
 }>()
+
+const emit = defineEmits<{
+	"update:name": [value: string]
+	"update:entries": [value: Array<unknown>]
+}>()
+
+const tierName = computed({
+	get: () => props.tier.name,
+	set: value => emit("update:name", value)
+})
+const tierEntries = computed({
+	get: () => props.tier.entries,
+	set: value => emit("update:entries", value)
+})
 
 const tierlistStore = useTierlistStore()
 

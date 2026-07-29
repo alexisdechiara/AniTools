@@ -73,7 +73,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedGenres(sort: MetricSort = genresSort.value, limit: number = 5) {
 		if (!genres.value) return []
-		let sortedGenres: statistics["genres"] = []
+		let sortedGenres: statistics["genres"]
 		switch (sort) {
 			case "count":
 				sortedGenres = genres.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
@@ -95,7 +95,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedTags(sort: MetricSort, limit: number = 5) {
 		if (!tags.value) return []
-		let sortedTags: statistics["tags"] = []
+		let sortedTags: statistics["tags"]
 		switch (sort) {
 			case "count":
 				sortedTags = tags.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
@@ -117,7 +117,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedFormats(sort: MetricSort = formatsSort.value, limit: number = 6) {
 		if (!formats.value) return []
-		let sorted = formats.value
+		let sorted: statistics["formats"]
 		switch (sort) {
 			case "count":
 				sorted = formats.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
@@ -138,7 +138,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedCountries(sort: MetricSort = countriesSort.value, limit: number = 4) {
 		if (!countries.value) return []
-		let sorted = countries.value
+		let sorted: statistics["countries"]
 		switch (sort) {
 			case "count":
 				sorted = countries.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
@@ -159,7 +159,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedStatus(sort: MetricSort = statusSort.value, limit: number = 5) {
 		if (!statuses.value) return []
-		let sorted = statuses.value
+		let sorted: statistics["statuses"]
 		switch (sort) {
 			case "count":
 				sorted = statuses.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
@@ -180,7 +180,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 
 	function getSortedStudios(sort: MetricSort = studiosSort.value, limit: number = 5) {
 		if (!studios.value) return []
-		let sortedStudios: statistics["studios"] = []
+		let sortedStudios: statistics["studios"]
 		switch (sort) {
 			case "count":
 				sortedStudios = studios.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))

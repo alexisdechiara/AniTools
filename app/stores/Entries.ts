@@ -10,26 +10,19 @@ export const useEntriesStore = defineStore("Entries", () => {
 	const isInitialized = ref(false)
 
 	function fetchAllAnimes(userId?: number, format?: ScoreFormat): Promise<typeof lists.value> {
-		console.log("fetchAllAnimes called with:", { userId: userId || user.getId, format })
-		console.log("User store ID:", user.getId)
-
 		return new Promise((resolve) => {
 			useAsyncGql({
 				operation: "getAllEntries",
 				variables: {
 					userId: userId || user.getId,
 					type: MediaType.ANIME,
-					format: ScoreFormat.POINT_100
+					format: format || user.getMediaListOptions.scoreFormat || ScoreFormat.POINT_100
 				}
 			})
 				.then(({ data }) => {
-					console.log("GQL response:", data.value)
-
 					if (data.value?.MediaListCollection?.lists) {
-						console.log("Found lists:", data.value.MediaListCollection.lists.length)
 						lists.value = data.value.MediaListCollection.lists
 					} else {
-						console.warn("Aucun anime trouvé pour cet utilisateur")
 						lists.value = []
 					}
 					isInitialized.value = true
@@ -38,6 +31,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 				.catch((error) => {
 					console.error("Erreur lors de la récupération des lists:", error)
 					lists.value = []
+					isInitialized.value = true
 					resolve(lists.value)
 				})
 		})
@@ -83,6 +77,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 
 	function $reset() {
 		lists.value = []
+		isInitialized.value = false
 	}
 
 	return {

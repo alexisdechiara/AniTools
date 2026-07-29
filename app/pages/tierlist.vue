@@ -69,7 +69,8 @@
 					class="flex flex-col" :class="[gapSizeClass]" :animation="300" :force-fallback="false"
 					:fallback-on-body="true" :swap-threshold="0.65" :delay="0" :delay-on-touch-start="false">
 					<RankedTier v-for="(tier, index) in tiers" :key="index" :tier="tier" :index="index" :isFirst="index === 0"
-						:isLast="index === tiers.length - 1" />
+						:isLast="index === tiers.length - 1" @update:name="tier.name = $event"
+						@update:entries="tier.entries = $event" />
 				</VueDraggable>
 				<div v-if="unrankedTier.length > 0" class="flex w-full min-h-32 mt-8"
 					:class="[selectedBackground, rowCornerClass]">

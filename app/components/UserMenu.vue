@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui";
 
-const { logout } = useAuth();
+const { loginWithAniList, logout } = useAuth();
 
 defineProps<{
   collapsed?: boolean;
@@ -37,7 +37,11 @@ const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
       type: "label",
-      label: user.username || "Guest",
+      label: user.isOAuthAuthenticated
+        ? `${user.username} · AniList`
+        : user.isAuthenticated
+          ? `${user.username} · Public profile`
+          : "Guest",
       avatar: user.avatar,
     },
   ],
@@ -132,13 +136,21 @@ const items = computed<DropdownMenuItem[][]>(() => [
 			to: "https://github.com/alexisdechiara/AniTools",
       target: "_blank",
     },
-    {
-      label: "Log out",
-      icon: "i-lucide-log-out",
-      onSelect() {
-        logout();
-      },
-    },
+    user.isAuthenticated
+      ? {
+          label: user.isOAuthAuthenticated ? "Log out" : "Clear profile",
+          icon: "i-lucide-log-out",
+          onSelect() {
+            logout();
+          },
+        }
+      : {
+          label: "Continue with AniList",
+          icon: "i-simple-icons-anilist",
+          onSelect() {
+            loginWithAniList();
+          },
+        },
   ],
 ]);
 </script>

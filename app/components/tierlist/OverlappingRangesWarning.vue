@@ -34,8 +34,7 @@ interface Props {
 
 interface Emits {
 	(e: 'update:open', value: boolean): void
-	(e: 'confirm'): void
-	(e: 'cancel'): void
+	(e: 'confirm' | 'cancel'): void
 }
 
 const props = defineProps<Props>()

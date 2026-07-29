@@ -14,6 +14,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
 	const entriesStore = useEntriesStore()
 
 	try {
+		await userStore.restoreSession()
+
 		// Si l'utilisateur est chargé dans le store (grâce à pinia-plugin-persistedstate)
 		if (userStore.isAuthenticated) {
 			if (!statisticsStore.isInitialized) {

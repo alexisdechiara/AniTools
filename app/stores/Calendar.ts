@@ -2,12 +2,14 @@ import { defineStore } from "pinia"
 import { getTime } from "date-fns"
 import type { DropdownMenuItem } from "@nuxt/ui"
 
+type CalendarView = "day" | "week" | "month"
+
 export const useCalendarStore = defineStore("Calendar", () => {
 	const userStore = useUserStore()
 	const entriesStore = useEntriesStore()
 
 	// ========== Refs UI ==========
-	const currentView = ref("week")
+	const currentView = ref<CalendarView>("week")
 	const timeStep = ref(20)
 
 	// ========== Date Range ==========

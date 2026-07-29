@@ -47,7 +47,7 @@
 					</div>
 				</div>
 			</template>
-			<template #weekday-heading="{ label, date }">
+			<template #weekday-heading="{ date }">
 				<UButton size="sm" color="neutral" variant="soft" class="rounded-full uppercase m-2"
 					:class="!store.isMonthView && 'cursor-pointer'"
 					@click="!store.isMonthView ? vueCalRef?.view.switch('day', date) : ''">
@@ -148,7 +148,6 @@
 </template>
 
 <script lang="ts" setup>
-// @ts-ignore
 import { VueCal, addDatePrototypes } from 'vue-cal'
 import 'vue-cal/style'
 import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'

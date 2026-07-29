@@ -26,7 +26,7 @@
       :class="orientation === 'horizontal' ? 'mx-0 justify-center' : 'mx-4'"
     >
       <li
-        v-for="(item, index) in processedData"
+        v-for="item in processedData"
         :key="item.name"
         class="flex justify-start items-center gap-x-2"
       >

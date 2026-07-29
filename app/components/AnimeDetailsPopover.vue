@@ -95,12 +95,14 @@
 									{{ data.score }} %
 								</span>
 							</div>
-							<p v-html="sanitizedDescription" class="text-muted text-sm w-full leading-tight" :class="isHorizontal
+							<p class="text-muted text-sm w-full leading-tight" :class="isHorizontal
 								? hoveredContent
 									? 'overflow-y-visible h-max'
 									: 'overflow-y-hidden h-max max-h-22'
 								: 'max-h-22 h-full overflow-y-hidden hover:overflow-y-auto'
-								" />
+								">
+								{{ sanitizedDescription }}
+							</p>
 						</div>
 						<div v-show="showDetails" class="flex flex-col justify-evenly size-full gap-y-4">
 							<div class="flex justify-between w-full">
@@ -327,6 +329,5 @@ watch(popoverEl, (el) => {
 	}
 });
 </script>
-
 
 

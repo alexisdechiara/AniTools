@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-	"compatibilityDate": "2024-07-11",
+	"compatibilityDate": "2026-07-29",
 
 	"components": [
 		{
@@ -16,20 +16,15 @@ export default defineNuxtConfig({
 
 	"eslint": {
 		config: {
-			stylistic: {
-				commaDangle: "never",
-				braceStyle: "1tbs",
-				semi: false,
-				indent: "tab",
-				quotes: "double"
-			}
+			stylistic: false
 		}
 	},
 
 	"graphql-client": {
 		clients: {
 			default: {
-				host: process.env.NUXT_PUBLIC_ANILIST_URL || "https://graphql.anilist.co"
+				host: process.env.NUXT_PUBLIC_ANILIST_URL || "https://graphql.anilist.co",
+				proxyCookies: false
 			}
 		}
 	},
@@ -47,13 +42,13 @@ export default defineNuxtConfig({
 		"@nuxt/eslint",
 		"@nuxt/ui",
 		"@vueuse/nuxt",
-		"nuxt-charts",
 		"@nuxt/image",
-		"@nuxtjs/seo",
+		"nuxt-site-config",
+		"@nuxtjs/robots",
+		"@nuxtjs/sitemap",
 		"@pinia/nuxt",
 		"nuxt-graphql-client",
-		"pinia-plugin-persistedstate/nuxt",
-		"@nuxtjs/mdc"
+		"pinia-plugin-persistedstate/nuxt"
 	],
 
 	"robots": {
@@ -84,12 +79,29 @@ export default defineNuxtConfig({
 			headers: {
 				"Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
 			}
+		},
+		"/api/auth/**": {
+			headers: {
+				"Cache-Control": "private, no-store"
+			}
+		},
+		"/auth/**": {
+			headers: {
+				"Cache-Control": "private, no-store"
+			}
 		}
 	},
 
 	"runtimeConfig": {
+		anilist: {
+			clientId: "",
+			clientSecret: "",
+			redirectUri: ""
+		},
+		sessionPassword: "",
 		public: {
-			directusUrl: process.env.NUXT_PUBLIC_DIRECTUS_URL || "https://api.anitools.geekly.blog"
+			anilistUrl: "https://graphql.anilist.co",
+			directusUrl: "https://api.anitools.geekly.blog"
 		}
 	},
 

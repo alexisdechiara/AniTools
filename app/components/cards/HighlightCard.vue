@@ -4,7 +4,7 @@
       <div
         class="col-span-6 flex justify-center items-center h-full w-full max-w-50 relative"
       >
-        <template v-for="(anime, index) in highlitedAnimes">
+        <template v-for="(anime, index) in highlitedAnimes" :key="anime.title">
           <NuxtImg
             v-if="anime.src"
             v-show="index >= currentIndex"
@@ -87,7 +87,7 @@ if (getBestScoreAnime.value?.media) {
       getBestScoreAnime.value?.media?.coverImage?.extraLarge ||
       getBestScoreAnime.value?.media?.coverImage?.large ||
       getBestScoreAnime.value?.media?.coverImage?.medium,
-    value: getBestScoreAnime.value?.score!.toString(),
+    value: getBestScoreAnime.value.score?.toString() || null,
   });
 }
 
@@ -103,7 +103,7 @@ if (getLongestAnime.value?.media) {
       getLongestAnime.value?.media?.coverImage?.large ||
       getLongestAnime.value?.media?.coverImage?.medium,
     value: formatWatchTime(
-      getLongestAnime.value?.progress! * getLongestAnime.value?.media?.duration!
+      (getLongestAnime.value.progress ?? 0) * (getLongestAnime.value.media.duration ?? 0)
     ),
   });
 }

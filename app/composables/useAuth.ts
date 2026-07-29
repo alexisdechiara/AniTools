@@ -5,10 +5,22 @@ export const useAuth = () => {
 
 	const route = useRoute()
 
-	function logout() {
-		userStore.$reset()
-		entriesStore.$reset()
-		statisticsStore.$reset()
+	function loginWithAniList(returnTo = route.query.redirect?.toString() || "/") {
+		const target = `/auth/anilist?returnTo=${encodeURIComponent(returnTo)}`
+		return navigateTo(target, { external: true })
+	}
+
+	async function logout() {
+		try {
+			await $fetch("/api/auth/logout", {
+				method: "POST"
+			})
+		} finally {
+			userStore.$reset()
+			entriesStore.$reset()
+			statisticsStore.$reset()
+		}
+
 		return navigateTo({
 			path: "/login",
 			query: {
@@ -18,6 +30,7 @@ export const useAuth = () => {
 	}
 
 	return {
+		loginWithAniList,
 		logout
 	}
 }

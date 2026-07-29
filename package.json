@@ -2,6 +2,10 @@
 	"name": "ani-tools",
 	"private": true,
 	"type": "module",
+	"packageManager": "bun@1.3.5",
+	"engines": {
+		"node": ">=22.19.0"
+	},
 	"scripts": {
 		"build": "nuxt build",
 		"dev": "nuxt dev",
@@ -12,39 +16,41 @@
 		"typecheck": "nuxt typecheck"
 	},
 	"dependencies": {
-		"@directus/sdk": "^21.1.0",
+		"@directus/sdk": "^23.0.0",
 		"@iconify-json/circle-flags": "^1.2.10",
-		"@iconify-json/lucide": "1.2.82",
-		"@iconify-json/simple-icons": "1.2.63",
-		"@nuxt/image": "2.0.0",
-		"@nuxt/ui": "^4.1.0",
-		"@nuxtjs/mdc": "^0.19.2",
-		"@nuxtjs/seo": "^3.4.0",
-		"@pinia/nuxt": "0.11.3",
-		"@unovis/ts": "^1.6.1",
-		"@unovis/vue": "^1.6.1",
-		"@vueuse/nuxt": "^14.0.0",
-		"country-to-iso": "^1.6.1",
-		"date-fns": "^4.1.0",
-		"embla-carousel-wheel-gestures": "^8.1.0",
+		"@iconify-json/lucide": "^1.2.120",
+		"@iconify-json/simple-icons": "^1.2.92",
+		"@nuxt/image": "^2.1.0",
+		"@nuxt/ui": "^4.10.0",
+		"@nuxtjs/robots": "^6.1.3",
+		"@nuxtjs/sitemap": "^8.3.0",
+		"@pinia/nuxt": "^1.0.1",
+		"@unovis/ts": "^1.6.7",
+		"@unovis/vue": "^1.6.7",
+		"@vueuse/nuxt": "^14.4.0",
+		"date-fns": "^4.4.0",
 		"grid-layout-plus": "^1.1.1",
-		"nuxt": "^4.2.2",
-		"nuxt-charts": "^2.0.0",
+		"nuxt": "^4.5.1",
 		"nuxt-graphql-client": "0.2.46",
-		"pinia": "3.0.4",
+		"nuxt-site-config": "^4.1.2",
+		"pinia": "^4.0.2",
 		"pinia-plugin-persistedstate": "^4.7.1",
-		"vue-cal": "^5.0.1-rc.34",
-		"vue-draggable-plus": "^0.6.0",
-		"zod": "^4.1.12"
+		"vue-cal": "^5.0.1-rc.46",
+		"vue-draggable-plus": "^0.6.1",
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
-		"@nuxt/eslint": "1.12.1",
-		"eslint": "9.39.2",
-		"eslint-plugin-tailwindcss": "^4.0.0-beta.0",
-		"typescript": "^5.9.3",
-		"vue-tsc": "3.2.1"
+		"@nuxt/eslint": "^1.16.0",
+		"eslint": "^10.8.0",
+		"eslint-plugin-tailwindcss": "^4.2.0",
+		"typescript": "^6.0.3",
+		"vue-tsc": "^3.3.8"
 	},
-	"resolutions": {
-		"unimport": "4.1.1"
+	"overrides": {
+		"brace-expansion": "5.0.8",
+		"esbuild": "0.28.1",
+		"immutable": "5.1.9",
+		"lodash": "4.18.1",
+		"minimatch": "10.2.6"
 	}
 }

@@ -4,12 +4,26 @@
 		<h1 class="text-6xl font-bold text-white dark:text-neutral-300 mb-4">
 			<span class="text-primary-400 me-1">Ani</span>Tools
 		</h1>
-		<h2 class="text-2xl text-white">The awesome anime tools</h2>
-		<div class="mt-auto">
-			<UInput v-model="username" placeholder="Enter your username"
-				:ui="{ base: 'h-16 ps-8 rounded-full text-base', trailing: '-end-12' }" @keyup.enter="login">
+		<h2 class="text-2xl text-white">Your anime year, lists and calendar in one place.</h2>
+		<div class="mt-auto flex flex-col gap-5">
+			<UButton
+				label="Continue with AniList"
+				icon="i-simple-icons-anilist"
+				size="xl"
+				block
+				class="h-16 rounded-full justify-center"
+				@click="loginWithAniList()" />
+
+			<div class="flex items-center gap-3 text-neutral-400">
+				<USeparator class="flex-1" />
+				<span class="text-sm">or view a public profile</span>
+				<USeparator class="flex-1" />
+			</div>
+
+			<UInput v-model="username" placeholder="AniList username"
+				:ui="{ base: 'h-16 ps-8 rounded-full text-base', trailing: '-end-12' }" @keyup.enter="loadPublicProfile">
 				<template #trailing>
-					<UButton @click="login" :ui="{
+					<UButton aria-label="Load public AniList profile" @click="loadPublicProfile" :ui="{
 						base:
 							'size-full cursor-pointer rounded-full px-8 hover:bg-primary-400 active:bg-primary-400',
 					}">
@@ -46,11 +60,22 @@ useSeoMeta({
 const toast = useToast();
 const username = ref("");
 
-const { fetchUserData } = useUserStore();
+const userStore = useUserStore();
+const { fetchUserData } = userStore;
 const { fetchStatistics } = useStatisticsStore();
 const { fetchAllAnimes } = useEntriesStore();
+const { loginWithAniList } = useAuth();
 
-const login = async () => {
+if (route.query.authError) {
+	toast.add({
+		title: "AniList login failed",
+		description: "The authorization could not be completed. Please try again.",
+		color: "error",
+		icon: "i-lucide-circle-alert"
+	});
+}
+
+const loadPublicProfile = async () => {
 	if (!username.value.trim()) {
 		toast.add({
 			title: "Error",
@@ -67,6 +92,9 @@ const login = async () => {
 
 		// Récupérer les données de l'utilisateur
 		const userData = await fetchUserData(username.value);
+		if (!userData.id) {
+			throw new Error("User not found");
+		}
 
 		// Utiliser l'ID de l'utilisateur pour charger les statistiques
 		await fetchStatistics(userData.id);
@@ -79,10 +107,8 @@ const login = async () => {
 		const redirectTo = route.query.redirect?.toString() || "/";
 		await navigateTo(redirectTo, { replace: true });
 	} catch (error: any) {
-		console.error("Login error:", error);
-
 		toast.add({
-			title: "Login Error",
+			title: "Profile error",
 			description: error.message || "An error occurred during login",
 			color: "error",
 			icon: "i-lucide-circle-alert",

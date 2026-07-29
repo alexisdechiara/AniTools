@@ -46,8 +46,8 @@ useHead(() => ({
 		{ rel: "canonical", href: canonicalUrl.value }
 	],
 	script: [
-		{ key: "ld-website", type: "application/ld+json", children: websiteSchema.value },
-		{ key: "ld-webapp", type: "application/ld+json", children: appSchema.value }
+		{ key: "ld-website", type: "application/ld+json", innerHTML: websiteSchema.value },
+		{ key: "ld-webapp", type: "application/ld+json", innerHTML: appSchema.value }
 	],
 	titleTemplate: (titleChunk) => (titleChunk ? `${titleChunk} | AniTools` : "AniTools"),
 	htmlAttrs: {

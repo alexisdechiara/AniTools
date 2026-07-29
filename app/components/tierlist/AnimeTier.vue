@@ -54,10 +54,6 @@ const emit = defineEmits<{
 
 const showDetails = ref(false)
 
-function toggleLock() {
-	props.item.locked = !props.item.locked
-}
-
 function removeAnime() {
 	emit('remove', props.item)
 }

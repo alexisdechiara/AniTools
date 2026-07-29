@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 		}
 	}
 
-	let media: AniListSearchMedia[] = []
+	let media: AniListSearchMedia[]
 	try {
 		const response = await GqlSearch({
 			search: rawSearch,

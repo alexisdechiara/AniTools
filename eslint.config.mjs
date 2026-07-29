@@ -3,8 +3,15 @@ import tailwind from "eslint-plugin-tailwindcss"
 import withNuxt from "./.nuxt/eslint.config.mjs"
 
 export default withNuxt({
+	...tailwind.configs.recommended,
 	files: ["*.vue", "**/*.vue", "*.ts", "**/*.ts", "*.mjs"],
+	settings: {
+		tailwindcss: {
+			cssConfigPath: "./app/assets/css/main.css"
+		}
+	},
 	rules: {
+		...tailwind.configs.recommended.rules,
 		"@typescript-eslint/no-explicit-any": "warn",
 		"@typescript-eslint/no-unused-vars": "warn",
 		"vue/no-multiple-template-root": "off",
@@ -25,6 +32,4 @@ export default withNuxt({
 			externalIgnores: ["div", "h1", "h2", "h3", "h4", "h5", "h6", "p"]
 		}]
 	}
-},
-...tailwind.configs["flat/recommended"]
-)
+})
