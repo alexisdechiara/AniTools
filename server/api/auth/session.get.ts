@@ -1,12 +1,15 @@
-import { getAniListSession } from "~~/server/utils/anilist-auth"
+import {
+	AniListSessionResponseSchema,
+	getAniListSession
+} from "~~/server/utils/anilist-auth"
 
 export default defineEventHandler((event) => {
 	setResponseHeader(event, "Cache-Control", "private, no-store")
 	const session = getAniListSession(event)
 
-	return {
+	return AniListSessionResponseSchema.parse({
 		authenticated: Boolean(session),
 		expiresAt: session?.expiresAt ?? null,
 		user: session?.user ?? null
-	}
+	})
 })

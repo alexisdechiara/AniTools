@@ -19,7 +19,8 @@ describe("sanitizeReturnTo", () => {
 		"calendar",
 		"https://example.com",
 		"//example.com/path",
-		"/\\example.com/path"
+		"/\\example.com/path",
+		`/${"a".repeat(2048)}`
 	])("rejects the unsafe destination %s", (value) => {
 		expect(sanitizeReturnTo(value)).toBe("/")
 	})

@@ -128,7 +128,9 @@ export default defineNuxtConfig({
 			clientSecret: "",
 			redirectUri: ""
 		},
+		siteUrl: "",
 		sessionPassword: "",
+		sessionPreviousPassword: "",
 		public: {
 			anilistUrl: "https://graphql.anilist.co",
 			directusUrl: "https://api.anitools.geekly.blog"
