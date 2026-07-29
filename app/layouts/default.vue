@@ -3,8 +3,10 @@ import type { NavigationMenuItem } from "@nuxt/ui"
 
 const open = ref(false)
 
+useDashboard()
+
 const links = [[{
-	label: "Playground",
+	label: "Dashboard",
 	icon: "i-lucide-layout-dashboard",
 	to: "/",
 	onSelect: () => {
@@ -136,8 +138,6 @@ const links = [[{
       </template>
 
       <template #default="{ collapsed }">
-        <!-- <UDashboardSearchButton :collapsed="collapsed" variant="ghost" :ui="{ base: 'bg-elevated/50 rounded-3xl cursor-pointer', leadingIcon: 'ms-1'}" /> -->
-
         <UNavigationMenu
           :collapsed="collapsed"
           :items="links[0]"
@@ -146,15 +146,6 @@ const links = [[{
           popover
 					:ui="{ childItem: 'first:pt-2' }"
         />
-
-				<!-- <UNavigationMenu
-          :collapsed="collapsed"
-          :items="links[1]"
-          orientation="vertical"
-          tooltip
-          variant="link"
-          class="mt-auto"
-        /> -->
       </template>
 
       <template #footer="{ collapsed }">
@@ -163,7 +154,5 @@ const links = [[{
     </UDashboardSidebar>
 
     <slot />
-
-    <NotificationsSlideover />
   </UDashboardGroup>
 </template>
