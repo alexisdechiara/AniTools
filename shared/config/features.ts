@@ -176,8 +176,8 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/explore",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
-		navigation: "hidden"
+		status: "beta",
+		navigation: "primary"
 	},
 	timeline: {
 		label: "Timeline",
@@ -185,8 +185,8 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/timeline",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
-		navigation: "hidden"
+		status: "beta",
+		navigation: "primary"
 	},
 	login: {
 		label: "Sign in",

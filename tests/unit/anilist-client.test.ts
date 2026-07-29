@@ -73,7 +73,9 @@ describe("AniList endpoint query validation", () => {
 			"profile",
 			"anime-list",
 			"statistics",
-			"activities"
+			"activities",
+			"recommendations",
+			"studio-media"
 		])
 	})
 
@@ -119,7 +121,7 @@ describe("AniList endpoint query validation", () => {
 		})).toThrow()
 		expect(() => parseAniListActivitiesQuery({
 			username: "Alexis",
-			perPage: 26
+			perPage: 51
 		})).toThrow()
 	})
 })

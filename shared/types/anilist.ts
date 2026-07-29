@@ -74,6 +74,7 @@ export interface AniListProfile {
 export interface AniListMediaSummary {
 	id: number
 	idMal: number | null
+	type: string | null
 	title: {
 		english: string | null
 		native: string | null
@@ -276,4 +277,31 @@ export interface AniListActivitiesResponse {
 	source: AniListSource
 	pageInfo: AniListPageInfo
 	activities: AniListActivity[]
+}
+
+export interface AniListRecommendation {
+	id: number
+	rating: number
+	media: AniListMediaSummary
+}
+
+export interface AniListRecommendationsResponse {
+	source: AniListSource
+	seedMediaId: number
+	pageInfo: AniListPageInfo
+	recommendations: AniListRecommendation[]
+}
+
+export interface AniListStudio {
+	id: number
+	name: string
+	isAnimationStudio: boolean
+	siteUrl: string | null
+}
+
+export interface AniListStudioMediaResponse {
+	source: AniListSource
+	studio: AniListStudio
+	pageInfo: AniListPageInfo
+	media: AniListMediaSummary[]
 }

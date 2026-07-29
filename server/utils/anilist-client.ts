@@ -19,7 +19,9 @@ import {
 	type AniListPageInfo,
 	type AniListProfile,
 	type AniListProfileResponse,
+	type AniListRecommendationsResponse,
 	type AniListSource,
+	type AniListStudioMediaResponse,
 	type AniListStatistics,
 	type AniListStatisticsResponse
 } from "~~/shared/types/anilist"
@@ -29,18 +31,24 @@ const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co"
 const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_PAGE = 100
 const MAX_LIST_PAGE_SIZE = 50
-const MAX_ACTIVITY_PAGE_SIZE = 25
+const MAX_ACTIVITY_PAGE_SIZE = 50
+const MAX_EXPLORE_PAGE_SIZE = 20
 const MAX_STATISTIC_GROUPS = 100
 const MAX_MEDIA_IDS_PER_STATISTIC = 250
 const MAX_UPSTREAM_STATISTIC_GROUPS = 5_000
 const UPSTREAM_REQUEST_LIMIT = 28
 const UPSTREAM_REQUEST_WINDOW_MS = 60_000
+const MIN_ACTIVITY_TIMESTAMP = 946_684_800
+const MAX_ACTIVITY_TIMESTAMP = 4_102_444_800
+const MAX_ACTIVITY_RANGE_SECONDS = 370 * 24 * 60 * 60
 
 export const ANILIST_ALLOWED_OPERATIONS = [
 	"profile",
 	"anime-list",
 	"statistics",
-	"activities"
+	"activities",
+	"recommendations",
+	"studio-media"
 ] as const
 
 const PROFILE_FIELDS = `
@@ -67,6 +75,7 @@ const PROFILE_FIELDS = `
 const MEDIA_SUMMARY_FIELDS = `
 	id
 	idMal
+	type
 	title { romaji english native userPreferred }
 	coverImage { extraLarge large medium color }
 	bannerImage
@@ -217,6 +226,8 @@ const ACTIVITIES_QUERY = `
 	query AniToolsActivities(
 		$userId: Int!
 		$type: ActivityType
+		$createdAtGreater: Int
+		$createdAtLesser: Int
 		$page: Int!
 		$perPage: Int!
 	) {
@@ -228,7 +239,13 @@ const ACTIVITIES_QUERY = `
 				perPage
 				total
 			}
-			activities(userId: $userId, type: $type, sort: ID_DESC) {
+			activities(
+				userId: $userId
+				type: $type
+				createdAt_greater: $createdAtGreater
+				createdAt_lesser: $createdAtLesser
+				sort: ID_DESC
+			) {
 				__typename
 				... on ListActivity {
 					id
@@ -268,6 +285,66 @@ const ACTIVITIES_QUERY = `
 	}
 `
 
+const RECOMMENDATIONS_QUERY = `
+	query AniToolsRecommendations(
+		$mediaId: Int!
+		$page: Int!
+		$perPage: Int!
+		$onList: Boolean
+	) {
+		Page(page: $page, perPage: $perPage) {
+			pageInfo {
+				currentPage
+				hasNextPage
+				lastPage
+				perPage
+				total
+			}
+			recommendations(mediaId: $mediaId, onList: $onList, sort: RATING_DESC) {
+				id
+				rating
+				mediaRecommendation {
+					${MEDIA_SUMMARY_FIELDS}
+				}
+			}
+		}
+	}
+`
+
+const STUDIO_MEDIA_QUERY = `
+	query AniToolsStudioMedia(
+		$studioId: Int!
+		$page: Int!
+		$perPage: Int!
+		$onList: Boolean
+	) {
+		Studio(id: $studioId) {
+			id
+			name
+			isAnimationStudio
+			siteUrl
+			media(
+				page: $page
+				perPage: $perPage
+				isMain: true
+				onList: $onList
+				sort: [SCORE_DESC, POPULARITY_DESC]
+			) {
+				pageInfo {
+					currentPage
+					hasNextPage
+					lastPage
+					perPage
+					total
+				}
+				nodes {
+					${MEDIA_SUMMARY_FIELDS}
+				}
+			}
+		}
+	}
+`
+
 const usernameSchema = z.string()
 	.trim()
 	.min(2)
@@ -279,6 +356,12 @@ const optionalUsernameSchema = usernameSchema.optional()
 const pageSchema = z.coerce.number().int().min(1).max(MAX_PAGE).default(1)
 const listPageSizeSchema = z.coerce.number().int().min(1).max(MAX_LIST_PAGE_SIZE).default(25)
 const activityPageSizeSchema = z.coerce.number().int().min(1).max(MAX_ACTIVITY_PAGE_SIZE).default(20)
+const explorePageSizeSchema = z.coerce.number().int().min(1).max(MAX_EXPLORE_PAGE_SIZE).default(12)
+const mediaIdSchema = z.coerce.number().int().positive().max(10_000_000)
+const activityTimestampSchema = z.coerce.number()
+	.int()
+	.min(MIN_ACTIVITY_TIMESTAMP)
+	.max(MAX_ACTIVITY_TIMESTAMP)
 
 const profileQuerySchema = z.object({
 	username: optionalUsernameSchema
@@ -300,7 +383,60 @@ const activitiesQuerySchema = z.object({
 	username: optionalUsernameSchema,
 	page: pageSchema,
 	perPage: activityPageSizeSchema,
-	kind: z.enum(ANILIST_ACTIVITY_KINDS).default("anime")
+	kind: z.enum(ANILIST_ACTIVITY_KINDS).default("anime"),
+	year: z.coerce.number().int().min(2000).max(new Date().getUTCFullYear()).optional(),
+	from: activityTimestampSchema.optional(),
+	to: activityTimestampSchema.optional()
+}).strict().superRefine((query, context) => {
+	const hasYear = query.year !== undefined
+	const hasFrom = query.from !== undefined
+	const hasTo = query.to !== undefined
+
+	if (hasYear && (hasFrom || hasTo)) {
+		context.addIssue({
+			code: "custom",
+			message: "year cannot be combined with from or to",
+			path: ["year"]
+		})
+	}
+
+	if (hasFrom !== hasTo) {
+		context.addIssue({
+			code: "custom",
+			message: "from and to must be provided together",
+			path: [hasFrom ? "to" : "from"]
+		})
+	}
+
+	if (query.from !== undefined && query.to !== undefined) {
+		if (query.from >= query.to) {
+			context.addIssue({
+				code: "custom",
+				message: "from must be earlier than to",
+				path: ["from"]
+			})
+		} else if (query.to - query.from > MAX_ACTIVITY_RANGE_SECONDS) {
+			context.addIssue({
+				code: "custom",
+				message: "activity range cannot exceed 370 days",
+				path: ["to"]
+			})
+		}
+	}
+})
+
+const recommendationsQuerySchema = z.object({
+	username: optionalUsernameSchema,
+	mediaId: mediaIdSchema,
+	page: pageSchema,
+	perPage: explorePageSizeSchema
+}).strict()
+
+const studioMediaQuerySchema = z.object({
+	username: optionalUsernameSchema,
+	studioId: mediaIdSchema,
+	page: pageSchema,
+	perPage: explorePageSizeSchema
 }).strict()
 
 const publicAccessSchema = z.object({
@@ -325,6 +461,8 @@ export type AniListProfileQuery = z.infer<typeof profileQuerySchema>
 export type AniListAnimeListQuery = z.infer<typeof animeListQuerySchema>
 export type AniListStatisticsQuery = z.infer<typeof statisticsQuerySchema>
 export type AniListActivitiesQuery = z.infer<typeof activitiesQuerySchema>
+export type AniListRecommendationsQuery = z.infer<typeof recommendationsQuerySchema>
+export type AniListStudioMediaQuery = z.infer<typeof studioMediaQuerySchema>
 
 export interface AniListRequestOptions {
 	fetch?: typeof globalThis.fetch
@@ -388,6 +526,7 @@ const titleSchema = z.object({
 const mediaSchema = z.object({
 	id: z.number().int().positive(),
 	idMal: z.number().int().positive().nullable(),
+	type: z.string().max(32).nullable(),
 	title: titleSchema.nullable(),
 	coverImage: z.object({
 		color: z.string().max(64).nullable(),
@@ -591,6 +730,25 @@ const activitySchema = z.discriminatedUnion("__typename", [
 	messageActivitySchema
 ])
 
+const recommendationSchema = z.object({
+	id: z.number().int().positive(),
+	rating: z.number().int().min(-1_000_000).max(10_000_000).nullable(),
+	mediaRecommendation: mediaSchema.nullable()
+})
+
+const studioSchema = z.object({
+	id: z.number().int().positive(),
+	name: z.string().min(1).max(200),
+	isAnimationStudio: z.boolean(),
+	siteUrl: httpUrlSchema.nullable(),
+	media: z.object({
+		pageInfo: nullablePageInfoSchema,
+		nodes: z.array(mediaSchema.nullable())
+			.max(MAX_EXPLORE_PAGE_SIZE)
+			.nullable()
+	}).nullable()
+})
+
 const listSortMap: Record<AniListListSort, string> = {
 	updated: "UPDATED_TIME_DESC",
 	score: "SCORE_DESC",
@@ -631,6 +789,14 @@ export function parseAniListStatisticsQuery(query: unknown) {
 
 export function parseAniListActivitiesQuery(query: unknown) {
 	return parseQuery(activitiesQuerySchema, query)
+}
+
+export function parseAniListRecommendationsQuery(query: unknown) {
+	return parseQuery(recommendationsQuerySchema, query)
+}
+
+export function parseAniListStudioMediaQuery(query: unknown) {
+	return parseQuery(studioMediaQuerySchema, query)
 }
 
 export async function resolveAniListAccess(
@@ -1141,13 +1307,37 @@ function normalizeActivity(
 	}
 }
 
+export function resolveAniListActivityRange(
+	query: Pick<AniListActivitiesQuery, "from" | "to" | "year">
+): { from: number, to: number } | null {
+	if (query.year !== undefined) {
+		return {
+			from: Math.floor(Date.UTC(query.year, 0, 1) / 1_000),
+			to: Math.floor(Date.UTC(query.year + 1, 0, 1) / 1_000)
+		}
+	}
+
+	if (query.from !== undefined && query.to !== undefined) {
+		return {
+			from: query.from,
+			to: query.to
+		}
+	}
+
+	return null
+}
+
 export async function getAniListActivitiesResponse(
 	access: AniListAccess,
-	query: Pick<AniListActivitiesQuery, "kind" | "page" | "perPage">,
+	query: Pick<
+		AniListActivitiesQuery,
+		"from" | "kind" | "page" | "perPage" | "to" | "year"
+	>,
 	options: AniListRequestOptions = {}
 ): Promise<AniListActivitiesResponse> {
 	const validatedAccess = accessSchema.parse(access)
-	const validatedQuery = activitiesQuerySchema.omit({ username: true }).parse(query)
+	const validatedQuery = activitiesQuerySchema.parse(query)
+	const activityRange = resolveAniListActivityRange(validatedQuery)
 	const userId = validatedAccess.mode === "oauth"
 		? validatedAccess.userId
 		: (await fetchAniListProfile(validatedAccess, options)).id
@@ -1158,6 +1348,8 @@ export async function getAniListActivitiesResponse(
 			type: validatedQuery.kind === "all"
 				? undefined
 				: activityTypeMap[validatedQuery.kind],
+			createdAtGreater: activityRange ? activityRange.from - 1 : undefined,
+			createdAtLesser: activityRange?.to,
 			page: validatedQuery.page,
 			perPage: validatedQuery.perPage
 		},
@@ -1191,5 +1383,118 @@ export async function getAniListActivitiesResponse(
 		activities: (data.Page.activities ?? [])
 			.filter((activity): activity is NonNullable<typeof activity> => activity !== null)
 			.map(normalizeActivity)
+	}
+}
+
+export async function getAniListRecommendationsResponse(
+	access: AniListAccess,
+	query: Pick<AniListRecommendationsQuery, "mediaId" | "page" | "perPage">,
+	options: AniListRequestOptions = {}
+): Promise<AniListRecommendationsResponse> {
+	const validatedAccess = accessSchema.parse(access)
+	const validatedQuery = recommendationsQuerySchema.parse(query)
+	const data = await requestAniList(
+		RECOMMENDATIONS_QUERY,
+		{
+			mediaId: validatedQuery.mediaId,
+			page: validatedQuery.page,
+			perPage: validatedQuery.perPage,
+			onList: validatedAccess.mode === "oauth" ? false : undefined
+		},
+		z.object({
+			Page: z.object({
+				pageInfo: nullablePageInfoSchema,
+				recommendations: z.array(recommendationSchema.nullable())
+					.max(MAX_EXPLORE_PAGE_SIZE)
+					.nullable()
+			}).nullable()
+		}),
+		validatedAccess,
+		options
+	)
+
+	if (!data.Page) {
+		throw upstreamError(
+			404,
+			"AniList recommendations were not found",
+			"ANILIST_RECOMMENDATIONS_NOT_FOUND"
+		)
+	}
+
+	return {
+		source: sourceFromAccess(validatedAccess),
+		seedMediaId: validatedQuery.mediaId,
+		pageInfo: normalizePageInfo(
+			data.Page.pageInfo,
+			validatedQuery.page,
+			validatedQuery.perPage
+		),
+		recommendations: (data.Page.recommendations ?? [])
+			.flatMap((recommendation) => {
+				const media = recommendation?.mediaRecommendation
+				? normalizeMedia(recommendation.mediaRecommendation)
+				: null
+
+				if (!recommendation || !media || media.type !== "ANIME" || media.isAdult === true) {
+					return []
+				}
+
+				return [{
+					id: recommendation.id,
+					rating: recommendation.rating ?? 0,
+					media
+				}]
+			})
+	}
+}
+
+export async function getAniListStudioMediaResponse(
+	access: AniListAccess,
+	query: Pick<AniListStudioMediaQuery, "page" | "perPage" | "studioId">,
+	options: AniListRequestOptions = {}
+): Promise<AniListStudioMediaResponse> {
+	const validatedAccess = accessSchema.parse(access)
+	const validatedQuery = studioMediaQuerySchema.parse(query)
+	const data = await requestAniList(
+		STUDIO_MEDIA_QUERY,
+		{
+			studioId: validatedQuery.studioId,
+			page: validatedQuery.page,
+			perPage: validatedQuery.perPage,
+			onList: validatedAccess.mode === "oauth" ? false : undefined
+		},
+		z.object({
+			Studio: studioSchema.nullable()
+		}),
+		validatedAccess,
+		options
+	)
+
+	if (!data.Studio?.media) {
+		throw upstreamError(
+			404,
+			"AniList studio was not found",
+			"ANILIST_STUDIO_NOT_FOUND"
+		)
+	}
+
+	return {
+		source: sourceFromAccess(validatedAccess),
+		studio: {
+			id: data.Studio.id,
+			name: data.Studio.name,
+			isAnimationStudio: data.Studio.isAnimationStudio,
+			siteUrl: data.Studio.siteUrl
+		},
+		pageInfo: normalizePageInfo(
+			data.Studio.media.pageInfo,
+			validatedQuery.page,
+			validatedQuery.perPage
+		),
+		media: (data.Studio.media.nodes ?? [])
+			.flatMap((node) => {
+				if (!node || node.type !== "ANIME" || node.isAdult === true) return []
+				return [normalizeMedia(node)]
+			})
 	}
 }
