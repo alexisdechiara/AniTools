@@ -42,11 +42,15 @@ export interface CalendarSimuldubItem {
 	title?: string | null
 }
 
-export type CalendarApiWarning = "simuldubs_unavailable"
+export type CalendarApiWarning =
+	| "simuldubs_unavailable"
+	| "simuldub_media_unavailable"
+	| "simuldub_media_truncated"
 
 export interface CalendarApiResponse {
 	airingSchedules: CalendarAiringSchedule[]
 	simuldubs: CalendarSimuldubItem[]
+	missingMedia: CalendarMedia[]
 	warnings: CalendarApiWarning[]
 }
 

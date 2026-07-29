@@ -15,6 +15,7 @@ import {
 	type AniListActivitiesResponse,
 	type AniListActivity,
 	type AniListActivityKind,
+	type AniListAiringSchedulesPage,
 	type AniListAnimeListResponse,
 	type AniListListSort,
 	type AniListMediaResponse,
@@ -37,6 +38,8 @@ const MAX_PAGE = 100
 const MAX_LIST_PAGE_SIZE = 50
 const MAX_ACTIVITY_PAGE_SIZE = 50
 const MAX_EXPLORE_PAGE_SIZE = 20
+const MAX_AIRING_PAGE_SIZE = 50
+const MAX_MEDIA_BATCH_SIZE = 50
 const MAX_SEARCH_RESULTS = 10
 const MAX_SEARCH_LENGTH = 100
 const MAX_STATISTIC_GROUPS = 100
@@ -47,6 +50,7 @@ const UPSTREAM_REQUEST_WINDOW_MS = 60_000
 const MIN_ACTIVITY_TIMESTAMP = 946_684_800
 const MAX_ACTIVITY_TIMESTAMP = 4_102_444_800
 const MAX_ACTIVITY_RANGE_SECONDS = 370 * 24 * 60 * 60
+const GRAPHQL_INT_MAX = 2_147_483_647
 
 export const ANILIST_ALLOWED_OPERATIONS = [
 	"profile",
@@ -56,7 +60,9 @@ export const ANILIST_ALLOWED_OPERATIONS = [
 	"recommendations",
 	"studio-media",
 	"search",
-	"media"
+	"media",
+	"airing-schedules",
+	"media-by-ids"
 ] as const
 
 const PROFILE_FIELDS = `
@@ -401,6 +407,40 @@ const MEDIA_QUERY = `
 	}
 `
 
+const AIRING_SCHEDULES_QUERY = `
+	query AniToolsAiringSchedules(
+		$page: Int!
+		$perPage: Int!
+		$airingAtGreater: Int!
+		$airingAtLesser: Int!
+	) {
+		Page(page: $page, perPage: $perPage) {
+			pageInfo { hasNextPage }
+			airingSchedules(
+				airingAt_greater: $airingAtGreater
+				airingAt_lesser: $airingAtLesser
+			) {
+				airingAt
+				episode
+				timeUntilAiring
+				media {
+					${MEDIA_SUMMARY_FIELDS}
+				}
+			}
+		}
+	}
+`
+
+const MEDIA_BY_IDS_QUERY = `
+	query AniToolsMediaByIds($mediaIds: [Int!]!, $perPage: Int!) {
+		Page(page: 1, perPage: $perPage) {
+			media(id_in: $mediaIds, type: ANIME, isAdult: false) {
+				${MEDIA_SUMMARY_FIELDS}
+			}
+		}
+	}
+`
+
 const usernameSchema = z.string()
 	.trim()
 	.min(2)
@@ -500,6 +540,25 @@ const searchTextSchema = z.string().trim().min(1).max(MAX_SEARCH_LENGTH)
 const mediaQuerySchema = z.object({
 	id: mediaIdSchema
 }).strict()
+
+const airingSchedulesQuerySchema = z.object({
+	page: pageSchema,
+	perPage: z.coerce.number().int().min(1).max(MAX_AIRING_PAGE_SIZE)
+		.default(MAX_AIRING_PAGE_SIZE),
+	airingAtGreater: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
+	airingAtLesser: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX)
+}).strict().refine(
+	query => query.airingAtGreater < query.airingAtLesser,
+	{
+		message: "airingAtGreater must be earlier than airingAtLesser",
+		path: ["airingAtLesser"]
+	}
+)
+
+const mediaIdsSchema = z.array(mediaIdSchema)
+	.min(1)
+	.max(MAX_MEDIA_BATCH_SIZE)
+	.transform(mediaIds => [...new Set(mediaIds)])
 
 const publicAccessSchema = z.object({
 	mode: z.literal("public"),
@@ -675,6 +734,13 @@ const mediaSchema = z.object({
 			}).nullable()
 		}).nullable()).max(100).nullable()
 	}).nullable()
+})
+
+const airingScheduleSchema = z.object({
+	airingAt: z.number().int().positive().max(GRAPHQL_INT_MAX),
+	episode: z.number().int().positive(),
+	timeUntilAiring: z.number().int().nullable(),
+	media: mediaSchema.nullable()
 })
 
 const nullablePageInfoSchema = z.object({
@@ -1263,6 +1329,109 @@ export async function getAniListMediaResponse(
 	return {
 		media: normalizeMedia(data.Media)
 	}
+}
+
+export async function getAniListAiringSchedulesPage(
+	query: {
+		page: number
+		perPage?: number
+		airingAtGreater: number
+		airingAtLesser: number
+	},
+	options: AniListRequestOptions = {}
+): Promise<AniListAiringSchedulesPage> {
+	const validatedQuery = airingSchedulesQuerySchema.parse(query)
+	const data = await requestAniList(
+		AIRING_SCHEDULES_QUERY,
+		validatedQuery,
+		z.object({
+			Page: z.object({
+				pageInfo: z.object({
+					hasNextPage: z.boolean().nullable()
+				}).nullable(),
+				airingSchedules: z.array(airingScheduleSchema.nullable())
+					.max(MAX_AIRING_PAGE_SIZE)
+					.nullable()
+			}).nullable()
+		}),
+		null,
+		options
+	)
+
+	if (!data.Page) {
+		throw upstreamError(
+			502,
+			"AniList airing schedule returned no page",
+			"ANILIST_AIRING_FAILED"
+		)
+	}
+
+	const airingSchedules = (data.Page.airingSchedules ?? []).flatMap((schedule) => {
+		if (
+			!schedule?.media
+			|| schedule.media.type !== "ANIME"
+			|| schedule.media.isAdult === true
+		) {
+			return []
+		}
+
+		return [{
+			airingAt: schedule.airingAt,
+			episode: schedule.episode,
+			timeUntilAiring: schedule.timeUntilAiring,
+			media: normalizeMedia(schedule.media)
+		}]
+	})
+
+	return {
+		hasNextPage: data.Page.pageInfo?.hasNextPage ?? false,
+		airingSchedules
+	}
+}
+
+export async function getAniListMediaByIds(
+	mediaIds: readonly number[],
+	options: AniListRequestOptions = {}
+): Promise<AniListMediaSummary[]> {
+	const validatedMediaIds = mediaIdsSchema.parse(mediaIds)
+	const data = await requestAniList(
+		MEDIA_BY_IDS_QUERY,
+		{
+			mediaIds: validatedMediaIds,
+			perPage: validatedMediaIds.length
+		},
+		z.object({
+			Page: z.object({
+				media: z.array(mediaSchema.nullable())
+					.max(MAX_MEDIA_BATCH_SIZE)
+					.nullable()
+			}).nullable()
+		}),
+		null,
+		options
+	)
+
+	if (!data.Page) {
+		throw upstreamError(
+			502,
+			"AniList media lookup returned no page",
+			"ANILIST_MEDIA_LOOKUP_FAILED"
+		)
+	}
+
+	const requestedIds = new Set(validatedMediaIds)
+	return (data.Page.media ?? []).flatMap((media) => {
+		if (
+			!media
+			|| !requestedIds.has(media.id)
+			|| media.type !== "ANIME"
+			|| media.isAdult === true
+		) {
+			return []
+		}
+
+		return [normalizeMedia(media)]
+	})
 }
 
 export async function fetchAniListProfile(

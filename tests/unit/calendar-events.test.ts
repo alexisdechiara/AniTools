@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-	buildCalendarEvents,
-	chunkCalendarMediaIds
-} from "../../app/utils/calendar-events"
+import { buildCalendarEvents } from "../../app/utils/calendar-events"
 import type {
 	CalendarAiringSchedule,
 	CalendarMedia,
@@ -102,16 +99,5 @@ describe("buildCalendarEvents", () => {
 		)
 
 		expect(events).toEqual([])
-	})
-})
-
-describe("chunkCalendarMediaIds", () => {
-	it("de-duplicates, validates and caps AniList batches to fifty IDs", () => {
-		const ids = [...Array.from({ length: 51 }, (_, index) => index + 1), 1, -1]
-
-		expect(chunkCalendarMediaIds(ids, 500)).toEqual([
-			Array.from({ length: 50 }, (_, index) => index + 1),
-			[51]
-		])
 	})
 })

@@ -214,6 +214,18 @@ export interface AniListMediaResponse {
 	media: AniListMediaSummary
 }
 
+export interface AniListAiringSchedule {
+	airingAt: number
+	episode: number
+	timeUntilAiring: number | null
+	media: AniListMediaSummary | null
+}
+
+export interface AniListAiringSchedulesPage {
+	hasNextPage: boolean
+	airingSchedules: AniListAiringSchedule[]
+}
+
 export interface AniListAnimeListResponse {
 	source: AniListSource
 	pageInfo: AniListPageInfo

@@ -22,7 +22,7 @@
 			class="absolute inset-x-3 top-20 z-50 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm shadow-sm backdrop-blur sm:inset-x-auto sm:right-6 sm:max-w-md"
 			role="status">
 			<Icon name="lucide:triangle-alert" class="size-5 shrink-0 text-warning" aria-hidden="true" />
-			<p class="flex-1">Simuldub details are temporarily unavailable. AniList broadcasts are still shown.</p>
+			<p class="flex-1">Some simuldub details are temporarily unavailable. AniList broadcasts are still shown.</p>
 			<UButton
 				icon="i-lucide-x"
 				size="xs"
@@ -173,10 +173,7 @@ import type {
 	CalendarEvent,
 	CalendarMedia
 } from "~/types/calendar"
-import {
-	buildCalendarEvents,
-	chunkCalendarMediaIds
-} from "~/utils/calendar-events"
+import { buildCalendarEvents } from "~/utils/calendar-events"
 
 definePageMeta({
 	feature: "calendar",
@@ -266,6 +263,7 @@ const {
 	default: () => ({
 		airingSchedules: [],
 		simuldubs: [],
+		missingMedia: [],
 		warnings: []
 	})
 })
@@ -273,61 +271,9 @@ const {
 const airingSchedules = computed(() => calendarData.value.airingSchedules)
 const simuldubs = computed(() => calendarData.value.simuldubs)
 
-const airingMediaIds = computed(() => {
-	const ids = new Set<number>()
-	airingSchedules.value.forEach((item) => {
-		const mediaId = Number(item.media?.id)
-		if (!Number.isSafeInteger(mediaId) || mediaId <= 0) return
-		ids.add(mediaId)
-	})
-	return ids
-})
-
-const missingSimuldubMediaIds = computed(() => {
-	const missingIds = new Set<number>()
-	simuldubs.value.forEach((simuldub) => {
-		const mediaId = Number(simuldub.anilist_media_id)
-		if (!Number.isSafeInteger(mediaId) || mediaId <= 0) return
-		if (airingMediaIds.value.has(mediaId)) return
-		missingIds.add(mediaId)
-	})
-	return [...missingIds]
-})
-
-const gqlRequest = useGql()
-const {
-	data: missingSimuldubMedias,
-	error: missingSimuldubMediaError
-} = await useAsyncData<CalendarMedia[]>(
-	"calendar-simuldub-missing-medias",
-	async () => {
-		const mediaChunks = chunkCalendarMediaIds(missingSimuldubMediaIds.value)
-		const medias: CalendarMedia[] = []
-
-		for (const mediaIds of mediaChunks) {
-			const response = await gqlRequest("getMediasByIds", {
-				mediaIds,
-				perPage: mediaIds.length
-			})
-
-			for (const media of response.Page?.media ?? []) {
-				if (media && Number.isSafeInteger(media.id) && media.id > 0) {
-					medias.push(media)
-				}
-			}
-		}
-
-		return medias
-	},
-	{
-		watch: [missingSimuldubMediaIds],
-		default: () => []
-	}
-)
-
 const missingSimuldubMediaById = computed(() => {
 	const map = new Map<number, CalendarMedia>()
-	missingSimuldubMedias.value.forEach((media) => {
+	calendarData.value.missingMedia.forEach((media) => {
 		map.set(media.id, media)
 	})
 	return map
@@ -406,10 +352,7 @@ const filteredCalendarEvents = computed(() => {
 	})
 })
 
-const hasCalendarWarning = computed(() =>
-	calendarData.value.warnings.includes("simuldubs_unavailable")
-	|| Boolean(missingSimuldubMediaError.value && missingSimuldubMediaIds.value.length)
-)
+const hasCalendarWarning = computed(() => calendarData.value.warnings.length > 0)
 const showEmptyState = computed(() =>
 	calendarStatus.value !== "pending"
 	&& !calendarError.value

@@ -44,18 +44,6 @@ function mergeEventMetadata(target: CalendarEvent, source: CalendarEvent) {
 	target.streaming = mergeUnique(target.streaming, source.streaming)
 }
 
-export function chunkCalendarMediaIds(mediaIds: readonly number[], chunkSize = 50) {
-	const safeChunkSize = Math.max(1, Math.min(50, Math.trunc(chunkSize)))
-	const uniqueIds = [...new Set(mediaIds.filter(id => Number.isSafeInteger(id) && id > 0))]
-	const chunks: number[][] = []
-
-	for (let index = 0; index < uniqueIds.length; index += safeChunkSize) {
-		chunks.push(uniqueIds.slice(index, index + safeChunkSize))
-	}
-
-	return chunks
-}
-
 export function buildCalendarEvents(
 	airingSchedules: readonly CalendarAiringSchedule[],
 	simuldubs: readonly CalendarSimuldubItem[],

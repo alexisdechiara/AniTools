@@ -3,7 +3,9 @@ import {
 	ANILIST_ALLOWED_OPERATIONS,
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
+	getAniListAiringSchedulesPage,
 	getAniListAnimeListResponse,
+	getAniListMediaByIds,
 	getAniListMediaResponse,
 	getAniListSearchResponse,
 	getAniListStatisticsResponse,
@@ -132,7 +134,9 @@ describe("AniList endpoint query validation", () => {
 			"recommendations",
 			"studio-media",
 			"search",
-			"media"
+			"media",
+			"airing-schedules",
+			"media-by-ids"
 		])
 	})
 
@@ -286,6 +290,84 @@ describe("AniList allowlisted client", () => {
 			data: {
 				code: "ANILIST_MEDIA_NOT_FOUND"
 			}
+		})
+	})
+
+	it("loads a validated airing page through a fixed anonymous operation", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Page: {
+					pageInfo: { hasNextPage: true },
+					airingSchedules: [{
+						airingAt: 1_800_000_000,
+						episode: 12,
+						timeUntilAiring: 600,
+						media
+					}]
+				}
+			}
+		}))
+
+		const result = await getAniListAiringSchedulesPage({
+			page: 2,
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })
+
+		expect(result).toMatchObject({
+			hasNextPage: true,
+			airingSchedules: [{
+				airingAt: 1_800_000_000,
+				episode: 12,
+				media: {
+					id: 7,
+					genres: ["Action"]
+				}
+			}]
+		})
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsAiringSchedules")
+		expect(body.variables).toEqual({
+			page: 2,
+			perPage: 50,
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		})
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("de-duplicates and validates batched media hydration", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Page: {
+					media: [
+						media,
+						{ ...media, id: 99 },
+						{ ...media, id: 8, isAdult: true }
+					]
+				}
+			}
+		}))
+
+		const result = await getAniListMediaByIds([7, 7, 8], {
+			fetch: requester
+		})
+
+		expect(result.map(item => item.id)).toEqual([7])
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsMediaByIds")
+		expect(body.variables).toEqual({
+			mediaIds: [7, 8],
+			perPage: 2
 		})
 	})
 
