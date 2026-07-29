@@ -1,12 +1,24 @@
 <template>
-	<MetricsCard title="Mean Score" :value="meanScore ? meanScore.toFixed(2) + ' %' : ''" v-bind="$attrs">
-		<UTabs :items="items" class="w-fit absolute top-6 right-6" :ui="{ trigger: 'cursor-pointer' }"
-			v-model="selectedTab" />
+	<MetricsCard title="Mean Score" :value="meanScore === undefined ? '-' : meanScore.toFixed(2) + ' %'" v-bind="$attrs">
+		<UTabs
+v-model="selectedTab"
+:items="items"
+class="absolute top-6 right-6 w-fit"
+			:ui="{ trigger: 'cursor-pointer' }" />
 		<VisXYContainer :data="scoring" :height="200" class="mt-auto">
-			<VisStackedBar :x="(d: ScoringData, i: number) => i" :y="(d: ScoringData) => d.y" :roundedCorners="8"
+			<VisStackedBar
+:x="(d: ScoringData, i: number) => i"
+:y="(d: ScoringData) => d.y"
+:rounded-corners="8"
 				:bar-padding="0.2" />
-			<VisAxis type="x" :gridLine="false" :domainLine="false" :tickLine="false" tickTextAlign="center"
-				:tickFormat="(d: ScoringData, i: number) => scoring[i]?.x" :numTicks="10" />
+			<VisAxis
+type="x"
+:grid-line="false"
+:domain-line="false"
+:tick-line="false"
+tick-text-align="center"
+				:tick-format="(d: ScoringData, i: number) => scoring[i]?.x"
+:num-ticks="10" />
 			<VisTooltip :triggers="triggers" />
 		</VisXYContainer>
 	</MetricsCard>
@@ -40,7 +52,7 @@ const scoring = computed(
 			?.map((score) => ({
 				x: score?.score ?? 0,
 				y: selectedTab.value === "count" ? score?.count : score?.minutesWatched,
-				label: score?.meanScore || undefined,
+				label: score?.meanScore ?? undefined,
 			}))
 			.sort((a, b) => a.x - b.x) || ([] as ScoringData[])
 );
@@ -55,7 +67,7 @@ const triggers = {
 	[StackedBar.selectors.bar]: (data: ScoringData) => {
 		return `
       <div class='flex flex-col'>
-        <span class='font-semibold'>${data.label ? data.label : data.x} %</span>
+        <span class='font-semibold'>${data.label ?? data.x} %</span>
         <span>${formatValue(data.y)}</span>
       </div>
     `;

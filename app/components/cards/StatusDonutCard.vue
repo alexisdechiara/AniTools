@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Status" v-bind="$attrs" enable-sort-select v-model:sort="statusSort">
+  <MetricsCard v-bind="$attrs" v-model:sort="statusSort" title="Status" enable-sort-select>
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -8,8 +8,7 @@
       :orientation="orientation"
       :width="width"
       :height="height"
-      :metric-type="statusSort"
-    />
+      :metric-type="statusSort"/>
   </MetricsCard>
 </template>
 
@@ -23,7 +22,9 @@ export interface DonutStatus {
   color: string;
   name: string;
   value: number;
-  [key: string]: any;
+  count: number;
+  meanScore?: number;
+  minutesWatched?: number;
 }
 
 withDefaults(

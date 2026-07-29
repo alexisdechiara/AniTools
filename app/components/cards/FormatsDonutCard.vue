@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Formats" v-bind="$attrs" enable-sort-select v-model:sort="formatsSort">
+  <MetricsCard v-bind="$attrs" v-model:sort="formatsSort" title="Formats" enable-sort-select>
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -8,16 +8,13 @@
       :orientation="orientation"
       :width="width"
       :height="height"
-      :metric-type="formatsSort"
-    />
+      :metric-type="formatsSort"/>
   </MetricsCard>
 </template>
 
 <script lang="ts" setup>
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
-import { MediaFormat } from "#gql/default";
-
 const { formats: formatsRef, formatsSort } = storeToRefs(useStatisticsStore());
 
 export interface DonutFormat {
@@ -25,7 +22,8 @@ export interface DonutFormat {
   name: string;
   value: number;
   count: number;
-  [key: string]: any;
+  meanScore?: number;
+  minutesWatched?: number;
 }
 
 withDefaults(
@@ -51,23 +49,33 @@ withDefaults(
 // Source: https://anilist.github.io/ApiV2-GraphQL-Docs/medialiststatus.doc.html
 const formatColors: Record<string, string> = {
   // Main formats
-  [MediaFormat.TV]: "var(--color-completed)",
-  [MediaFormat.MOVIE]: "var(--color-planning)",
-  [MediaFormat.ONA]: "var(--color-dropped)",
-  [MediaFormat.OVA]: "var(--color-pink-300)",
-  [MediaFormat.TV_SHORT]: "var(--color-watching)",
-  [MediaFormat.SPECIAL]: "var(--color-paused)",
+  TV: "var(--color-completed)",
+  MOVIE: "var(--color-planning)",
+  ONA: "var(--color-dropped)",
+  OVA: "var(--color-pink-300)",
+  TV_SHORT: "var(--color-watching)",
+  SPECIAL: "var(--color-paused)",
 };
 
 // Custom display names for formats
 const formatDisplayNames: Record<string, string> = {
-  [MediaFormat.TV]: "TV",
-  [MediaFormat.TV_SHORT]: "TV Short",
-  [MediaFormat.MOVIE]: "Movie",
-  [MediaFormat.SPECIAL]: "Special",
-  [MediaFormat.OVA]: "OVA",
-  [MediaFormat.ONA]: "ONA",
+  TV: "TV",
+  TV_SHORT: "TV Short",
+  MOVIE: "Movie",
+  SPECIAL: "Special",
+  OVA: "OVA",
+  ONA: "ONA",
 };
+
+const excludedFormats = new Set(["MANGA", "NOVEL", "ONE_SHOT", "MUSIC"]);
+
+type FormatStatistic = NonNullable<typeof formatsRef.value>[number];
+
+function getMetric(format: FormatStatistic): number {
+  if (formatsSort.value === "meanScore") return format.meanScore ?? 0;
+  if (formatsSort.value === "minutesWatched") return format.minutesWatched ?? 0;
+  return format.count ?? 0;
+}
 
 // Transforme les données pour le composant DonutChart
 const chartData = computed<DonutFormat[]>(() => {
@@ -77,31 +85,19 @@ const chartData = computed<DonutFormat[]>(() => {
   const relevantFormats = formats.filter((format) => {
     if (!format?.format) return false;
 
-    const excludedFormats = [
-      MediaFormat.MANGA,
-      MediaFormat.NOVEL,
-      MediaFormat.ONE_SHOT,
-      MediaFormat.MUSIC,
-    ];
-
-    return !excludedFormats.includes(format.format);
+    return !excludedFormats.has(format.format);
   });
-
-  const accessor = (f: any) => {
-    if (formatsSort.value === "meanScore") return f?.meanScore ?? 0;
-    if (formatsSort.value === "minutesWatched") return f?.minutesWatched ?? 0;
-    return f?.count ?? 0;
-  };
 
   const mapped = relevantFormats
     .filter((format): format is NonNullable<typeof format> => format?.format != null)
     .map((format) => {
-      const metric = accessor(format);
+      const metric = getMetric(format);
+      const formatKey = format.format ?? "UNKNOWN";
 
       // Format du nom pour l'affichage
-      const formatName = format.format
-        ? formatDisplayNames[format.format as keyof typeof formatDisplayNames] ||
-          format.format
+      const formatName = formatKey !== "UNKNOWN"
+        ? formatDisplayNames[formatKey] ||
+          formatKey
             .toString()
             .toLowerCase()
             .split("_")
@@ -111,7 +107,7 @@ const chartData = computed<DonutFormat[]>(() => {
 
       return {
         color:
-          formatColors[format.format as keyof typeof formatColors] ||
+          formatColors[formatKey] ||
           "var(--color-text-muted)",
         name: formatName,
         value: metric,

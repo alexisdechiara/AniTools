@@ -1,10 +1,9 @@
 <template>
   <MetricsCard
-    title="Countries of origin"
     v-bind="$attrs"
-    enable-sort-select
     v-model:sort="countriesSort"
-  >
+    title="Countries of origin"
+    enable-sort-select>
     <DonutChart
       :data="chartData"
       :max-items="maxItems"
@@ -15,8 +14,7 @@
       :height="height"
       :angle-range="DONUT_HALF_ANGLE_RANGE_TOP"
       :metric-type="countriesSort"
-      class="gap-4!"
-    />
+      class="gap-4!"/>
   </MetricsCard>
 </template>
 
@@ -31,7 +29,9 @@ export interface DonutCountry {
   name: string;
   value: number;
   count: number;
-  [key: string]: any;
+  country: string;
+  meanScore?: number;
+  minutesWatched?: number;
 }
 
 withDefaults(
@@ -75,12 +75,10 @@ const countryData: Record<string, { name: string; color: string }> = {
 
 // Transform data for the chart
 const chartData = computed<DonutCountry[]>(() => {
-  const countries = (countriesRef.value || []) as Array<{
-    country: string;
-    count?: number;
-    meanScore?: number;
-    minutesWatched?: number;
-  }>;
+  const countries = (countriesRef.value || [])
+    .filter((country): country is typeof country & { country: string } =>
+      country.country !== null
+    );
 
   if (countries.length === 0) return [];
 
@@ -94,7 +92,6 @@ const chartData = computed<DonutCountry[]>(() => {
   // Pas de calcul de pourcentage ici; on transmet des valeurs brutes au DonutChart
 
   const mapped = countries
-    .filter((c) => c.country)
     .map((c) => {
       const countryInfo = countryData[c.country] || {
         name: c.country,

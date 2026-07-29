@@ -1,61 +1,77 @@
 <template>
-  <div class="flex gap-8" :class="orientation === 'horizontal' ? 'flex-row' : 'flex-col'">
+  <div
+    class="flex gap-6"
+    :class="orientation === 'horizontal' ? 'flex-col sm:flex-row' : 'flex-col'"
+    role="img"
+    :aria-label="chartAriaLabel">
     <VisSingleContainer
+      v-if="chartDataForDonut.length"
       :data="chartDataForDonut"
       :width="width"
       :height="height"
       :style="{ '--chart-width': width, '--chart-height': height }"
-    >
+      aria-hidden="true">
       <VisDonut
-        :value="value"
-        :padAngle="0.05"
-        :showBackground="false"
-        :cornerRadius="16"
+        :value="sliceValue"
+        :pad-angle="0.05"
+        :show-background="false"
+        :corner-radius="16"
         :color="color"
         :events="showCentralValue ? events : {}"
-        :centralLabel="showCentralValue ? centralLabelText : ''"
-        :centralSubLabel="showCentralValue ? centralSubLabelText : ''"
-        :angleRange="angleRange || [0, 360]"
-      />
-      <VisTooltip v-if="showTooltip" :triggers="triggers" />
+        :central-label="showCentralValue ? centralLabelText : ''"
+        :central-sub-label="showCentralValue ? centralSubLabelText : ''"
+        :angle-range="angleRange || [0, 360]"/>
+      <VisTooltip
+        v-if="showTooltip"
+        :triggers="triggers"/>
     </VisSingleContainer>
 
+    <div
+      v-else
+      class="flex min-h-36 items-center justify-center text-sm text-muted">
+      No data available.
+    </div>
+
     <ul
-      v-if="showLegend"
-      class="text-sm flex flex-col gap-2"
-      :class="orientation === 'horizontal' ? 'mx-0 justify-center' : 'mx-4'"
-    >
+      v-if="showLegend && processedData.length"
+      class="flex flex-col gap-2 text-sm"
+      :class="orientation === 'horizontal' ? 'mx-0 justify-center' : 'mx-4'">
       <li
         v-for="item in processedData"
         :key="item.name"
-        class="flex justify-start items-center gap-x-2"
-      >
-        <div
+        class="flex items-center justify-start gap-x-2">
+        <span
           class="size-2 rounded-full"
           :style="{
             backgroundColor: item.color,
             opacity: isItemInOverflow(item) ? 0.5 : 1,
           }"
-        />
+          aria-hidden="true"/>
         <span :class="{ 'opacity-50': isItemInOverflow(item) }">
           {{ item.name }}
         </span>
-        <span class="ms-auto">{{ legendRawValue(item) }}</span>
+        <span class="ms-auto tabular-nums">{{ legendRawValue(item) }}</span>
       </li>
     </ul>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 import { Donut } from "@unovis/ts";
-import { VisSingleContainer, VisDonut, VisTooltip } from "@unovis/vue";
+import { VisDonut, VisSingleContainer, VisTooltip } from "@unovis/vue";
+
+export type DonutMetric = "count" | "meanScore" | "minutesWatched";
 
 export interface DonutDataItem {
   color: string;
   name: string;
   value: number;
-  [key: string]: any;
+  count?: number;
+  meanScore?: number;
+  minutesWatched?: number;
+  isOverflow?: boolean;
+  isOverflowItem?: boolean;
 }
 
 const props = withDefaults(
@@ -69,136 +85,198 @@ const props = withDefaults(
     showCentralValue?: boolean;
     orientation?: "horizontal" | "vertical";
     angleRange?: [number, number];
-    metricType?: 'count' | 'meanScore' | 'minutesWatched';
+    metricType?: DonutMetric;
   }>(),
   {
     width: "100%",
     height: "200px",
     maxItems: 5,
     showLegend: true,
-    showTooltip: false, // Désactivé par défaut
-    showCentralValue: true, // Activé par défaut
+    showTooltip: false,
+    showCentralValue: true,
     orientation: "vertical",
-    metricType: 'count', // Add default value for metricType
+    angleRange: () => [0, 360],
+    metricType: "count",
   }
 );
 
-// Traite les données pour gérer le débordement
-const processedData = computed<DonutDataItem[]>(() => {
-  if (!props.data?.length) return [];
+function getCount(item: DonutDataItem): number {
+  return item.count ?? (props.metricType === "count" ? item.value : 0);
+}
 
-  // Crée une copie profonde des données
-  const sortedData = [...props.data]
-    .map((item) => ({
+function getMeanScore(item: DonutDataItem): number {
+  return item.meanScore ?? (props.metricType === "meanScore" ? item.value : 0);
+}
+
+function getMinutes(item: DonutDataItem): number {
+  return item.minutesWatched
+    ?? (props.metricType === "minutesWatched" ? item.value : 0);
+}
+
+function buildOverflowItem(items: DonutDataItem[]): DonutDataItem {
+  const count = items.reduce((sum, item) => sum + getCount(item), 0);
+  const minutesWatched = items.reduce(
+    (sum, item) => sum + getMinutes(item),
+    0
+  );
+  const weightedScore = items.reduce(
+    (sum, item) => sum + getMeanScore(item) * Math.max(1, getCount(item)),
+    0
+  );
+  const scoreWeight = items.reduce(
+    (sum, item) => sum + Math.max(1, getCount(item)),
+    0
+  );
+  const meanScore = scoreWeight > 0 ? weightedScore / scoreWeight : 0;
+  const value = props.metricType === "meanScore"
+    ? meanScore
+    : props.metricType === "minutesWatched"
+      ? minutesWatched
+      : count;
+
+  return {
+    name: "Other",
+    value: Number(value.toFixed(2)),
+    count,
+    meanScore: Number(meanScore.toFixed(2)),
+    minutesWatched,
+    color: "var(--ui-text-muted)",
+    isOverflow: true,
+    isOverflowItem: false,
+  };
+}
+
+const processedData = computed<DonutDataItem[]>(() => {
+  if (!props.data.length) return [];
+
+  const sortedData = props.data
+    .map(item => ({
       ...item,
       isOverflowItem: false,
       isOverflow: false,
     }))
-    .sort((a, b) => b.value - a.value);
+    .toSorted((left, right) => right.value - left.value);
 
-  // Si on a moins d'éléments que le maximum, on retourne tout
-  if (sortedData.length <= props.maxItems) {
+  if (sortedData.length <= props.maxItems || props.maxItems < 2) {
     return sortedData;
   }
 
-  // Sinon, on regroupe les éléments restants dans "Autres"
   const mainItems = sortedData.slice(0, props.maxItems - 1);
-  const otherItems = sortedData.slice(props.maxItems - 1);
-
-  const otherSum = otherItems.reduce((sum, item) => sum + item.value, 0);
+  const overflowItems = sortedData.slice(props.maxItems - 1);
 
   return [
     ...mainItems,
-    {
-      name: "Other",
-      value: parseFloat(otherSum.toFixed(2)),
-      color: "var(--ui-text-muted)",
-      isOverflow: true,
-      isOverflowItem: false,
-    },
-    ...otherItems.map((item) => ({
+    buildOverflowItem(overflowItems),
+    ...overflowItems.map(item => ({
       ...item,
       isOverflowItem: true,
     })),
-  ] as DonutDataItem[];
+  ];
 });
 
-// Données réellement affichées dans le donut (on garde "Other", on masque les items overflow individuels)
-const chartDataForDonut = computed<DonutDataItem[]>(() =>
-  processedData.value.filter((i) => !i.isOverflowItem)
+const chartDataForDonut = computed(() =>
+  processedData.value.filter(item => !item.isOverflowItem)
 );
+const totalSliceValue = computed(() =>
+  chartDataForDonut.value.reduce((sum, item) => sum + sliceValue(item), 0)
+);
+const chartAriaLabel = computed(() => {
+  if (!props.data.length) return "Donut chart: no data available"
 
-// Vérifie si un élément fait partie du débordement
-const isItemInOverflow = (item: DonutDataItem): boolean => {
-  return Boolean(item?.isOverflowItem);
-};
+  return `Donut chart. ${props.data.map(item =>
+    `${item.name}: ${legendRawValue(item)}`
+  ).join(", ")}`
+})
 
-// Fonctions pour le graphique
-const value = (d: DonutDataItem) => d?.value ?? 0;
-const color = (d: unknown, i: number) => chartDataForDonut.value[i]?.color || "var(--ui-text-muted)";
+function isItemInOverflow(item: DonutDataItem): boolean {
+  return Boolean(item.isOverflowItem);
+}
 
-// Totaux pour le calcul des pourcentages (centre + tooltip)
-const totalAll = computed(() => (props.data ?? []).reduce((s, it) => s + (it?.value ?? 0), 0));
+function sliceValue(item: DonutDataItem): number {
+  if (props.metricType === "meanScore") {
+    return Math.max(0, getCount(item)) || 1;
+  }
 
-// Gestion des labels centraux
+  return Math.max(0, item.value);
+}
+
+function color(_item: DonutDataItem, index: number): string {
+  return chartDataForDonut.value[index]?.color ?? "var(--ui-text-muted)";
+}
+
+function formatDuration(minutes: number): string {
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  const remainingMinutes = Math.round(minutes % 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${remainingMinutes}m`;
+  return `${remainingMinutes}m`;
+}
+
+function legendRawValue(item: DonutDataItem): string {
+  if (props.metricType === "meanScore") {
+    return `${Number(getMeanScore(item).toFixed(2))}%`;
+  }
+  if (props.metricType === "minutesWatched") {
+    return formatDuration(getMinutes(item));
+  }
+
+  return getCount(item).toLocaleString();
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, character => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#039;",
+    };
+    return entities[character] ?? character;
+  });
+}
+
+function getSecondaryLabel(item: DonutDataItem): string {
+  if (props.metricType === "meanScore") return legendRawValue(item);
+
+  const percentage = totalSliceValue.value > 0
+    ? Math.round((sliceValue(item) / totalSliceValue.value) * 100)
+    : 0;
+  return `${percentage}%`;
+}
+
 const centralLabelText = ref("");
 const centralSubLabelText = ref("");
 
-// Configuration du tooltip
 const triggers = {
-  [Donut.selectors.segment]: (d: { index: number }) => {
-    const item = chartDataForDonut.value[d.index];
+  [Donut.selectors.segment]: (datum: { index: number }) => {
+    const item = chartDataForDonut.value[datum.index];
     if (!item) return "";
 
-    const percent = totalAll.value ? Math.round(((item.value || 0) / totalAll.value) * 100) : 0;
     return `
-      <div class='flex flex-col p-1'>
-        <span class='font-semibold capitalize'>${item.name || ""}</span>
-        <span>${percent}%</span>
+      <div class="flex flex-col p-1">
+        <span class="font-semibold capitalize">${escapeHtml(item.name)}</span>
+        <span>${escapeHtml(getSecondaryLabel(item))}</span>
       </div>
     `;
   },
 };
 
-// Gestion des événements
 const events = {
   [Donut.selectors.segment]: {
-    mouseover: (d: { index: number }) => {
-      const item = chartDataForDonut.value[d.index];
-      if (item) {
-        centralLabelText.value = item.name || "";
-        const percent = totalAll.value ? Math.round(((item.value || 0) / totalAll.value) * 100) : 0;
-        centralSubLabelText.value = `${percent}%`;
-      }
+    mouseover: (datum: { index: number }) => {
+      const item = chartDataForDonut.value[datum.index];
+      if (!item) return;
+
+      centralLabelText.value = item.name;
+      centralSubLabelText.value = getSecondaryLabel(item);
     },
     mouseout: () => {
       centralLabelText.value = "";
       centralSubLabelText.value = "";
     },
   },
-};
-
-// Affichage brut dans la légende selon les métadonnées disponibles
-const formatDuration = (minutes: number) => {
-  const d = Math.floor((minutes || 0) / 1440);
-  const h = Math.floor(((minutes || 0) % 1440) / 60);
-  const m = (minutes || 0) % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-};
-
-const legendRawValue = (item: DonutDataItem): string => {
-  // Si un type de métrique est fourni, on suit strictement ce type
-  if (props.metricType === 'meanScore') return `${item.meanScore ?? item.value ?? 0}%`;
-  if (props.metricType === 'minutesWatched') return formatDuration((item as any).minutesWatched ?? item.value ?? 0);
-  if (props.metricType === 'count') return String((item as any).count ?? item.value ?? 0);
-
-  // Fallback heuristique si metricType n'est pas fourni
-  if (typeof (item as any).count === 'number') return String((item as any).count);
-  if (typeof (item as any).minutesWatched === 'number') return formatDuration((item as any).minutesWatched);
-  if (typeof (item as any).meanScore === 'number') return `${(item as any).meanScore}%`;
-  return String(item.value ?? 0);
 };
 </script>
 
@@ -208,36 +286,31 @@ const legendRawValue = (item: DonutDataItem): string => {
   --vis-donut-central-label-text-color: var(--ui-text);
   --vis-donut-central-label-font-family: var(--font-sans);
   --vis-donut-central-label-font-weight: 600;
-
   --vis-donut-central-sub-label-font-size: 12px;
   --vis-donut-central-sub-label-text-color: var(--ui-text-muted);
   --vis-donut-central-sub-label-font-family: var(--font-sans);
   --vis-donut-central-sub-label-font-weight: 400;
 }
 
-/* Force le débordement visible sur tous les éléments Unovis */
 .unovis-single-container :deep(*) {
   overflow: visible !important;
 }
 
-/* Style de base des segments */
 .unovis-single-container :deep(path[class*="segment"]) {
+  cursor: pointer;
   opacity: 1;
   transform: scale(1);
-  transition: transform 250ms ease, opacity 250ms ease, fill 250ms ease !important;
-  cursor: pointer;
   transform-box: fill-box;
   transform-origin: 50% 50%;
+  transition: transform 250ms ease, opacity 250ms ease, fill 250ms ease !important;
 }
 
-/* Style quand un segment est survolé */
 .unovis-single-container :deep(path[class*="segment"]:hover) {
+  filter: brightness(90%) !important;
   opacity: 1 !important;
   transform: scale(1.03) !important;
-  filter: brightness(90%) !important;
 }
 
-/* Style de tous les segments non survolés quand l'un d'eux est survolé */
 .unovis-single-container:has(path[class*="segment"]:hover)
   :deep(path[class*="segment"]:not(:hover)) {
   opacity: 0.3 !important;

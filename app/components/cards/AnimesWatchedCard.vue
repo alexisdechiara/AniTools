@@ -6,6 +6,6 @@
 const { count } = storeToRefs(useStatisticsStore());
 
 const formattedAnimeCount = computed(() => {
-  return count.value ? count.value.toLocaleString() : "-";
+  return count.value === undefined ? "-" : count.value.toLocaleString();
 });
 </script>

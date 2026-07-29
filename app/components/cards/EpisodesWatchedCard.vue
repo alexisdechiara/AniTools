@@ -6,6 +6,8 @@
 const { episodesWatched } = storeToRefs(useStatisticsStore());
 
 const formattedEpisodeCount = computed(() => {
-  return episodesWatched.value ? episodesWatched.value.toLocaleString() : "-";
+  return episodesWatched.value === undefined
+    ? "-"
+    : episodesWatched.value.toLocaleString();
 });
 </script>

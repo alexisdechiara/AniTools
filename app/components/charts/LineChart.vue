@@ -1,44 +1,39 @@
 <template>
-  <div class="flex flex-col gap-2 w-full">
+  <div class="flex w-full flex-col gap-2">
     <VisXYContainer
       :key="`xy-${selectedMetric}`"
       :data="data"
       :height="height"
-      :xDomain="xDomain"
-      :scaleByDomain="true"
-      class="mt-2"
-    >
+      :x-domain="xDomain"
+      :scale-by-domain="true"
+      class="mt-2">
       <VisArea
         v-if="showArea"
         :key="`area-${selectedMetric}`"
         :x="xAccessor"
-        :y="yAccessor"
-      />
+        :y="yAccessor"/>
       <VisLine
         :key="`line-${selectedMetric}`"
         :x="xAccessor"
         :y="yAccessor"
-        interpolateMissingData
-      />
+        interpolate-missing-data/>
       <VisAxis
         type="x"
-        :gridLine="false"
-        :domainLine="false"
-        :tickLine="false"
-        tickTextAlign="center"
-        :tickFormat="(d: number) => String(d)"
-        :numTicks="Math.min(5, data.length)"
-      />
+        :grid-line="false"
+        :domain-line="false"
+        :tick-line="false"
+        tick-text-align="center"
+        :tick-format="(d: number) => String(d)"
+        :num-ticks="Math.min(5, data.length)"/>
       <VisAxis
         v-if="showY"
         type="y"
-        :gridLine="false"
-        :domainLine="false"
-        :tickLine="false"
-        :tickFormat="(d: number) => formatYAxis(d, selectedMetric)"
-        :numTicks="5"
-        position="end"
-      />
+        :grid-line="false"
+        :domain-line="false"
+        :tick-line="false"
+        :tick-format="(d: number) => formatYAxis(d, selectedMetric)"
+        :num-ticks="5"
+        position="end"/>
       <VisTooltip v-if="showTooltip" />
       <VisCrosshair :template="crosshairTemplate" :color="crosshairColor" />
     </VisXYContainer>
@@ -47,16 +42,14 @@
       <VisXYContainer
         :key="`brush-xy-${selectedMetric}`"
         :data="data"
-        :height="brushHeight"
-      >
+        :height="brushHeight">
         <VisLine :key="`brush-line-${selectedMetric}`" :x="xAccessor" :y="yAccessor" />
         <VisBrush
           :key="`brush-${selectedMetric}`"
           :selection="xDomain"
-          :onBrush="updateDomain"
-          :draggable="true"
-        />
-        <VisAxis type="x" :numTicks="Math.min(15, data.length)" />
+          :on-brush="updateDomain"
+          :draggable="true"/>
+        <VisAxis type="x" :num-ticks="Math.min(15, data.length)" />
       </VisXYContainer>
     </template>
   </div>
@@ -76,18 +69,22 @@ import {
 
 export type LineMetric = "count" | "meanScore" | "minutesWatched";
 
-type LineDatum = any;
+export interface LineDatum {
+  year: number;
+  count: number;
+  meanScore: number;
+  minutesWatched: number;
+}
 
 const props = withDefaults(
   defineProps<{
-    data: any[];
+    data: LineDatum[];
     selectedMetric: LineMetric;
     height?: number;
     brush?: boolean;
     brushHeight?: number;
     autoBrush?: boolean;
     brushThreshold?: number;
-    xKey?: string;
     showArea?: boolean;
     showTooltip?: boolean;
     crosshairColor?: string;
@@ -99,7 +96,6 @@ const props = withDefaults(
     brushHeight: 75,
     autoBrush: true,
     brushThreshold: 25,
-    xKey: "year",
     showArea: true,
     showTooltip: true,
     crosshairColor: "var(--ui-color-primary-700)",
@@ -110,10 +106,9 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: "update:domain", value: [number, number]): void }>();
 
 // Accessors
-const xAccessor = (d: LineDatum) => Number(d[props.xKey] ?? 0);
+const xAccessor = (datum: LineDatum) => datum.year;
 const yAccessor = computed(() => (d: LineDatum) => {
-  const v = d?.[props.selectedMetric];
-  return v == null ? 0 : Number(v);
+  return d[props.selectedMetric];
 });
 
 // Domain / Brush handling
@@ -136,7 +131,11 @@ watch(extent, (e) => {
   xDomain.value = e;
 });
 
-function updateDomain(selection: [number, number], _ev?: any, userDriven?: boolean) {
+function updateDomain(
+  selection: [number, number],
+  _event?: unknown,
+  userDriven?: boolean
+) {
   if (userDriven) {
     xDomain.value = selection;
     emit("update:domain", selection);
@@ -156,7 +155,7 @@ function formatYAxis(value: number, metric: LineMetric): string {
   if (metric === "count") return String(Math.round(value));
   // minutesWatched -> best unit
   const maxValue = Math.max(
-    ...(props.data || []).map((d) => Number(d.minutesWatched || 0))
+    ...props.data.map(d => d.minutesWatched)
   );
   if (maxValue >= 60 * 24) return `${Math.round(value / (60 * 24))}d`;
   if (maxValue >= 60) return `${Math.round(value / 60)}h`;
@@ -165,7 +164,7 @@ function formatYAxis(value: number, metric: LineMetric): string {
 
 // Crosshair template
 const crosshairTemplate = (d: LineDatum) => {
-  const minutes = Number(d.minutesWatched || 0);
+  const minutes = d.minutesWatched;
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   const mins = minutes % 60;
@@ -173,14 +172,14 @@ const crosshairTemplate = (d: LineDatum) => {
     days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   return `
     <div class='flex flex-col p-1 text-sm gap-0.5'>
-      <span class='font-bold text-base mb-0.5'>${(d as any)[props.xKey]}</span>
+      <span class='font-bold text-base mb-0.5'>${d.year}</span>
       <div class='inline-flex justify-between items-center gap-4'>
         <span class='text-thin'>Mean Score</span>
-        <span class='font-medium'>${Number(d.meanScore || 0)} %</span>
+        <span class='font-medium'>${d.meanScore} %</span>
       </div>
       <div class='inline-flex justify-between items-center gap-4'>
         <span class='text-thin'>Titles Watched</span>
-        <span class='font-medium'>${Number(d.count || 0)}</span>
+        <span class='font-medium'>${d.count}</span>
       </div>
       <div class='inline-flex justify-between items-center gap-4'>
         <span class='text-thin'>Watch Time</span>

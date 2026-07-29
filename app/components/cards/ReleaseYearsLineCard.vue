@@ -1,22 +1,20 @@
 <template>
   <MetricsCard title="Release Year" v-bind="$attrs">
     <UTabs
-      :items="items"
-      class="w-fit absolute top-6 right-6"
-      :ui="{ trigger: 'cursor-pointer' }"
       v-model="selectedTab"
-    />
+      :items="items"
+      class="absolute top-6 right-6 w-fit"
+      :ui="{ trigger: 'cursor-pointer' }"/>
 
     <LineChart
       class="mt-8"
       :data="yearlyData"
-      :selectedMetric="selectedTab"
+      :selected-metric="selectedTab"
       :height="256"
-      :autoBrush="true"
-      :brushHeight="85"
-      :showArea="true"
-      :showTooltip="true"
-    />
+      :auto-brush="true"
+      :brush-height="85"
+      :show-area="true"
+      :show-tooltip="true"/>
   </MetricsCard>
 </template>
 
@@ -49,13 +47,13 @@ const yearlyData = computed<YearlyData[]>(() => {
   const filtered = releaseYears.value
     .filter(
       (item): item is NonNullable<typeof item> =>
-        item !== null && (item as any).releaseYear !== null
+        item !== null && item.releaseYear !== null
     )
     .map((item) => ({
-      year: Number((item as any).releaseYear),
-      meanScore: (item as any).meanScore || 0,
-      count: (item as any).count || 0,
-      minutesWatched: (item as any).minutesWatched || 0,
+      year: Number(item.releaseYear),
+      meanScore: item.meanScore ?? 0,
+      count: item.count ?? 0,
+      minutesWatched: item.minutesWatched ?? 0,
     }));
   return filtered.sort((a, b) => a.year - b.year);
 });
