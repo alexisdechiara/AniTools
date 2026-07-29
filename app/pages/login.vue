@@ -38,10 +38,14 @@
 
 <script lang="ts" setup>
 import { ScoreFormat } from "#gql/default";
+import { FEATURE_REGISTRY } from "#shared/config/features";
 const { isLoading, start } = useLoadingIndicator();
 
 definePageMeta({
 	layout: "none",
+	feature: "login",
+	auth: FEATURE_REGISTRY.login.access,
+	indexable: FEATURE_REGISTRY.login.indexable
 });
 
 const route = useRoute();

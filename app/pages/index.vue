@@ -2,6 +2,13 @@
 import { ref } from "vue"
 import { GridLayout, GridItem, type LayoutItem } from "grid-layout-plus"
 import { ComponentType, getComponentById } from "~/config/components"
+import { FEATURE_REGISTRY } from "#shared/config/features"
+
+definePageMeta({
+	feature: "dashboard",
+	auth: FEATURE_REGISTRY.dashboard.access,
+	indexable: FEATURE_REGISTRY.dashboard.indexable
+})
 
 const { getUsername } = useUserStore()
 

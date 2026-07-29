@@ -111,6 +111,14 @@
 import { VueDraggable } from "vue-draggable-plus"
 import type { CommandPaletteItem, DropdownMenuItem } from '@nuxt/ui'
 import { tierlistFormats, tierlistGenres, tierlistSeasons, tierlistYears } from "~/utils/tierlist-data"
+import { FEATURE_REGISTRY } from "#shared/config/features"
+
+definePageMeta({
+	feature: "tierlist",
+	auth: FEATURE_REGISTRY.tierlist.access,
+	indexable: FEATURE_REGISTRY.tierlist.indexable
+})
+
 const seo = {
 	title: "Anime Tier List",
 	description: "Build and manage your anime tier list with filters, search and drag-and-drop ranking."

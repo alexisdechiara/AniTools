@@ -153,6 +153,13 @@ import 'vue-cal/style'
 import { AnimeCalEvent, SimuldubCalEvent } from '~/models/AnimeCalEvent'
 import { useAiringSchedules } from '~/composables/useAiringSchedules'
 import { useCalendarStore } from '~/stores/Calendar'
+import { FEATURE_REGISTRY } from "#shared/config/features"
+
+definePageMeta({
+	feature: "calendar",
+	auth: FEATURE_REGISTRY.calendar.access,
+	indexable: FEATURE_REGISTRY.calendar.indexable
+})
 
 const store = useCalendarStore()
 const seo = {

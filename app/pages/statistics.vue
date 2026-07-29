@@ -1,3 +1,13 @@
+<script setup lang="ts">
+import { FEATURE_REGISTRY } from "#shared/config/features"
+
+definePageMeta({
+	feature: "statistics",
+	auth: FEATURE_REGISTRY.statistics.access,
+	indexable: FEATURE_REGISTRY.statistics.indexable
+})
+</script>
+
 <template>
   <UDashboardPanel id="statistics">
     <template #body>

@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { beforeAll, describe, expect, it } from "vitest"
+import {
+	FEATURE_ACCESS,
+	FEATURE_REGISTRY
+} from "../../shared/config/features"
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url))
 let nuxtConfig = ""
@@ -40,13 +44,18 @@ describe("security configuration regressions", () => {
 	it("retains the OAuth and session hardening primitives", () => {
 		expect(authSource).toContain("httpOnly: true")
 		expect(authSource).toContain("sameSite: \"lax\"")
-		expect(authSource).toContain("secure: getRequestURL(event).protocol === \"https:\"")
-		expect(authSource).toContain("createCipheriv(\"aes-256-gcm\"")
+		expect(authSource).toMatch(
+			/secure:\s*(?:isProduction\(\)\s*\|\|\s*)?getRequestURL\(event\)\.protocol === "https:"/
+		)
+		expect(authSource).toMatch(/createCipheriv\(\s*"aes-256-gcm"/)
 		expect(authSource).toContain("timingSafeEqual(expected, received)")
 		expect(authSource).toContain("randomBytes(32)")
 	})
 
 	it("keeps Calendar and Tierlist available without authentication", () => {
-		expect(middlewareSource).toMatch(/hybridPaths\s*=\s*\[[^\]]*"\/tierlist"[^\]]*"\/calendar"[^\]]*\]/)
+		expect(FEATURE_REGISTRY.calendar.access).toBe(FEATURE_ACCESS.optional)
+		expect(FEATURE_REGISTRY.tierlist.access).toBe(FEATURE_ACCESS.optional)
+		expect(middlewareSource).toContain("const access = to.meta.auth ?? FEATURE_ACCESS.oauth")
+		expect(middlewareSource).not.toMatch(/\b(?:publicPaths|hybridPaths)\b/)
 	})
 })

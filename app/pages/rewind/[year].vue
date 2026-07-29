@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import type { MetricSort } from "~/stores/Statistics"
+import { FEATURE_REGISTRY } from "#shared/config/features"
+
+definePageMeta({
+	feature: "rewind",
+	auth: FEATURE_REGISTRY.rewind.access,
+	indexable: FEATURE_REGISTRY.rewind.indexable
+})
 
 const year = useRoute().params.year as string;
 const yearNumber = parseInt(year, 10);

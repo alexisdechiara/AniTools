@@ -1,123 +1,13 @@
 <script setup lang="ts">
-import type { NavigationMenuItem } from "@nuxt/ui"
-
 const open = ref(false)
 
 useDashboard()
 
-const links = [[{
-	label: "Dashboard",
-	icon: "i-lucide-layout-dashboard",
-	to: "/",
+const { items: links } = useAppNavigation({
 	onSelect: () => {
 		open.value = false
 	}
-}, {
-	label: "Statistics",
-	icon: "i-lucide-chart-no-axes-combined",
-	to: '/statistics',
-	children: [{
-		label: 'Overview',
-		to: '/statistics',
-		onSelect: () => {
-			open.value = false
-		}
-	}, {
-			label: 'Genres',
-			to: '/statistics/genres',
-			onSelect: () => {
-				open.value = false
-			},
-			disabled: true
-		}, {
-			label: 'Tags',
-			to: '/statistics/tags',
-			onSelect: () => {
-				open.value = false
-			},
-			disabled: true
-		}, {
-			label: 'Voice Actors',
-			to: '/statistics/voice-actors',
-			onSelect: () => {
-				open.value = false
-			},
-			disabled: true
-		}, {
-			label: 'Studios',
-			to: '/statistics/studios',
-			onSelect: () => {
-				open.value = false
-			},
-			disabled: true
-		}, {
-			label: 'Staff',
-			to: '/statistics/staff',
-			onSelect: () => {
-				open.value = false
-			},
-			disabled: true
-		}]
-}, {
-	label: "Rewind",
-	icon: "i-lucide-rewind",
-	to: `/rewind/${new Date().getFullYear()}`,
-	onSelect: () => {
-		open.value = false
-	}
-}, {
-	label: "Tierlist",
-	icon: "i-lucide-rows-3",
-	to: "/tierlist",
-	onSelect: () => {
-		open.value = false
-	}
-	},
-	// {
-	// 	label: "Create",
-	// 	icon: "i-lucide-circle-fading-plus",
-	// 	to: "/create",
-	// 	disabled: true,
-	// 	onSelect: () => {
-	// 		open.value = false
-	// 	}
-	//},
-	{
-	label: "Calendar",
-	icon: "i-lucide-calendar-days",
-	to: "/calendar",
-	onSelect: () => {
-		open.value = false
-	}
-	},
-	// {
-	// 	label: "Explore",
-	// 	icon: "i-lucide-telescope",
-	// 	to: "/explore",
-	// 	disabled: true,
-	// 	onSelect: () => {
-	// 		open.value = false
-	// 	}
-	// },
-	// {
-	// 	label: "Podium",
-	// 	icon: "i-lucide-trophy",
-	// 	to: "/podium",
-	// 	disabled: true,
-	// 	onSelect: () => {
-	// 		open.value = false
-	// 	}
-	// },
-	// {
-	// 	label: "Timeline",
-	// 	icon: "i-lucide-chart-no-axes-gantt",
-	// 	to: "/timeline",
-	// 	disabled: true,
-	// 	onSelect: () => {
-	// 		open.value = false
-	// 	}
-	// }
-]] satisfies NavigationMenuItem[][]
+})
 </script>
 
 <template>
@@ -140,7 +30,7 @@ const links = [[{
       <template #default="{ collapsed }">
         <UNavigationMenu
           :collapsed="collapsed"
-          :items="links[0]"
+          :items="links"
           orientation="vertical"
           tooltip
           popover

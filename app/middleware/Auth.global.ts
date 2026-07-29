@@ -1,11 +1,13 @@
-// Définition des routes publiques qui ne nécessitent pas d'authentification
-const publicPaths = ["/login", "/test"]
-// Routes qui fonctionnent avec et sans authentification
-const hybridPaths = ["/tierlist", "/calendar"]
+import {
+	FEATURE_ACCESS,
+	canAccessFeature,
+	type FeatureIdentity
+} from "#shared/config/features"
 
 export default defineNuxtRouteMiddleware(async (to) => {
-	// Si c'est une route publique, on ne fait rien
-	if (publicPaths.includes(to.path)) {
+	const access = to.meta.auth ?? FEATURE_ACCESS.oauth
+
+	if (access.mode === "public") {
 		return
 	}
 
@@ -16,20 +18,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
 	try {
 		await userStore.restoreSession()
 
-		// Si l'utilisateur est chargé dans le store (grâce à pinia-plugin-persistedstate)
-		if (userStore.isAuthenticated) {
-			if (!statisticsStore.isInitialized) {
-				await statisticsStore.fetchStatistics(userStore.getId!)
-			}
-			if (!entriesStore.isInitialized) {
-				await entriesStore.fetchAllAnimes(userStore.getId!)
-			}
-			return
-		}
+		const identity: FeatureIdentity = userStore.isOAuthAuthenticated
+			? "oauth"
+			: userStore.authMode === "public"
+				? "public-profile"
+				: "anonymous"
 
-		// Si on arrive ici, l'utilisateur n'est pas authentifié
-		// On redirige vers la page de connexion avec un paramètre de retour
-		if (!hybridPaths.includes(to.path)) {
+		if (!canAccessFeature(access, identity)) {
 			return navigateTo({
 				path: "/login",
 				query: {
@@ -37,9 +32,30 @@ export default defineNuxtRouteMiddleware(async (to) => {
 				}
 			})
 		}
+
+		const userId = userStore.getId
+
+		if (userId) {
+			const pendingRequests: Promise<unknown>[] = []
+
+			if (!statisticsStore.isInitialized) {
+				pendingRequests.push(statisticsStore.fetchStatistics(userId))
+			}
+			if (!entriesStore.isInitialized) {
+				pendingRequests.push(entriesStore.fetchAllAnimes(userId))
+			}
+
+			await Promise.all(pendingRequests)
+		}
+
+		return
 	} catch (error) {
 		console.error("Error while verifying authentication:", error)
-		// En cas d'erreur, on redirige vers la page de connexion
+
+		if (access.mode === "optional") {
+			return
+		}
+
 		return navigateTo("/login")
 	}
 })
