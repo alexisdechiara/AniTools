@@ -136,6 +136,13 @@ function getDateKey(timestamp: number): string {
 	return new Date(timestamp * 1000).toISOString().slice(0, 10)
 }
 
+function isWatchRelatedActivity(activity: AniListAnimeActivity): boolean {
+	const status = activity.status?.toLocaleLowerCase("en") ?? ""
+	return !status.includes("plan to watch")
+		&& !status.includes("plans to watch")
+		&& !status.includes("planning")
+}
+
 function getTitle(entry: AniListAnimeListEntry): string {
 	return entry.media?.title?.userPreferred
 		|| entry.media?.title?.english
@@ -226,7 +233,9 @@ export function buildRewindSummary(
 
 		const mediaId = activity.media?.id
 		if (!mediaId) continue
-		activeMediaIds.add(mediaId)
+		if (isWatchRelatedActivity(activity)) {
+			activeMediaIds.add(mediaId)
+		}
 
 		const result = getActivityEpisodeIncrement(
 			activity,

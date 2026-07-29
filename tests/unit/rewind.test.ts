@@ -22,6 +22,7 @@ function media(
 	return {
 		id,
 		idMal: null,
+		type: "ANIME",
 		title: {
 			english: `Anime ${id}`,
 			native: null,
@@ -207,6 +208,24 @@ describe("Rewind aggregation", () => {
 		expect(summary.animeCount).toBe(1)
 		expect(summary.matchedAnimeCount).toBe(0)
 		expect(summary.minutesWatched).toBe(0)
+	})
+
+	it("does not count planning-only updates as watched anime", () => {
+		const summary = buildRewindSummary(
+			2025,
+			[activity(
+				1,
+				999,
+				"2025-06-01T12:00:00Z",
+				"",
+				"plans to watch"
+			)],
+			[]
+		)
+
+		expect(summary.activityCount).toBe(1)
+		expect(summary.animeCount).toBe(0)
+		expect(summary.episodesWatched).toBe(0)
 	})
 })
 
