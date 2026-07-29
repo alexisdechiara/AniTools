@@ -10,7 +10,7 @@ const contentSecurityPolicy = [
 	"font-src 'self' data:",
 	"img-src 'self' data: blob: https://s4.anilist.co",
 	"media-src 'self' blob:",
-	`connect-src 'self' https://graphql.anilist.co https://api.anitools.geekly.blog${isProduction ? "" : " http: ws: wss:"}`,
+	`connect-src 'self' https://api.anitools.geekly.blog${isProduction ? "" : " http: ws: wss:"}`,
 	"frame-src https://www.youtube-nocookie.com https://www.youtube.com",
 	"worker-src 'self' blob:"
 ].join("; ")
@@ -50,16 +50,6 @@ export default defineNuxtConfig({
 		}
 	},
 
-	"graphql-client": {
-		tokenStorage: false,
-		clients: {
-			default: {
-				host: process.env.NUXT_PUBLIC_ANILIST_URL || "https://graphql.anilist.co",
-				proxyCookies: false
-			}
-		}
-	},
-
 	"image": {
 		domains: ["s4.anilist.co"]
 	},
@@ -82,7 +72,6 @@ export default defineNuxtConfig({
 		"@nuxtjs/robots",
 		"@nuxtjs/sitemap",
 		"@pinia/nuxt",
-		"nuxt-graphql-client",
 		"pinia-plugin-persistedstate/nuxt"
 	],
 
@@ -132,7 +121,6 @@ export default defineNuxtConfig({
 		sessionPassword: "",
 		sessionPreviousPassword: "",
 		public: {
-			anilistUrl: "https://graphql.anilist.co",
 			directusUrl: "https://api.anitools.geekly.blog"
 		}
 	},

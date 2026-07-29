@@ -12,7 +12,6 @@ import {
 } from "~/utils/anilist-list"
 
 export type AnimeListEntry = AniListAnimeListEntry
-export type { AnimeListGroup } from "~/utils/anilist-list"
 
 export type AnimesType = AnimeListGroup[]
 

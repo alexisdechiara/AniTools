@@ -1,18 +1,14 @@
 import { expect, test } from "@playwright/test"
 
 test("Tierlist remains usable without an AniList session", async ({ page }) => {
+	const browserAniListRequests: string[] = []
+	page.on("request", (request) => {
+		if (request.url().startsWith("https://graphql.anilist.co")) {
+			browserAniListRequests.push(request.url())
+		}
+	})
 	await page.route("https://graphql.anilist.co/**", async (route) => {
-		await route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				data: {
-					MediaListCollection: {
-						lists: []
-					}
-				}
-			})
-		})
+		await route.abort()
 	})
 
 	const response = await page.goto("/tierlist", {
@@ -26,6 +22,7 @@ test("Tierlist remains usable without an AniList session", async ({ page }) => {
 	await expect(page).toHaveURL(/\/tierlist$/)
 	await expect(page).toHaveTitle("Anime Tier List | AniTools")
 	await expect(page.getByRole("button", { name: "Search animes..." })).toBeVisible()
+	expect(browserAniListRequests).toEqual([])
 })
 
 test("the unauthenticated session endpoint never exposes a token", async ({ request }) => {
