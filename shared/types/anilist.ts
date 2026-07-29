@@ -21,10 +21,29 @@ export const ANILIST_ACTIVITY_KINDS = [
 	"all"
 ] as const
 
+export const ANILIST_SCORE_FORMATS = [
+	"POINT_3",
+	"POINT_5",
+	"POINT_10",
+	"POINT_10_DECIMAL",
+	"POINT_100"
+] as const
+
+export const ANILIST_TITLE_LANGUAGES = [
+	"ENGLISH",
+	"ENGLISH_STYLISED",
+	"NATIVE",
+	"NATIVE_STYLISED",
+	"ROMAJI",
+	"ROMAJI_STYLISED"
+] as const
+
 export type AniListAccessMode = "oauth" | "public"
 export type AniListListStatus = typeof ANILIST_LIST_STATUSES[number]
 export type AniListListSort = typeof ANILIST_LIST_SORTS[number]
 export type AniListActivityKind = typeof ANILIST_ACTIVITY_KINDS[number]
+export type AniListScoreFormat = typeof ANILIST_SCORE_FORMATS[number]
+export type AniListTitleLanguage = typeof ANILIST_TITLE_LANGUAGES[number]
 
 export interface AniListSource {
 	mode: AniListAccessMode
@@ -63,11 +82,11 @@ export interface AniListProfile {
 		displayAdultContent: boolean | null
 		profileColor: string | null
 		timezone: string | null
-		titleLanguage: string | null
+		titleLanguage: AniListTitleLanguage | null
 	} | null
 	mediaListOptions: {
 		rowOrder: string | null
-		scoreFormat: string | null
+		scoreFormat: AniListScoreFormat | null
 	} | null
 }
 
@@ -178,6 +197,21 @@ export interface AniListAnimeListEntry {
 export interface AniListProfileResponse {
 	source: AniListSource
 	profile: AniListProfile
+}
+
+export interface AniListSearchPrediction {
+	id: number
+	title: string
+}
+
+export interface AniListSearchResponse {
+	result: {
+		predictions: AniListSearchPrediction[]
+	}
+}
+
+export interface AniListMediaResponse {
+	media: AniListMediaSummary
 }
 
 export interface AniListAnimeListResponse {

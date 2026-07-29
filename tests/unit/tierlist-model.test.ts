@@ -90,6 +90,22 @@ describe("tierlist entry model", () => {
 		})
 	})
 
+	it("accepts the plain media response returned by the allowlisted endpoint", () => {
+		const parsed = formatMediaResultToTierlistEntry({
+			id: 8,
+			title: { userPreferred: "Server media" },
+			coverImage: { large: "https://example.com/8.jpg" },
+			genres: ["Drama"]
+		})
+
+		expect(parsed).toMatchObject({
+			media: {
+				id: 8,
+				title: { userPreferred: "Server media" }
+			}
+		})
+	})
+
 	it("compacts persisted entries to the fields needed by the tier list", () => {
 		const compact = compactTierlistEntry(entry(8, {
 			media: {

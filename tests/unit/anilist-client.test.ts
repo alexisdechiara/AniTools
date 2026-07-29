@@ -4,9 +4,12 @@ import {
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
 	getAniListAnimeListResponse,
+	getAniListMediaResponse,
+	getAniListSearchResponse,
 	getAniListStatisticsResponse,
 	parseAniListActivitiesQuery,
 	parseAniListAnimeListQuery,
+	parseAniListMediaQuery,
 	parseAniListProfileQuery,
 	resolveAniListAccess
 } from "../../server/utils/anilist-client"
@@ -47,6 +50,58 @@ const profile = {
 	}
 }
 
+const media = {
+	id: 7,
+	idMal: 5114,
+	type: "ANIME",
+	title: {
+		romaji: "Hagane no Renkinjutsushi: Fullmetal Alchemist",
+		english: "Fullmetal Alchemist: Brotherhood",
+		native: "鋼の錬金術師 FULLMETAL ALCHEMIST",
+		userPreferred: "Fullmetal Alchemist: Brotherhood"
+	},
+	coverImage: {
+		extraLarge: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5114.jpg",
+		large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/b5114.jpg",
+		medium: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/b5114.jpg",
+		color: "#e4a15d"
+	},
+	bannerImage: null,
+	description: "Two brothers search for the Philosopher's Stone.",
+	format: "TV",
+	status: "FINISHED",
+	episodes: 64,
+	duration: 24,
+	genres: ["Action", null],
+	countryOfOrigin: "JP",
+	season: "SPRING",
+	seasonYear: 2009,
+	startDate: {
+		year: 2009,
+		month: 4,
+		day: 5
+	},
+	endDate: {
+		year: 2010,
+		month: 7,
+		day: 4
+	},
+	averageScore: 90,
+	meanScore: 90,
+	popularity: 900_000,
+	favourites: 200_000,
+	isFavourite: false,
+	isAdult: false,
+	tags: null,
+	nextAiringEpisode: null,
+	siteUrl: "https://anilist.co/anime/5114",
+	studios: null,
+	rankings: null,
+	externalLinks: null,
+	trailer: null,
+	relations: null
+}
+
 function jsonResponse(
 	body: unknown,
 	status = 200,
@@ -75,7 +130,9 @@ describe("AniList endpoint query validation", () => {
 			"statistics",
 			"activities",
 			"recommendations",
-			"studio-media"
+			"studio-media",
+			"search",
+			"media"
 		])
 	})
 
@@ -124,9 +181,114 @@ describe("AniList endpoint query validation", () => {
 			perPage: 51
 		})).toThrow()
 	})
+
+	it("accepts only a bounded positive media id", () => {
+		expect(parseAniListMediaQuery({ id: "7" })).toEqual({ id: 7 })
+
+		for (const query of [
+			{},
+			{ id: 0 },
+			{ id: -1 },
+			{ id: 1.5 },
+			{ id: 10_000_001 },
+			{ id: 7, extra: "query" }
+		]) {
+			expect(() => parseAniListMediaQuery(query)).toThrow()
+		}
+	})
 })
 
 describe("AniList allowlisted client", () => {
+	it("uses a fixed anonymous search query and preserves the public response contract", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Page: {
+					media: [
+						null,
+						{
+							id: 7,
+							title: {
+								romaji: "Hagane no Renkinjutsushi",
+								english: "Fullmetal Alchemist",
+								native: "鋼の錬金術師",
+								userPreferred: "Fullmetal Alchemist"
+							}
+						}
+					]
+				}
+			}
+		}))
+
+		await expect(getAniListSearchResponse("  fullmetal  ", {
+			fetch: requester
+		})).resolves.toEqual({
+			result: {
+				predictions: [{
+					id: 7,
+					title: "Fullmetal Alchemist"
+				}]
+			}
+		})
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsSearch")
+		expect(body.query).not.toContain("fullmetal")
+		expect(body.variables).toEqual({ search: "fullmetal" })
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("loads a non-adult anime through the fixed media operation", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: { Media: media }
+		}))
+
+		const result = await getAniListMediaResponse({ id: 7 }, {
+			fetch: requester
+		})
+
+		expect(result.media).toMatchObject({
+			id: 7,
+			type: "ANIME",
+			genres: ["Action"],
+			tags: [],
+			rankings: [],
+			externalLinks: []
+		})
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsMedia")
+		expect(body.variables).toEqual({ mediaId: 7 })
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("does not expose adult media through the public media operation", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Media: {
+					...media,
+					isAdult: true
+				}
+			}
+		}))
+
+		await expect(getAniListMediaResponse({ id: 7 }, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 404,
+			data: {
+				code: "ANILIST_MEDIA_NOT_FOUND"
+			}
+		})
+	})
+
 	it("sends public usernames only as GraphQL variables", async () => {
 		const requester = fetchMock(async () => jsonResponse({
 			data: { User: profile }

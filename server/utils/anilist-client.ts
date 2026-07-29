@@ -9,17 +9,21 @@ import {
 	ANILIST_ACTIVITY_KINDS,
 	ANILIST_LIST_SORTS,
 	ANILIST_LIST_STATUSES,
+	ANILIST_SCORE_FORMATS,
+	ANILIST_TITLE_LANGUAGES,
 	type AniListAccessMode,
 	type AniListActivitiesResponse,
 	type AniListActivity,
 	type AniListActivityKind,
 	type AniListAnimeListResponse,
 	type AniListListSort,
+	type AniListMediaResponse,
 	type AniListMediaSummary,
 	type AniListPageInfo,
 	type AniListProfile,
 	type AniListProfileResponse,
 	type AniListRecommendationsResponse,
+	type AniListSearchResponse,
 	type AniListSource,
 	type AniListStudioMediaResponse,
 	type AniListStatistics,
@@ -33,6 +37,8 @@ const MAX_PAGE = 100
 const MAX_LIST_PAGE_SIZE = 50
 const MAX_ACTIVITY_PAGE_SIZE = 50
 const MAX_EXPLORE_PAGE_SIZE = 20
+const MAX_SEARCH_RESULTS = 10
+const MAX_SEARCH_LENGTH = 100
 const MAX_STATISTIC_GROUPS = 100
 const MAX_MEDIA_IDS_PER_STATISTIC = 250
 const MAX_UPSTREAM_STATISTIC_GROUPS = 5_000
@@ -48,7 +54,9 @@ export const ANILIST_ALLOWED_OPERATIONS = [
 	"statistics",
 	"activities",
 	"recommendations",
-	"studio-media"
+	"studio-media",
+	"search",
+	"media"
 ] as const
 
 const PROFILE_FIELDS = `
@@ -374,6 +382,25 @@ const STUDIO_MEDIA_QUERY = `
 	}
 `
 
+const SEARCH_QUERY = `
+	query AniToolsSearch($search: String!) {
+		Page(page: 1, perPage: ${MAX_SEARCH_RESULTS}) {
+			media(type: ANIME, isAdult: false, search: $search) {
+				id
+				title { romaji english native userPreferred }
+			}
+		}
+	}
+`
+
+const MEDIA_QUERY = `
+	query AniToolsMedia($mediaId: Int!) {
+		Media(id: $mediaId, type: ANIME) {
+			${MEDIA_SUMMARY_FIELDS}
+		}
+	}
+`
+
 const usernameSchema = z.string()
 	.trim()
 	.min(2)
@@ -468,6 +495,12 @@ const studioMediaQuerySchema = z.object({
 	perPage: explorePageSizeSchema
 }).strict()
 
+const searchTextSchema = z.string().trim().min(1).max(MAX_SEARCH_LENGTH)
+
+const mediaQuerySchema = z.object({
+	id: mediaIdSchema
+}).strict()
+
 const publicAccessSchema = z.object({
 	mode: z.literal("public"),
 	username: usernameSchema
@@ -492,6 +525,7 @@ export type AniListStatisticsQuery = z.infer<typeof statisticsQuerySchema>
 export type AniListActivitiesQuery = z.infer<typeof activitiesQuerySchema>
 export type AniListRecommendationsQuery = z.infer<typeof recommendationsQuerySchema>
 export type AniListStudioMediaQuery = z.infer<typeof studioMediaQuerySchema>
+export type AniListMediaQuery = z.infer<typeof mediaQuerySchema>
 
 export interface AniListRequestOptions {
 	fetch?: typeof globalThis.fetch
@@ -537,11 +571,11 @@ const profileSchema = z.object({
 		displayAdultContent: z.boolean().nullable(),
 		profileColor: z.string().max(128).nullable(),
 		timezone: z.string().max(128).nullable(),
-		titleLanguage: z.string().max(128).nullable()
+		titleLanguage: z.enum(ANILIST_TITLE_LANGUAGES).nullable()
 	}).nullable(),
 	mediaListOptions: z.object({
 		rowOrder: z.string().max(128).nullable(),
-		scoreFormat: z.string().max(128).nullable()
+		scoreFormat: z.enum(ANILIST_SCORE_FORMATS).nullable()
 	}).nullable()
 })
 
@@ -550,6 +584,11 @@ const titleSchema = z.object({
 	native: z.string().max(500).nullable(),
 	romaji: z.string().max(500).nullable(),
 	userPreferred: z.string().max(500).nullable()
+})
+
+const searchMediaSchema = z.object({
+	id: z.number().int().positive(),
+	title: titleSchema.nullable()
 })
 
 const mediaSchema = z.object({
@@ -848,6 +887,10 @@ export function parseAniListStudioMediaQuery(query: unknown) {
 	return parseQuery(studioMediaQuerySchema, query)
 }
 
+export function parseAniListMediaQuery(query: unknown) {
+	return parseQuery(mediaQuerySchema, query)
+}
+
 export async function resolveAniListAccess(
 	event: H3Event,
 	publicUsername?: string
@@ -985,8 +1028,8 @@ function upstreamError(
 	})
 }
 
-function enforceUpstreamBudget(access: AniListAccess) {
-	const key = access.mode === "oauth"
+function enforceUpstreamBudget(access: AniListAccess | null) {
+	const key = access?.mode === "oauth"
 		? `oauth-user:${access.userId}`
 		: "public"
 	const result = checkRateLimit(key, {
@@ -1009,10 +1052,10 @@ async function requestAniList<T>(
 	query: string,
 	variables: Record<string, unknown>,
 	dataSchema: z.ZodType<T>,
-	access: AniListAccess,
+	access: AniListAccess | null,
 	options: AniListRequestOptions = {}
 ): Promise<T> {
-	const validatedAccess = accessSchema.parse(access)
+	const validatedAccess = access === null ? null : accessSchema.parse(access)
 	enforceUpstreamBudget(validatedAccess)
 	const timeoutMs = z.number().int().min(1).max(30_000)
 		.parse(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -1027,7 +1070,7 @@ async function requestAniList<T>(
 			headers: {
 				Accept: "application/json",
 				"Content-Type": "application/json",
-				...(validatedAccess.mode === "oauth"
+				...(validatedAccess?.mode === "oauth"
 					? { Authorization: `Bearer ${validatedAccess.accessToken}` }
 					: {})
 			},
@@ -1149,6 +1192,77 @@ async function requestAniList<T>(
 	}
 
 	return parsedData.data
+}
+
+export async function getAniListSearchResponse(
+	search: string,
+	options: AniListRequestOptions = {}
+): Promise<AniListSearchResponse> {
+	const normalizedSearch = searchTextSchema.parse(search)
+	const data = await requestAniList(
+		SEARCH_QUERY,
+		{ search: normalizedSearch },
+		z.object({
+			Page: z.object({
+				media: z.array(searchMediaSchema.nullable())
+					.max(MAX_SEARCH_RESULTS)
+					.nullable()
+			}).nullable()
+		}),
+		null,
+		options
+	)
+
+	if (!data.Page) {
+		throw upstreamError(
+			502,
+			"AniList search returned no page",
+			"ANILIST_SEARCH_FAILED"
+		)
+	}
+
+	return {
+		result: {
+			predictions: (data.Page.media ?? [])
+				.filter((media): media is NonNullable<typeof media> => media !== null)
+				.map(media => ({
+					id: media.id,
+					title: media.title?.english
+						|| media.title?.romaji
+						|| media.title?.native
+						|| media.title?.userPreferred
+						|| `Anime #${media.id}`
+				}))
+		}
+	}
+}
+
+export async function getAniListMediaResponse(
+	query: Pick<AniListMediaQuery, "id">,
+	options: AniListRequestOptions = {}
+): Promise<AniListMediaResponse> {
+	const validatedQuery = mediaQuerySchema.parse(query)
+	const data = await requestAniList(
+		MEDIA_QUERY,
+		{ mediaId: validatedQuery.id },
+		z.object({
+			Media: mediaSchema.nullable()
+		}),
+		null,
+		options
+	)
+
+	if (!data.Media || data.Media.type !== "ANIME" || data.Media.isAdult === true) {
+		throw upstreamError(
+			404,
+			"AniList anime was not found",
+			"ANILIST_MEDIA_NOT_FOUND"
+		)
+	}
+
+	return {
+		media: normalizeMedia(data.Media)
+	}
 }
 
 export async function fetchAniListProfile(

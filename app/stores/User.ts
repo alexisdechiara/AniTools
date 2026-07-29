@@ -1,17 +1,22 @@
 // app/stores/User.ts
-import { ScoreFormat, UserTitleLanguage } from "#gql/default"
 import { defineStore } from "pinia"
-import type { AniListProfileResponse } from "~~/shared/types/anilist"
+import {
+	ANILIST_SCORE_FORMATS,
+	ANILIST_TITLE_LANGUAGES,
+	type AniListProfileResponse,
+	type AniListScoreFormat,
+	type AniListTitleLanguage
+} from "~~/shared/types/anilist"
 
 interface UserOptions {
-	titleLanguage?: UserTitleLanguage | null
+	titleLanguage?: AniListTitleLanguage | null
 	displayAdultContent?: boolean | null
 	profileColor?: string | null
 	timezone?: string | null
 }
 
 interface MediaListOptions {
-	scoreFormat?: ScoreFormat | null
+	scoreFormat?: AniListScoreFormat | null
 	rowOrder?: string | null
 }
 
@@ -48,6 +53,16 @@ interface SessionResponse {
 	user: SessionUser | null
 }
 
+function isAniListTitleLanguage(value: unknown): value is AniListTitleLanguage {
+	return typeof value === "string"
+		&& ANILIST_TITLE_LANGUAGES.some(language => language === value)
+}
+
+function isAniListScoreFormat(value: unknown): value is AniListScoreFormat {
+	return typeof value === "string"
+		&& ANILIST_SCORE_FORMATS.some(format => format === value)
+}
+
 export const useUserStore = defineStore("User", () => {
 	// State
 	const id = ref<number>()
@@ -60,13 +75,13 @@ export const useUserStore = defineStore("User", () => {
 	const loading = ref(false)
 	const error = ref<string | null>(null)
 	const options = ref<UserOptions>({
-		titleLanguage: UserTitleLanguage.ENGLISH,
+		titleLanguage: "ENGLISH",
 		displayAdultContent: false,
 		profileColor: "#000000",
 		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 	})
 	const mediaListOptions = ref<MediaListOptions>({
-		scoreFormat: ScoreFormat.POINT_100,
+		scoreFormat: "POINT_100",
 		rowOrder: "ANIME_BY_POPULARITY"
 	})
 
@@ -86,9 +101,12 @@ export const useUserStore = defineStore("User", () => {
 		publicUsername.value = mode === "public" ? user.name : null
 
 		if (user.options) {
+			const titleLanguage = user.options.titleLanguage
 			options.value = {
 				...options.value,
-				titleLanguage: user.options.titleLanguage as UserTitleLanguage | null | undefined,
+				titleLanguage: titleLanguage === null || isAniListTitleLanguage(titleLanguage)
+					? titleLanguage
+					: options.value.titleLanguage,
 				displayAdultContent: user.options.displayAdultContent,
 				profileColor: user.options.profileColor,
 				timezone: user.options.timezone
@@ -96,9 +114,12 @@ export const useUserStore = defineStore("User", () => {
 		}
 
 		if (user.mediaListOptions) {
+			const scoreFormat = user.mediaListOptions.scoreFormat
 			mediaListOptions.value = {
 				...mediaListOptions.value,
-				scoreFormat: user.mediaListOptions.scoreFormat as ScoreFormat | null | undefined,
+				scoreFormat: scoreFormat === null || isAniListScoreFormat(scoreFormat)
+					? scoreFormat
+					: mediaListOptions.value.scoreFormat,
 				rowOrder: user.mediaListOptions.rowOrder
 			}
 		}
@@ -152,13 +173,13 @@ export const useUserStore = defineStore("User", () => {
 		loading.value = false
 		error.value = null
 		options.value = {
-			titleLanguage: UserTitleLanguage.ENGLISH,
+			titleLanguage: "ENGLISH",
 			displayAdultContent: false,
 			profileColor: "#000000",
 			timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
 		}
 		mediaListOptions.value = {
-			scoreFormat: ScoreFormat.POINT_100,
+			scoreFormat: "POINT_100",
 			rowOrder: "ANIME_BY_POPULARITY"
 		}
 	}

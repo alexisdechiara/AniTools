@@ -1,5 +1,6 @@
 import type { CommandPaletteItem } from "@nuxt/ui"
 import { defineStore } from "pinia"
+import type { AniListMediaResponse } from "~~/shared/types/anilist"
 import type {
 	TierlistEntry,
 	TierlistImportResult,
@@ -230,19 +231,14 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		const mediaId = typeof item.id === "number" ? item.id : Number(item.id)
 		if (!Number.isInteger(mediaId) || mediaId <= 0) return false
 
-		const userStore = useUserStore()
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
 		const existingEntry = getAllAnimes.value.find(entry => entry?.media?.id === mediaId)
 		if (existingEntry) return addEntryToUnrankedTier(existingEntry)
 
-		const { data } = await useAsyncGql({
-			operation: "getMediaById",
-			variables: {
-				mediaId,
-				scoreFormat: userStore.mediaListOptions.scoreFormat
-			}
+		const response = await $fetch<AniListMediaResponse>("/api/anilist/media", {
+			query: { id: mediaId }
 		})
-		const entry = formatMediaResultToTierlistEntry(data.value)
+		const entry = formatMediaResultToTierlistEntry(response.media)
 		return entry ? addEntryToUnrankedTier(entry) : false
 	}
 
