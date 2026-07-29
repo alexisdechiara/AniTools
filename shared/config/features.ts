@@ -90,7 +90,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/statistics/genres",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
+		status: "beta",
 		navigation: "child",
 		parent: "statistics"
 	},
@@ -100,7 +100,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/statistics/tags",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
+		status: "beta",
 		navigation: "child",
 		parent: "statistics"
 	},
@@ -120,7 +120,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/statistics/studios",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
+		status: "beta",
 		navigation: "child",
 		parent: "statistics"
 	},
@@ -167,8 +167,8 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/create",
 		access: FEATURE_ACCESS.optional,
 		indexable: false,
-		status: "planned",
-		navigation: "hidden"
+		status: "beta",
+		navigation: "primary"
 	},
 	explore: {
 		label: "Explore",

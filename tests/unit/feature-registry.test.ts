@@ -42,9 +42,21 @@ describe("feature registry", () => {
 		expect(canAccessFeature(FEATURE_ACCESS.oauth, "oauth")).toBe(true)
 	})
 
-	it("exposes the implemented people statistics views as beta features", () => {
-		expect(FEATURE_REGISTRY["statistics-voice-actors"].status).toBe("beta")
-		expect(FEATURE_REGISTRY["statistics-staff"].status).toBe("beta")
+	it("exposes every implemented statistics view and creation studio", () => {
+		const implementedFeatureIds = [
+			"statistics-genres",
+			"statistics-tags",
+			"statistics-voice-actors",
+			"statistics-studios",
+			"statistics-staff",
+			"create"
+		] as const
+
+		for (const featureId of implementedFeatureIds) {
+			expect(FEATURE_REGISTRY[featureId].status).not.toBe("planned")
+		}
+
+		expect(FEATURE_REGISTRY.create.navigation).toBe("primary")
 	})
 
 	it("resolves dynamic navigation paths", () => {
