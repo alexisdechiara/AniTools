@@ -108,7 +108,7 @@ const loadPublicProfile = async () => {
 			title: "Error",
 			description: "Please enter a username",
 			color: "error",
-			icon: "i-heroicons-exclamation-circle",
+			icon: "i-lucide-circle-alert",
 		});
 		return;
 	}

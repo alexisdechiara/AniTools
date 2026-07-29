@@ -144,7 +144,13 @@
 										{{ genre }}
 									</UBadge>
 								</div>
-								<UButton :to="`https://anilist.co/anime/${data.media.id}`" target="_blank" variant="subtle" size="sm"
+								<UButton
+									:to="`https://anilist.co/anime/${data.media.id}`"
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label="Open this anime on AniList"
+									variant="subtle"
+									size="sm"
 									class="rounded-full z-10 bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-(--anime-theme-color) hover:bg-(--anime-theme-color)/50"
 									icon="i-lucide-external-link" />
 							</div>
@@ -341,4 +347,3 @@ watch(popoverEl, (el) => {
 	}
 });
 </script>
-
