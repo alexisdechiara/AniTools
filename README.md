@@ -1,64 +1,65 @@
-# Nuxt Dashboard Template
+# AniTools
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+AniTools est une application Nuxt qui transforme les données AniList en calendrier de diffusion, tableau de bord, statistiques, rétrospective annuelle et tier lists.
 
-Get started with the Nuxt dashboard template with multiple pages, collapsible sidebar, keyboard shortcuts, light & dark more, command palette and more, powered by [Nuxt UI](https://ui.nuxt.com).
+## Prérequis
 
-- [Live demo](https://dashboard-template.nuxt.dev/)
-- [Documentation](https://ui4.nuxt.com/docs/getting-started/installation/nuxt)
+- Bun 1.3.5 ou supérieur
+- Node.js 22.19 ou supérieur uniquement si la cible de déploiement exécute le serveur avec Node
 
-<a href="https://dashboard-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui4.nuxt.com/assets/templates/nuxt/dashboard-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui4.nuxt.com/assets/templates/nuxt/dashboard-light.png">
-    <img alt="Nuxt Dashboard Template" src="https://ui4.nuxt.com/assets/templates/nuxt/dashboard-light.png">
-  </picture>
-</a>
+Le dépôt utilise uniquement `bun.lock`.
 
-> The dashboard template for Vue is on https://github.com/nuxt-ui-templates/dashboard-vue.
-
-## Quick Start
-
-```bash [Terminal]
-npm create nuxt@latest -- -t github:nuxt-ui-templates/dashboard
-```
-
-## Deploy your own
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=dashboard-template&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fdashboard&demo-image=https%3A%2F%2Fui4.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fdashboard-dark.png&demo-url=https%3A%2F%2Fdashboard-template.nuxt.dev%2F&demo-title=Nuxt%20Dashboard%20Template&demo-description=A%20dashboard%20template%20with%20multi-column%20layout%20for%20building%20sophisticated%20admin%20interfaces.)
-
-## Setup
-
-Make sure to install the dependencies:
+## Installation
 
 ```bash
-pnpm install
+bun install
+cp .env.example .env
+bun run dev
 ```
 
-## Development Server
+Le serveur de développement est disponible par défaut sur `http://localhost:3000`.
 
-Start the development server on `http://localhost:3000`:
+## Variables d'environnement
+
+Les données AniList publiques fonctionnent sans OAuth. Pour activer « Continue with AniList », créer une application dans les [paramètres développeur AniList](https://anilist.co/settings/developer), puis configurer :
+
+```dotenv
+NUXT_ANILIST_CLIENT_ID=
+NUXT_ANILIST_CLIENT_SECRET=
+NUXT_ANILIST_REDIRECT_URI=http://localhost:3000/auth/anilist/callback
+NUXT_SESSION_PASSWORD=
+```
+
+L'URL de redirection doit correspondre exactement à celle enregistrée chez AniList. `NUXT_SESSION_PASSWORD` doit contenir au moins 32 caractères aléatoires. Ne jamais placer ces valeurs dans une variable `NUXT_PUBLIC_*`.
+
+Les autres variables disponibles sont documentées dans `.env.example`.
+
+## Vérifications
 
 ```bash
-pnpm dev
+bun run lint
+bun run typecheck
+bun run build
+bun audit
 ```
 
-## Production
+## État du produit
 
-Build the application for production:
+- Calendar : fonctionnel, avec épisodes AniList et simuldubs Directus.
+- Dashboard et Statistics : partiels.
+- Rewind : prototype à remplacer par de vrais calculs annuels.
+- Tierlist : fonctionnelle, exports et mode franchise à terminer.
+- Explore, Timeline et Create : à construire.
 
-```bash
-pnpm build
-```
+Consulter [l'audit complet](docs/AUDIT.md) et [les consignes pour agents IA](AGENTS.md) avant toute évolution importante.
 
-Locally preview production build:
+## Authentification
 
-```bash
-pnpm preview
-```
+Le flux AniList utilise l'Authorization Code Grant :
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+- le client secret et l'échange du code restent côté serveur ;
+- un état temporaire protège le callback contre les requêtes forgées ;
+- le jeton est conservé dans un cookie chiffré `HttpOnly` ;
+- l'API de session ne renvoie jamais le jeton au client.
 
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+Le mode par nom d'utilisateur reste disponible pour consulter un profil public sans autoriser l'application.
