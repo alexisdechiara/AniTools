@@ -193,6 +193,28 @@ export interface AniListStatisticMetric {
 	mediaIds: number[]
 }
 
+export interface AniListStaffSummary {
+	id: number
+	name: {
+		full: string | null
+		native: string | null
+		userPreferred: string | null
+	} | null
+	language: string | null
+	image: AniListImage | null
+	primaryOccupations: string[]
+	siteUrl: string | null
+}
+
+export interface AniListVoiceActorStatistic extends AniListStatisticMetric {
+	voiceActor: AniListStaffSummary | null
+	characterIds: number[]
+}
+
+export interface AniListStaffStatistic extends AniListStatisticMetric {
+	staff: AniListStaffSummary | null
+}
+
 export interface AniListStatistics {
 	count: number
 	meanScore: number
@@ -220,6 +242,8 @@ export interface AniListStatistics {
 			isAnimationStudio: boolean
 		} | null
 	}>
+	voiceActors: AniListVoiceActorStatistic[]
+	staff: AniListStaffStatistic[]
 	lengths: Array<AniListStatisticMetric & { length: string | null }>
 }
 

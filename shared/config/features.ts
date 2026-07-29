@@ -110,7 +110,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/statistics/voice-actors",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
+		status: "beta",
 		navigation: "child",
 		parent: "statistics"
 	},
@@ -130,7 +130,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		path: "/statistics/staff",
 		access: FEATURE_ACCESS.oauthWithPublicProfile,
 		indexable: false,
-		status: "planned",
+		status: "beta",
 		navigation: "child",
 		parent: "statistics"
 	},

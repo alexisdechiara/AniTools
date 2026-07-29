@@ -239,6 +239,46 @@ describe("AniList allowlisted client", () => {
 							startYears: null,
 							releaseYears: null,
 							studios: null,
+							voiceActors: [{
+								count: 8,
+								meanScore: 84,
+								minutesWatched: 2_400,
+								mediaIds: [42, null],
+								characterIds: [101, null],
+								voiceActor: {
+									id: 7,
+									name: {
+										full: "Voice Actor",
+										native: "声優",
+										userPreferred: "Voice Actor"
+									},
+									languageV2: "Japanese",
+									image: {
+										large: "https://s4.anilist.co/file/anilistcdn/staff/large/n7.jpg",
+										medium: null
+									},
+									primaryOccupations: ["Voice Actor", null],
+									siteUrl: "https://anilist.co/staff/7"
+								}
+							}],
+							staff: [{
+								count: 5,
+								meanScore: 88,
+								minutesWatched: 1_800,
+								mediaIds: [42],
+								staff: {
+									id: 9,
+									name: {
+										full: "Series Director",
+										native: null,
+										userPreferred: "Series Director"
+									},
+									languageV2: null,
+									image: null,
+									primaryOccupations: ["Director"],
+									siteUrl: "https://anilist.co/staff/9"
+								}
+							}],
 							lengths: null
 						}
 					}
@@ -262,13 +302,87 @@ describe("AniList allowlisted client", () => {
 				genre: "Adventure"
 			}],
 			tags: [],
-			studios: []
+			studios: [],
+			voiceActors: [{
+				count: 8,
+				mediaIds: [42],
+				characterIds: [101],
+				voiceActor: {
+					id: 7,
+					language: "Japanese",
+					primaryOccupations: ["Voice Actor"]
+				}
+			}],
+			staff: [{
+				count: 5,
+				staff: {
+					id: 9,
+					primaryOccupations: ["Director"]
+				}
+			}]
 		})
 		const [, request] = requester.mock.calls[0]!
 		const body = JSON.parse(String(request?.body)) as {
 			query: string
 		}
 		expect(body.query).toContain("query AniToolsAnimeStatistics")
+		expect(body.query).toContain("voiceActors(limit: 100, sort: COUNT_DESC)")
+		expect(body.query).toContain("staff(limit: 100, sort: COUNT_DESC)")
+	})
+
+	it("rejects unsafe URL schemes in people statistics", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				User: {
+					statistics: {
+						anime: {
+							count: 1,
+							meanScore: 80,
+							minutesWatched: 24,
+							episodesWatched: 1,
+							statuses: null,
+							scores: null,
+							formats: null,
+							countries: null,
+							genres: null,
+							tags: null,
+							startYears: null,
+							releaseYears: null,
+							studios: null,
+							voiceActors: null,
+							staff: [{
+								count: 1,
+								meanScore: 80,
+								minutesWatched: 24,
+								mediaIds: [42],
+								staff: {
+									id: 9,
+									name: {
+										full: "Unsafe URL",
+										native: null,
+										userPreferred: "Unsafe URL"
+									},
+									languageV2: null,
+									image: null,
+									primaryOccupations: [],
+									siteUrl: "javascript:alert(1)"
+								}
+							}],
+							lengths: null
+						}
+					}
+				}
+			}
+		}))
+
+		await expect(getAniListStatisticsResponse(publicAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 502,
+			data: {
+				code: "ANILIST_INVALID_DATA"
+			}
+		})
 	})
 
 	it("returns only validated activities with bounded pagination", async () => {

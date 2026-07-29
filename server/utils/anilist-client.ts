@@ -215,6 +215,35 @@ const STATISTICS_QUERY = `
 						mediaIds
 						studio { id name isAnimationStudio }
 					}
+					voiceActors(limit: 100, sort: COUNT_DESC) {
+						count
+						meanScore
+						minutesWatched
+						mediaIds
+						characterIds
+						voiceActor {
+							id
+							name { full native userPreferred }
+							languageV2
+							image { large medium }
+							primaryOccupations
+							siteUrl
+						}
+					}
+					staff(limit: 100, sort: COUNT_DESC) {
+						count
+						meanScore
+						minutesWatched
+						mediaIds
+						staff {
+							id
+							name { full native userPreferred }
+							languageV2
+							image { large medium }
+							primaryOccupations
+							siteUrl
+						}
+					}
 					lengths { length count meanScore minutesWatched mediaIds }
 				}
 			}
@@ -643,6 +672,19 @@ function statisticGroupSchema<T extends z.ZodRawShape>(shape: T) {
 		.nullable()
 }
 
+const statisticStaffSchema = z.object({
+	id: z.number().int().positive(),
+	name: z.object({
+		full: z.string().min(1).max(300).nullable(),
+		native: z.string().min(1).max(300).nullable(),
+		userPreferred: z.string().min(1).max(300).nullable()
+	}).nullable(),
+	languageV2: z.string().max(100).nullable(),
+	image: imageSchema.nullable(),
+	primaryOccupations: z.array(z.string().max(200).nullable()).max(100).nullable(),
+	siteUrl: httpUrlSchema.nullable()
+})
+
 const statisticsSchema = z.object({
 	count: z.number().int().nonnegative(),
 	meanScore: z.number(),
@@ -669,6 +711,13 @@ const statisticsSchema = z.object({
 			name: z.string().min(1).max(200),
 			isAnimationStudio: z.boolean()
 		}).nullable()
+	}),
+	voiceActors: statisticGroupSchema({
+		voiceActor: statisticStaffSchema.nullable(),
+		characterIds: z.array(z.number().int().positive().nullable()).max(50_000)
+	}),
+	staff: statisticGroupSchema({
+		staff: statisticStaffSchema.nullable()
 	}),
 	lengths: statisticGroupSchema({ length: z.string().max(100).nullable() })
 })
@@ -1215,6 +1264,27 @@ function boundedGroup<T extends { mediaIds: Array<number | null> }>(
 function normalizeStatistics(
 	statistics: z.infer<typeof statisticsSchema>
 ): AniListStatistics {
+	const normalizePerson = (person: z.infer<typeof statisticStaffSchema>) => ({
+		id: person.id,
+		name: person.name,
+		language: person.languageV2,
+		image: person.image,
+		primaryOccupations: (person.primaryOccupations ?? [])
+			.filter((occupation): occupation is string => occupation !== null),
+		siteUrl: person.siteUrl
+	})
+	const voiceActors = boundedGroup(statistics.voiceActors).map(item => ({
+		...item,
+		voiceActor: item.voiceActor ? normalizePerson(item.voiceActor) : null,
+		characterIds: item.characterIds
+			.filter((characterId): characterId is number => characterId !== null)
+			.slice(0, MAX_MEDIA_IDS_PER_STATISTIC)
+	}))
+	const staff = boundedGroup(statistics.staff).map(item => ({
+		...item,
+		staff: item.staff ? normalizePerson(item.staff) : null
+	}))
+
 	return {
 		...statistics,
 		statuses: boundedGroup(statistics.statuses),
@@ -1226,6 +1296,8 @@ function normalizeStatistics(
 		startYears: boundedGroup(statistics.startYears),
 		releaseYears: boundedGroup(statistics.releaseYears),
 		studios: boundedGroup(statistics.studios),
+		voiceActors,
+		staff,
 		lengths: boundedGroup(statistics.lengths)
 	}
 }

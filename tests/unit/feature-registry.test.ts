@@ -42,6 +42,11 @@ describe("feature registry", () => {
 		expect(canAccessFeature(FEATURE_ACCESS.oauth, "oauth")).toBe(true)
 	})
 
+	it("exposes the implemented people statistics views as beta features", () => {
+		expect(FEATURE_REGISTRY["statistics-voice-actors"].status).toBe("beta")
+		expect(FEATURE_REGISTRY["statistics-staff"].status).toBe("beta")
+	})
+
 	it("resolves dynamic navigation paths", () => {
 		expect(resolveFeaturePath("rewind", { year: 2026 })).toBe("/rewind/2026")
 		expect(() => resolveFeaturePath("rewind")).toThrowError(

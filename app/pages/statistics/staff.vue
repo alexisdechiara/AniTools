@@ -9,9 +9,9 @@ definePageMeta({
 </script>
 
 <template>
-	<StatisticsUnavailablePage
+	<StatisticsPeoplePage
 		page-id="statistics-staff"
 		title="Staff"
-		description="A future ranking of directors, writers and other staff behind your list."
-		required-data="The current allowlisted AniList response does not fetch media staff connections. This page stays explicit until a paginated, cached server query can supply complete credits."/>
+		description="Explore the directors, writers and other staff represented across your anime list."
+		kind="staff"/>
 </template>

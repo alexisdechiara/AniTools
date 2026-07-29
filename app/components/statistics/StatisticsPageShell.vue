@@ -6,8 +6,10 @@ const props = withDefaults(defineProps<{
 	title: string
 	description: string
 	loadData?: boolean
+	loadEntries?: boolean
 }>(), {
-	loadData: true
+	loadData: true,
+	loadEntries: true
 })
 
 const entriesStore = useEntriesStore()
@@ -28,15 +30,32 @@ const navigationItems = navigationIds.map(id => ({
 	...FEATURE_REGISTRY[id]
 }))
 const hasData = computed(() =>
-	entriesStore.isInitialized || statisticsStore.isInitialized
+	props.loadEntries
+		? entriesStore.isInitialized || statisticsStore.isInitialized
+		: statisticsStore.isInitialized
+)
+const pageLoading = computed(() =>
+	props.loadEntries ? loading.value : statisticsStore.loading
+)
+const pageError = computed(() =>
+	props.loadEntries ? error.value : statisticsStore.error
 )
 
 async function retry() {
-	await load(true)
+	if (props.loadEntries) {
+		await load(true)
+	} else {
+		await statisticsStore.fetchStatistics(true)
+	}
 }
 
 onMounted(() => {
-	if (props.loadData) void load()
+	if (!props.loadData) return
+	if (props.loadEntries) {
+		void load()
+	} else {
+		void statisticsStore.fetchStatistics()
+	}
 })
 </script>
 
@@ -71,10 +90,10 @@ onMounted(() => {
 				</nav>
 
 				<UAlert
-					v-if="loadData && error"
+					v-if="loadData && pageError"
 					icon="i-lucide-triangle-alert"
 					title="Statistics could not be fully loaded"
-					:description="error"
+					:description="pageError"
 					color="error"
 					variant="soft"
 					:actions="[{
@@ -85,7 +104,7 @@ onMounted(() => {
 					}]"/>
 
 				<div
-					v-if="loadData && loading && !hasData"
+					v-if="loadData && pageLoading && !hasData"
 					class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
 					aria-label="Loading statistics"
 					aria-busy="true">

@@ -48,6 +48,8 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	const tags = computed(() => statistics.value?.tags)
 	const countries = computed(() => statistics.value?.countries)
 	const studios = computed(() => statistics.value?.studios)
+	const voiceActors = computed(() => statistics.value?.voiceActors)
+	const staff = computed(() => statistics.value?.staff)
 	const formats = computed(() => statistics.value?.formats)
 	const lengths = computed(() => statistics.value?.lengths)
 
@@ -159,6 +161,8 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		tags,
 		countries,
 		studios,
+		voiceActors,
+		staff,
 		formats,
 		lengths,
 		genresSort,
