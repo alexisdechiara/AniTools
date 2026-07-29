@@ -13,7 +13,13 @@
 		"postinstall": "nuxt prepare",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"typecheck": "nuxt typecheck"
+		"typecheck": "nuxt typecheck",
+		"test": "bun run test:unit",
+		"test:unit": "vitest run",
+		"test:unit:watch": "vitest",
+		"test:unit:coverage": "vitest run --coverage",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui"
 	},
 	"dependencies": {
 		"@directus/sdk": "^23.0.0",
@@ -41,9 +47,12 @@
 	},
 	"devDependencies": {
 		"@nuxt/eslint": "^1.16.0",
+		"@playwright/test": "^1.62.0",
+		"@vitest/coverage-istanbul": "^4.1.10",
 		"eslint": "^10.8.0",
 		"eslint-plugin-tailwindcss": "^4.2.0",
 		"typescript": "^6.0.3",
+		"vitest": "^4.1.10",
 		"vue-tsc": "^3.3.8"
 	},
 	"overrides": {

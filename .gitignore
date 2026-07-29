@@ -13,6 +13,11 @@ node_modules
 logs
 *.log
 
+# Test outputs
+coverage
+playwright-report
+test-results
+
 # Misc
 .DS_Store
 .fleet
@@ -25,5 +30,3 @@ logs
 
 # VSC
 .history
-
-test.vue
