@@ -10,7 +10,7 @@ const { getAnimesByMediaIds } = useEntriesStore();
 const list = computed(() => {
   if (!statisticsStore.getSortedStudios(studiosSort.value)) return [];
   return statisticsStore.getSortedStudios(studiosSort.value).map((studio) => ({
-    name: studio?.studio?.name,
+    name: studio?.studio?.name ?? "Unknown studio",
     count: studio?.count,
     meanScore: studio?.meanScore,
     minutesWatched: studio?.minutesWatched,

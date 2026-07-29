@@ -11,7 +11,7 @@ const { getAnimesByMediaIds } = useEntriesStore();
 const list = computed(() => {
   if (!getSortedTags(tagsSort.value)) return [];
   return getSortedTags(tagsSort.value).map((tag) => ({
-    name: tag?.tag?.name,
+    name: tag?.tag?.name ?? "Unknown tag",
     count: tag?.count,
     meanScore: tag?.meanScore,
     minutesWatched: tag?.minutesWatched,

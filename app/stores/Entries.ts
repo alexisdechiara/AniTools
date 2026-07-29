@@ -2,7 +2,10 @@ import { ScoreFormat, MediaType } from "#gql/default"
 import { defineStore } from "pinia"
 import type { GetAllEntriesQuery } from "#gql/default"
 
-export type AnimesType = NonNullable<GetAllEntriesQuery["MediaListCollection"]>["lists"]
+type MediaListCollection = NonNullable<GetAllEntriesQuery["MediaListCollection"]>
+export type AnimesType = NonNullable<MediaListCollection["lists"]>
+type AnimeList = NonNullable<AnimesType[number]>
+export type AnimeListEntry = NonNullable<NonNullable<AnimeList["entries"]>[number]>
 
 export const useEntriesStore = defineStore("Entries", () => {
 	const user = useUserStore()

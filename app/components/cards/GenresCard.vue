@@ -10,7 +10,7 @@ const { getAnimesByMediaIds } = useEntriesStore();
 const list = computed(() => {
   if (!statisticsStore.getSortedGenres(genresSort.value)) return [];
   return statisticsStore.getSortedGenres(genresSort.value).map((genre) => ({
-    name: genre?.genre,
+    name: genre?.genre ?? "Unknown genre",
     count: genre?.count,
     meanScore: genre?.meanScore,
     minutesWatched: genre?.minutesWatched,

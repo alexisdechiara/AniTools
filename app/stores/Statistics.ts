@@ -1,9 +1,16 @@
 import { defineStore } from "pinia"
 import type { UserStatisticsQuery } from "#gql/default"
+import {
+	selectBestScoreAnime,
+	selectLongestWatchAnime,
+	selectMostRewatchedAnime,
+	sortStatistics
+} from "~/utils/statistics"
+import type { StatisticMetric as MetricSort } from "~/utils/statistics"
 
 type statistics = NonNullable<NonNullable<NonNullable<UserStatisticsQuery["User"]>["statistics"]>["anime"]>
 
-export type MetricSort = "count" | "meanScore" | "minutesWatched"
+export type { StatisticMetric as MetricSort } from "~/utils/statistics"
 
 export const useStatisticsStore = defineStore("Statistics", () => {
 	const { getAllAnimes: animes } = storeToRefs(useEntriesStore())
@@ -72,222 +79,39 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	}
 
 	function getSortedGenres(sort: MetricSort = genresSort.value, limit: number = 5) {
-		if (!genres.value) return []
-		let sortedGenres: statistics["genres"]
-		switch (sort) {
-			case "count":
-				sortedGenres = genres.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sortedGenres = genres.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sortedGenres = genres.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sortedGenres = genres.value
-				break
-		}
-		if (sortedGenres.length > limit)
-			return sortedGenres.slice(0, limit)
-		return sortedGenres
+		return sortStatistics(genres.value, sort, limit)
 	}
 
-	function getSortedTags(sort: MetricSort, limit: number = 5) {
-		if (!tags.value) return []
-		let sortedTags: statistics["tags"]
-		switch (sort) {
-			case "count":
-				sortedTags = tags.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sortedTags = tags.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sortedTags = tags.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sortedTags = tags.value
-				break
-		}
-		if (sortedTags.length > limit)
-			return sortedTags.slice(0, limit)
-		return sortedTags
+	function getSortedTags(sort: MetricSort = tagsSort.value, limit: number = 5) {
+		return sortStatistics(tags.value, sort, limit)
 	}
 
 	function getSortedFormats(sort: MetricSort = formatsSort.value, limit: number = 6) {
-		if (!formats.value) return []
-		let sorted: statistics["formats"]
-		switch (sort) {
-			case "count":
-				sorted = formats.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sorted = formats.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sorted = formats.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sorted = formats.value
-		}
-		if (sorted.length > limit)
-			return sorted.slice(0, limit)
-		return sorted
+		return sortStatistics(formats.value, sort, limit)
 	}
 
 	function getSortedCountries(sort: MetricSort = countriesSort.value, limit: number = 4) {
-		if (!countries.value) return []
-		let sorted: statistics["countries"]
-		switch (sort) {
-			case "count":
-				sorted = countries.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sorted = countries.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sorted = countries.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sorted = countries.value
-		}
-		if (sorted.length > limit)
-			return sorted.slice(0, limit)
-		return sorted
+		return sortStatistics(countries.value, sort, limit)
 	}
 
 	function getSortedStatus(sort: MetricSort = statusSort.value, limit: number = 5) {
-		if (!statuses.value) return []
-		let sorted: statistics["statuses"]
-		switch (sort) {
-			case "count":
-				sorted = statuses.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sorted = statuses.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sorted = statuses.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sorted = statuses.value
-		}
-		if (sorted.length > limit)
-			return sorted.slice(0, limit)
-		return sorted
+		return sortStatistics(statuses.value, sort, limit)
 	}
 
 	function getSortedStudios(sort: MetricSort = studiosSort.value, limit: number = 5) {
-		if (!studios.value) return []
-		let sortedStudios: statistics["studios"]
-		switch (sort) {
-			case "count":
-				sortedStudios = studios.value.sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
-				break
-			case "meanScore":
-				sortedStudios = studios.value.sort((a, b) => (b?.meanScore ?? 0) - (a?.meanScore ?? 0))
-				break
-			case "minutesWatched":
-				sortedStudios = studios.value.sort((a, b) => (b?.minutesWatched ?? 0) - (a?.minutesWatched ?? 0))
-				break
-			default:
-				sortedStudios = studios.value
-				break
-		}
-		if (sortedStudios.length > limit)
-			return sortedStudios.slice(0, limit)
-		return sortedStudios
+		return sortStatistics(studios.value, sort, limit)
 	}
 
-	// TODO : donner la licences au lieu de la saison
 	const getBestScoreAnime = computed(() => {
-		try {
-			if (!animes.value || animes.value.length === 0) return null
-
-			// Filtrer les entrées sans média ou sans score valide
-			const validAnimes = animes.value.filter(anime =>
-				anime?.media
-				&& (anime.score !== null && anime.score !== undefined)
-			)
-
-			if (validAnimes.length === 0) return null
-
-			// Trier d'abord par score décroissant, puis par isFavourite, puis par meanScore
-			const sortedAnimes = [...validAnimes].sort((a, b) => {
-				// S'assurer que les scores sont des nombres
-				const scoreA = Number(a?.score) || 0
-				const scoreB = Number(b?.score) || 0
-
-				// Comparaison des scores
-				const scoreDiff = scoreB - scoreA
-				if (scoreDiff !== 0) return scoreDiff
-
-				// En cas d'égalité, vérifier si l'un est favori et pas l'autre
-				const isFavA = a?.media?.isFavourite ? 1 : 0
-				const isFavB = b?.media?.isFavourite ? 1 : 0
-				const favDiff = isFavB - isFavA
-				if (favDiff !== 0) return favDiff
-
-				// Si toujours égalité, comparer les averageScore
-				const meanScoreA = Number(a?.media?.averageScore) || 0
-				const meanScoreB = Number(b?.media?.averageScore) || 0
-				return meanScoreB - meanScoreA
-			})
-
-			return sortedAnimes[0] || null
-		} catch (error) {
-			console.error("Error in getBestScoreAnime:", error)
-			return null
-		}
+		return selectBestScoreAnime(animes.value)
 	})
 
 	const getLongestAnime = computed(() => {
-		try {
-			if (!animes.value || animes.value.length === 0) return null
-
-			// Filtrer les entrées avec un progrès valide
-			const validAnimes = animes.value.filter(anime =>
-				!!anime?.media
-				&& (anime.progress !== null && anime.progress !== undefined && anime.progress > 0)
-			)
-
-			if (validAnimes.length === 0) return null
-
-			// Trier par progress décroissant
-			const sortedAnimes = [...validAnimes].sort((a, b) =>
-				(b?.progress ?? 0) - (a?.progress ?? 0)
-			)
-
-			return sortedAnimes[0] || null
-		} catch (error) {
-			console.error("Error in getLongestAnime:", error)
-			return null
-		}
+		return selectLongestWatchAnime(animes.value)
 	})
 
 	const getMostWatchedAnime = computed(() => {
-		try {
-			if (!animes.value || animes.value.length === 0) return null
-
-			// Filtrer les entrées avec un nombre de répétitions valide
-			const validAnimes = animes.value.filter(anime =>
-				!!anime?.media
-				&& (anime.repeat !== null && anime.repeat !== undefined && anime.repeat > 0)
-			)
-
-			if (validAnimes.length === 0) return null
-
-			// Trier par nombre de répétitions décroissant
-			const sortedAnimes = [...validAnimes].sort((a, b) =>
-				(b?.repeat ?? 0) - (a?.repeat ?? 0)
-			)
-
-			return sortedAnimes[0] || null
-		} catch (error) {
-			console.error("Error in getMostWatchedAnime:", error)
-			return null
-		}
+		return selectMostRewatchedAnime(animes.value)
 	})
 
 	function $reset() {

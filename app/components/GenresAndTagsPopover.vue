@@ -67,7 +67,9 @@ import type { listType } from "./cards/ListCard.vue";
 const props = defineProps<listType>();
 
 const items = computed(() => {
-  return props.entries?.map((entry: any) => entry.media) ?? [];
+  return props.entries
+    ?.map((entry) => entry.media)
+    .filter((media): media is NonNullable<typeof media> => media != null) ?? [];
 });
 </script>
 

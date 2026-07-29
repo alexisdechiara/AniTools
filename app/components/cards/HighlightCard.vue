@@ -4,7 +4,7 @@
       <div
         class="col-span-6 flex justify-center items-center h-full w-full max-w-50 relative"
       >
-        <template v-for="(anime, index) in highlitedAnimes" :key="anime.title">
+        <template v-for="(anime, index) in highlightedAnimes" :key="anime.title">
           <NuxtImg
             v-if="anime.src"
             v-show="index >= currentIndex"
@@ -44,6 +44,8 @@
             size="xs"
             color="neutral"
             variant="link"
+            aria-label="Previous highlight"
+            :disabled="currentIndex === 0"
             @click="currentIndex > 0 && currentIndex--"
             :ui="{ base: 'p-0 cursor-pointer' }"
           />
@@ -52,7 +54,9 @@
             size="xs"
             color="neutral"
             variant="link"
-            @click="currentIndex < highlitedAnimes.length - 1 && currentIndex++"
+            aria-label="Next highlight"
+            :disabled="currentIndex >= highlightedAnimes.length - 1"
+            @click="currentIndex < highlightedAnimes.length - 1 && currentIndex++"
             :ui="{ base: 'p-0 cursor-pointer' }"
           />
         </div>
@@ -62,6 +66,8 @@
 </template>
 
 <script lang="ts" setup>
+import { getEntryWatchMinutes } from "~/utils/statistics";
+
 const { getBestScoreAnime, getLongestAnime, getMostWatchedAnime } = storeToRefs(
   useStatisticsStore()
 );
@@ -74,54 +80,69 @@ type Highlight = {
 };
 
 const currentIndex = ref(0);
-const highlitedAnimes = ref<Highlight[]>([]);
+const highlightedAnimes = computed<Highlight[]>(() => {
+  const highlights: Highlight[] = [];
+  const bestScore = getBestScoreAnime.value;
+  const longest = getLongestAnime.value;
+  const mostRewatched = getMostWatchedAnime.value;
 
-if (getBestScoreAnime.value?.media) {
-  highlitedAnimes.value.push({
-    title: "Best score anime",
-    name:
-      getBestScoreAnime.value?.media?.title?.userPreferred ||
-      getBestScoreAnime.value?.media?.title?.english ||
-      "",
-    src:
-      getBestScoreAnime.value?.media?.coverImage?.extraLarge ||
-      getBestScoreAnime.value?.media?.coverImage?.large ||
-      getBestScoreAnime.value?.media?.coverImage?.medium,
-    value: getBestScoreAnime.value.score?.toString() || null,
-  });
-}
+  if (bestScore?.media) {
+    highlights.push({
+      title: "Best rated anime",
+      name:
+        bestScore.media.title?.userPreferred ||
+        bestScore.media.title?.english ||
+        bestScore.media.title?.romaji ||
+        "",
+      src:
+        bestScore.media.coverImage?.extraLarge ||
+        bestScore.media.coverImage?.large ||
+        bestScore.media.coverImage?.medium,
+      value: bestScore.score?.toString() ?? null,
+    });
+  }
 
-if (getLongestAnime.value?.media) {
-  highlitedAnimes.value.push({
-    title: "Longest time watched anime",
-    name:
-      getLongestAnime.value?.media?.title?.userPreferred ||
-      getLongestAnime.value?.media?.title?.english ||
-      "",
-    src:
-      getLongestAnime.value?.media?.coverImage?.extraLarge ||
-      getLongestAnime.value?.media?.coverImage?.large ||
-      getLongestAnime.value?.media?.coverImage?.medium,
-    value: formatWatchTime(
-      (getLongestAnime.value.progress ?? 0) * (getLongestAnime.value.media.duration ?? 0)
-    ),
-  });
-}
+  if (longest?.media) {
+    highlights.push({
+      title: "Longest watch time",
+      name:
+        longest.media.title?.userPreferred ||
+        longest.media.title?.english ||
+        longest.media.title?.romaji ||
+        "",
+      src:
+        longest.media.coverImage?.extraLarge ||
+        longest.media.coverImage?.large ||
+        longest.media.coverImage?.medium,
+      value: formatWatchTime(getEntryWatchMinutes(longest)),
+    });
+  }
 
-if (getMostWatchedAnime.value?.media) {
-  highlitedAnimes.value.push({
-    title: "Most watched anime",
-    name:
-      getMostWatchedAnime.value?.media?.title?.userPreferred ||
-      getMostWatchedAnime.value?.media?.title?.english ||
-      "",
-    src:
-      getMostWatchedAnime.value?.media?.coverImage?.extraLarge ||
-      getMostWatchedAnime.value?.media?.coverImage?.large ||
-      getMostWatchedAnime.value?.media?.coverImage?.medium,
-    value: getMostWatchedAnime.value?.repeat + " times",
-  });
-}
+  if (mostRewatched?.media) {
+    const repeats = mostRewatched.repeat ?? 0;
+    highlights.push({
+      title: "Most rewatched anime",
+      name:
+        mostRewatched.media.title?.userPreferred ||
+        mostRewatched.media.title?.english ||
+        mostRewatched.media.title?.romaji ||
+        "",
+      src:
+        mostRewatched.media.coverImage?.extraLarge ||
+        mostRewatched.media.coverImage?.large ||
+        mostRewatched.media.coverImage?.medium,
+      value: `${repeats} ${repeats === 1 ? "time" : "times"}`,
+    });
+  }
+
+  return highlights;
+});
+
+watch(highlightedAnimes, (highlights) => {
+  if (currentIndex.value >= highlights.length) {
+    currentIndex.value = Math.max(0, highlights.length - 1);
+  }
+});
 
 function indexToRotate(index: number): string {
   switch (index) {
@@ -137,7 +158,7 @@ function indexToRotate(index: number): string {
 }
 
 const currentHighlightedAnime = computed(() => {
-  return highlitedAnimes.value[currentIndex.value];
+  return highlightedAnimes.value[currentIndex.value];
 });
 </script>
 
