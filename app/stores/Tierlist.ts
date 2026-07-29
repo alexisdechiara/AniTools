@@ -1,22 +1,72 @@
-import { defineStore } from "pinia"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import { defaultTierlistTemplateIndex, tierlistTemplates } from "~/utils/tierlist-templates"
-import { colWidthToClass, gapSizeToClass, gapSizeToText, getTierlistNeutralBackgrounds, rowCornerToClass, nbColToClass, bodyColWidthToClass } from "~/utils/tierlist"
+import { defineStore } from "pinia"
+import type {
+	TierlistEntry,
+	TierlistImportResult,
+	TierlistLaneId,
+	TierlistMoveTarget,
+	TierlistSnapshot,
+	TierlistTier
+} from "~/types/tierlist"
+import {
+	MAX_TIERLIST_ENTRIES,
+	MAX_TIERLIST_ENTRIES_PER_LANE,
+	MAX_TIERLIST_TIERS,
+	createCustomTierId,
+	createTemplateTierId,
+	createTierlistSnapshot,
+	deserializeTierlistState,
+	formatMediaResultToTierlistEntry,
+	sanitizeTierlistEntry,
+	serializeTierlistState
+} from "~/utils/tierlist-model"
+import {
+	findMatchingTierIds,
+	findOverlappingTierRanges,
+	matchesTierlistImportFilters,
+	selectFranchiseRepresentatives
+} from "~/utils/tierlist-ranking"
+import {
+	bodyColWidthToClass,
+	colWidthToClass,
+	gapSizeToClass,
+	gapSizeToText,
+	getTierlistNeutralBackgrounds,
+	nbColToClass,
+	rowCornerToClass
+} from "~/utils/tierlist"
+import {
+	defaultTierlistTemplateIndex,
+	tierlistTemplates
+} from "~/utils/tierlist-templates"
 
-interface Tier {
-	name: string
-	color: string
-	range: Array<number>
-	entries: Array<unknown>
+function createTemplateTiers(templateIndex: number): TierlistTier[] {
+	const template = tierlistTemplates[templateIndex]
+	if (!template) return []
+
+	return template.value.map((tier, tierIndex) => ({
+		id: createTemplateTierId(templateIndex, tierIndex, tier.name),
+		name: tier.name,
+		color: tier.color,
+		range: [...tier.range],
+		entries: []
+	}))
+}
+
+function uniqueEntries(entries: TierlistEntry[]): TierlistEntry[] {
+	const mediaIds = new Set<number>()
+	return entries.filter((entry) => {
+		if (mediaIds.has(entry.media.id)) return false
+		mediaIds.add(entry.media.id)
+		return true
+	})
 }
 
 export const useTierlistStore = defineStore("tierlist", () => {
-	// State
 	const templates = ref(tierlistTemplates)
 	const currentTemplate = ref(defaultTierlistTemplateIndex)
-	const tiers = ref<Tier[]>(templates.value[currentTemplate.value]?.value.map(t => ({ ...t, entries: [] })) ?? [])
-
-	const unrankedTier = ref<unknown[]>([])
+	const tiers = ref<TierlistTier[]>(createTemplateTiers(currentTemplate.value))
+	const unrankedTier = ref<TierlistEntry[]>([])
 
 	const gapSize = ref(25)
 	const headingCorner = ref(true)
@@ -32,434 +82,377 @@ export const useTierlistStore = defineStore("tierlist", () => {
 	const filterScore = ref<[number, number]>([0, 100])
 
 	const colorMode = useColorMode()
-	const selectedBackground = ref(colorMode.value === "dark" ? "bg-neutral-900" : "bg-neutral-100")
+	const selectedBackground = ref(
+		colorMode.value === "dark" ? "bg-neutral-900" : "bg-neutral-100"
+	)
 
-	// Getters
-	const neutralBackgrounds = computed(() => {
-		return getTierlistNeutralBackgrounds(colorMode.value === "dark" ? "dark" : "light")
-	})
-
+	const neutralBackgrounds = computed(() =>
+		getTierlistNeutralBackgrounds(colorMode.value === "dark" ? "dark" : "light")
+	)
 	const gapSizeText = computed(() => gapSizeToText(gapSize.value))
 	const gapSizeClass = computed(() => gapSizeToClass(gapSize.value))
 	const rowCornerClass = computed(() => rowCornerToClass(rowCorner.value))
 	const colWidthClass = computed(() => colWidthToClass(colWidth.value))
 	const bodyColWidthClass = computed(() => bodyColWidthToClass(colWidth.value))
 	const nbColClass = computed(() => nbColToClass(nbCol.value))
+	const entryCount = computed(() =>
+		unrankedTier.value.length
+		+ tiers.value.reduce((total, tier) => total + tier.entries.length, 0)
+	)
 
-	// Actions
-	function setBackground(color: string) {
+	function setBackground(color: string): void {
 		selectedBackground.value = color
 	}
 
-	function setGapSize(size: number) {
+	function setGapSize(size: number): void {
 		gapSize.value = size
 	}
 
-	function setHeadingCorner(enabled: boolean) {
+	function setHeadingCorner(enabled: boolean): void {
 		headingCorner.value = enabled
 	}
 
-	function setRowCorner(corner: number) {
+	function setRowCorner(corner: number): void {
 		rowCorner.value = corner
 	}
 
-	function setColWidth(width: number) {
+	function setColWidth(width: number): void {
 		colWidth.value = width
 	}
 
-	function setFilterScore(range: [number, number]) {
+	function setFilterScore(range: [number, number]): void {
 		filterScore.value = range
 	}
 
-	function setDefaultBackgroundForTheme() {
-		selectedBackground.value = colorMode.value === "dark" ? "bg-neutral-900" : "bg-neutral-100"
+	function setDefaultBackgroundForTheme(): void {
+		selectedBackground.value = colorMode.value === "dark"
+			? "bg-neutral-900"
+			: "bg-neutral-100"
 	}
 
-	function addEntryToUnrankedTier(entry: unknown) {
+	function laneEntries(laneId: TierlistLaneId): TierlistEntry[] | null {
+		if (laneId === "unranked") return unrankedTier.value
+		return tiers.value.find(tier => tier.id === laneId)?.entries ?? null
+	}
+
+	function hasEntry(mediaId: number, laneId?: TierlistLaneId): boolean {
+		if (laneId) {
+			return laneEntries(laneId)?.some(entry => entry.media.id === mediaId) ?? false
+		}
+		return unrankedTier.value.some(entry => entry.media.id === mediaId)
+			|| tiers.value.some(tier => tier.entries.some(entry => entry.media.id === mediaId))
+	}
+
+	function addEntryToUnrankedTier(input: unknown, allowDuplicate = false): boolean {
+		const entry = sanitizeTierlistEntry(input)
+		if (!entry) return false
+		if (unrankedTier.value.length >= MAX_TIERLIST_ENTRIES_PER_LANE) return false
+		if (entryCount.value >= MAX_TIERLIST_ENTRIES) return false
+		if (!allowDuplicate && hasEntry(entry.media.id)) return false
+		if (hasEntry(entry.media.id, "unranked")) return false
+
 		unrankedTier.value.push(entry)
+		return true
 	}
 
-	function changeTemplate(index: number) {
-		const tpl = templates.value[index]
-		if (!tpl) return
+	function addEntryToLane(input: unknown, laneId: TierlistLaneId): boolean {
+		if (laneId === "unranked") return addEntryToUnrankedTier(input)
+		const entry = sanitizeTierlistEntry(input)
+		const tier = tiers.value.find(candidate => candidate.id === laneId)
+		if (!entry || !tier) return false
+		return addEntryToTier(tier, entry, false)
+	}
+
+	function addEntryToTier(
+		tier: TierlistTier,
+		entry: TierlistEntry,
+		allowDuplicateAcrossLanes: boolean
+	): boolean {
+		if (tier.entries.length >= MAX_TIERLIST_ENTRIES_PER_LANE) return false
+		if (entryCount.value >= MAX_TIERLIST_ENTRIES) return false
+		if (tier.entries.some(existing => existing.media.id === entry.media.id)) return false
+		if (!allowDuplicateAcrossLanes && hasEntry(entry.media.id)) return false
+		tier.entries.push(entry)
+		return true
+	}
+
+	function changeTemplate(index: number): void {
+		if (!templates.value[index]) return
+		const allEntries = uniqueEntries([
+			...unrankedTier.value,
+			...tiers.value.flatMap(tier => tier.entries)
+		])
 		currentTemplate.value = index
-		const newTiers: Tier[] = tpl.value.map(t => ({ ...t, entries: [] }))
-		const allEntries = [...unrankedTier.value, ...tiers.value.flatMap(t => t.entries)]
-		unrankedTier.value = allEntries
-		tiers.value = newTiers
+		tiers.value = createTemplateTiers(index)
+		unrankedTier.value = allEntries.slice(0, MAX_TIERLIST_ENTRIES_PER_LANE)
 	}
 
-	function addTier() {
-		tiers.value.push({ name: "New tier", color: "bg-neutral-500", range: [0, 0], entries: [] })
+	function addTier(): void {
+		if (tiers.value.length >= MAX_TIERLIST_TIERS) return
+		tiers.value.push({
+			id: createCustomTierId(),
+			name: "New tier",
+			color: "#737373",
+			range: [0, 0],
+			entries: []
+		})
+		currentTemplate.value = -1
 	}
 
-	function removeTier(index: number) {
-		if (index >= 0 && index < tiers.value.length) {
-			// Déplacer les entrées du tier supprimé vers unranked
-			const tierToRemove = tiers.value[index]
-			unrankedTier.value.push(...tierToRemove?.entries ?? [])
-			tiers.value.splice(index, 1)
-		}
+	function removeTier(index: number): void {
+		const tier = tiers.value[index]
+		if (!tier) return
+
+		const mergedEntries = uniqueEntries([...unrankedTier.value, ...tier.entries])
+			.slice(0, MAX_TIERLIST_ENTRIES_PER_LANE)
+		unrankedTier.value = mergedEntries
+		tiers.value.splice(index, 1)
+		currentTemplate.value = -1
 	}
 
-	function moveTierUp(index: number) {
-		if (index > 0 && index < tiers.value.length) {
-			// Échanger le tier avec celui du dessus
-			const tier = tiers.value[index]
-			if (tier) {
-				tiers.value.splice(index, 1)
-				tiers.value.splice(index - 1, 0, tier)
-			}
-		}
+	function moveTierUp(index: number): void {
+		const tier = tiers.value[index]
+		if (!tier || index <= 0) return
+		tiers.value.splice(index, 1)
+		tiers.value.splice(index - 1, 0, tier)
+		currentTemplate.value = -1
 	}
 
-	function moveTierDown(index: number) {
-		if (index >= 0 && index < tiers.value.length - 1) {
-			// Échanger le tier avec celui du dessous
-			const tier = tiers.value[index]
-			if (tier) {
-				tiers.value.splice(index, 1)
-				tiers.value.splice(index + 1, 0, tier)
-			}
-		}
+	function moveTierDown(index: number): void {
+		const tier = tiers.value[index]
+		if (!tier || index >= tiers.value.length - 1) return
+		tiers.value.splice(index, 1)
+		tiers.value.splice(index + 1, 0, tier)
+		currentTemplate.value = -1
 	}
 
-	async function addAnime(item: CommandPaletteItem) {
+	async function addAnime(item: CommandPaletteItem): Promise<boolean> {
+		const mediaId = typeof item.id === "number" ? item.id : Number(item.id)
+		if (!Number.isInteger(mediaId) || mediaId <= 0) return false
+
 		const userStore = useUserStore()
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
-		if (getAllAnimes.value.some(entry => entry?.media?.id === item.id)) {
-			console.log("Anime already in list", item.id)
-			addEntryToUnrankedTier(getAllAnimes.value.find(entry => entry?.media?.id === item.id)!)
-		} else {
-			const { data } = await useAsyncGql({
-				operation: "getMediaById",
-				variables: { mediaId: item.id, scoreFormat: userStore.mediaListOptions.scoreFormat }
-			})
-			console.log("Anime added", formatMediaToEntry(data.value))
-			addEntryToUnrankedTier(formatMediaToEntry(data.value))
-		}
+		const existingEntry = getAllAnimes.value.find(entry => entry?.media?.id === mediaId)
+		if (existingEntry) return addEntryToUnrankedTier(existingEntry)
+
+		const { data } = await useAsyncGql({
+			operation: "getMediaById",
+			variables: {
+				mediaId,
+				scoreFormat: userStore.mediaListOptions.scoreFormat
+			}
+		})
+		const entry = formatMediaResultToTierlistEntry(data.value)
+		return entry ? addEntryToUnrankedTier(entry) : false
+	}
+
+	function getExistingMediaIds(): Set<number> {
+		return new Set([
+			...unrankedTier.value,
+			...tiers.value.flatMap(tier => tier.entries)
+		].map(entry => entry.media.id))
 	}
 
 	function importAnimesFromEntries(
 		autoRank: boolean,
 		scoreRange: [number, number],
-		status: string[] = [],
+		statuses: string[] = [],
 		genres: string[] = [],
 		years: number[] = [],
 		seasons: string[] = [],
 		formats: string[] = [],
 		isFranchise = false,
 		allowDuplicates = false
-	) {
+	): TierlistImportResult {
 		const entriesStore = useEntriesStore()
 		const { getAllAnimes, isInitialized } = storeToRefs(entriesStore)
-
-		const normalize = (v: unknown) => String(v ?? "").trim().toLowerCase()
-		if (isFranchise) {
-			years = []
-			seasons = []
-			formats = []
+		if (!isInitialized.value) {
+			return { added: 0, skipped: 0, truncated: false }
 		}
 
-		const normalizedStatus = status.map(normalize)
-		const normalizedGenres = genres.map(normalize)
-		const normalizedFormats = formats.map(normalize)
-		const normalizedSeasons = (seasons as unknown[]).map((s) => {
-			if (typeof s === "object" && s !== null && "value" in s) {
-				return normalize((s as { value?: unknown }).value)
-			}
-			return normalize(s)
-		})
-
-		console.log("Import started:", { autoRank, scoreRange, isFranchise })
-		console.log("Entries initialized:", isInitialized.value)
-		console.log("All animes count:", getAllAnimes.value.length)
-
-		// Vérifier si les données sont chargées
-		if (!isInitialized.value || getAllAnimes.value.length === 0) {
-			console.warn("No animes available for import. Make sure the entries store is initialized.")
-			return
-		}
-
-		// Récupérer tous les IDs déjà présents dans les tiers et unranked
-		const existingIds = new Set<number>()
-		tiers.value.forEach((tier) => {
-			tier.entries.forEach((entry) => {
-				const mediaId = (entry as any)?.media?.id
-				if (mediaId) {
-					existingIds.add(mediaId)
-				}
+		const allEntries = getAllAnimes.value
+			.map(sanitizeTierlistEntry)
+			.filter((entry): entry is TierlistEntry => entry !== null)
+		const existingIds = getExistingMediaIds()
+		const effectiveYears = isFranchise ? [] : years
+		const effectiveSeasons = isFranchise ? [] : seasons
+		const effectiveFormats = isFranchise ? [] : formats
+		const candidates = allEntries.filter(entry =>
+			!existingIds.has(entry.media.id)
+			&& matchesTierlistImportFilters(entry, {
+				score: scoreRange,
+				statuses,
+				genres,
+				years: effectiveYears,
+				seasons: effectiveSeasons,
+				formats: effectiveFormats
 			})
-		})
-		unrankedTier.value.forEach((entry) => {
-			const mediaId = (entry as any)?.media?.id
-			if (mediaId) {
-				existingIds.add(mediaId)
-			}
-		})
+		)
+		const selectedEntries = isFranchise
+			? selectFranchiseRepresentatives(allEntries, candidates)
+			: candidates
+		const remainingCapacity = Math.max(0, MAX_TIERLIST_ENTRIES - entryCount.value)
+		const entriesToImport = selectedEntries.slice(0, remainingCapacity)
 
-		console.log("Existing entries count:", existingIds.size)
+		const added = autoRank
+			? rankEntries(entriesToImport, allowDuplicates)
+			: entriesToImport.reduce(
+				(total, entry) => total + (addEntryToUnrankedTier(entry) ? 1 : 0),
+				0
+			)
 
-		// Filtrer les animes par score range ET par tous les filtres
-		const filteredAnimes = getAllAnimes.value.filter((entry) => {
-			const score = entry?.score || 0
-			const inRange = score >= scoreRange[0] && score <= scoreRange[1]
-			const mediaId = entry?.media?.id
-			const notDuplicate = mediaId && !existingIds.has(mediaId)
-
-			// Filtrage par status
-			const entryStatus = normalize(entry?.status)
-			const statusMatch = normalizedStatus.length === 0 || normalizedStatus.includes(entryStatus)
-
-			// Filtrage par genres
-			const genresMatch
-				= normalizedGenres.length === 0 || (entry?.media?.genres?.some((genre: unknown) => {
-					if (typeof genre === "object" && genre !== null && "name" in genre) {
-						return normalizedGenres.includes(normalize((genre as { name?: unknown }).name))
-					}
-					return normalizedGenres.includes(normalize(genre))
-				}) || false)
-
-			// Filtrage par years
-			const yearMatch = years.length === 0 || (entry?.media?.startDate?.year && years.includes(entry.media.startDate.year))
-
-			// Filtrage par seasons
-			const entrySeason = normalize(entry?.media?.season)
-			const seasonMatch = normalizedSeasons.length === 0 || (entrySeason && normalizedSeasons.includes(entrySeason))
-
-			// Filtrage par formats
-			const entryFormat = normalize(entry?.media?.format)
-			const formatMatch = normalizedFormats.length === 0 || (entryFormat && normalizedFormats.includes(entryFormat))
-
-			const matchesAllFilters = inRange && notDuplicate && statusMatch && genresMatch && yearMatch && seasonMatch && formatMatch
-
-			console.log(`Anime: ${entry?.media?.title?.romaji}, Score: ${score}, Status: ${entry?.status}, In range: ${inRange}, Status match: ${statusMatch}, Genres match: ${genresMatch}, Year match: ${yearMatch}, Season match: ${seasonMatch}, Format match: ${formatMatch}, All filters match: ${matchesAllFilters}`)
-			return matchesAllFilters
-		})
-
-		let animesToImport: unknown[] = filteredAnimes
-
-		if (isFranchise) {
-			const byMediaId = new Map<number, unknown>()
-			for (const e of getAllAnimes.value) {
-				const id = e?.media?.id
-				if (typeof id === "number") byMediaId.set(id, e)
-			}
-
-			const filteredIds = new Set<number>()
-			for (const e of filteredAnimes) {
-				const id = (e as any)?.media?.id
-				if (typeof id === "number") filteredIds.add(id)
-			}
-
-			const rootCache = new Map<number, number>()
-			const getPrequelId = (e: unknown): number | null => {
-				const edges = (e as any)?.media?.relations?.edges
-				if (!Array.isArray(edges)) return null
-				const prequel = edges.find((ed: unknown) => normalize((ed as any)?.relationType) === "prequel")
-				const pid = prequel?.node?.id
-				return typeof pid === "number" ? pid : null
-			}
-
-			const getRootId = (mediaId: number): number => {
-				const cached = rootCache.get(mediaId)
-				if (cached) return cached
-				let current = mediaId
-				const seen = new Set<number>()
-				while (!seen.has(current)) {
-					seen.add(current)
-					const currentEntry = byMediaId.get(current)
-					const prequelId = currentEntry ? getPrequelId(currentEntry) : null
-					if (!prequelId) break
-					if (!byMediaId.has(prequelId)) break
-					current = prequelId
-				}
-				rootCache.set(mediaId, current)
-				return current
-			}
-
-			const getEarliestMatchingId = (mediaId: number): { rootId: number, representativeId: number } => {
-				let current = mediaId
-				let representative = mediaId
-				const seen = new Set<number>()
-				while (!seen.has(current)) {
-					seen.add(current)
-					if (filteredIds.has(current)) representative = current
-					const currentEntry = byMediaId.get(current)
-					const prequelId = currentEntry ? getPrequelId(currentEntry) : null
-					if (!prequelId) break
-					if (!byMediaId.has(prequelId)) break
-					current = prequelId
-				}
-				const rootId = getRootId(mediaId)
-				return { rootId, representativeId: representative }
-			}
-
-			const chosenByRoot = new Map<number, unknown>()
-			for (const entry of filteredAnimes) {
-				const mid = (entry as any)?.media?.id
-				if (typeof mid !== "number") continue
-				const { rootId, representativeId } = getEarliestMatchingId(mid)
-				if (existingIds.has(representativeId)) continue
-				if (!chosenByRoot.has(rootId)) {
-					const repEntry = byMediaId.get(representativeId)
-					if (repEntry) chosenByRoot.set(rootId, repEntry)
-				}
-			}
-
-			animesToImport = [...chosenByRoot.values()]
+		return {
+			added,
+			skipped: Math.max(0, candidates.length - added),
+			truncated: selectedEntries.length > entriesToImport.length || added < entriesToImport.length
 		}
-
-		console.log("Filtered animes count (no duplicates):", filteredAnimes.length)
-		console.log("Animes to import count:", animesToImport.length)
-
-		if (autoRank) {
-			// Utiliser la fonction factorisée pour placer automatiquement
-			rankEntries(animesToImport, allowDuplicates)
-		} else {
-			// Ajouter tout au unranked tier
-			animesToImport.forEach((entry) => {
-				addEntryToUnrankedTier(entry)
-				console.log(`Added to unranked: ${(entry as any)?.media?.title?.romaji}`)
-			})
-		}
-
-		console.log("Import completed")
 	}
 
-	function rankEntries(entries: unknown[], allowDuplicates = false) {
-		console.log(`Ranking ${entries.length} entries...`)
+	function rankEntries(inputs: unknown[], allowDuplicates = false): number {
+		const entries = inputs
+			.map(sanitizeTierlistEntry)
+			.filter((entry): entry is TierlistEntry => entry !== null)
+		if (entries.length === 0) return 0
 
-		if (entries.length === 0) {
-			console.log("No entries to rank")
-			return
-		}
-
-		// Vérifier les incohérences dans les ranges
 		const overlappingRanges = checkOverlappingRanges()
-
 		if (overlappingRanges.length > 0 && !allowDuplicates) {
-			console.warn("Overlapping ranges detected:", overlappingRanges)
-			// La popup sera gérée au niveau du composant
 			throw new Error("OVERLAPPING_RANGES")
 		}
 
-		// Placer chaque entrée dans le(s) tier(s) approprié(s) selon son score
-		entries.forEach((entry) => {
-			const score = (entry as any)?.score || 0
-			const matchingTiers = tiers.value.filter(tier =>
-				tier && tier.range && score >= (tier.range[0] || 0) && score <= (tier.range[1] || 100)
-			)
+		let rankedCount = 0
+		for (const entry of entries) {
+			const matchingIds = findMatchingTierIds(entry, tiers.value)
+			const matchingTiers = matchingIds
+				.map(id => tiers.value.find(tier => tier.id === id))
+				.filter((tier): tier is TierlistTier => tier !== undefined)
 
-			console.log(`Ranking: ${(entry as any)?.media?.title?.romaji}, Score: ${score}, Matching tiers: ${matchingTiers.map(t => t.name).join(", ")}`)
-
-			if (matchingTiers.length > 0) {
-				if (matchingTiers.length > 1 && allowDuplicates) {
-					// Dupliquer l'entrée dans tous les tiers correspondants
-					matchingTiers.forEach((tier) => {
-						// Vérifier si l'entrée n'existe pas déjà dans ce tier
-						const entryId = (entry as any)?.media?.id
-						const alreadyExists = tier.entries.some((existingEntry: any) =>
-							(existingEntry as any)?.media?.id === entryId
-						)
-
-						if (!alreadyExists) {
-							tier.entries.push(entry)
-							console.log(`Added to tier: ${tier.name}`)
-						} else {
-							console.log(`Entry already exists in tier: ${tier.name}, skipping`)
-						}
-					})
-				} else if (matchingTiers.length === 1) {
-					// Ajouter au seul tier correspondant
-					const targetTier = matchingTiers[0]
-					if (targetTier) {
-						// Vérifier si l'entrée n'existe pas déjà dans ce tier
-						const entryId = (entry as any)?.media?.id
-						const alreadyExists = targetTier.entries.some((existingEntry: any) =>
-							(existingEntry as any)?.media?.id === entryId
-						)
-
-						if (!alreadyExists) {
-							targetTier.entries.push(entry)
-							console.log(`Added to tier: ${targetTier.name}`)
-						} else {
-							console.log(`Entry already exists in tier: ${targetTier.name}, skipping`)
-						}
-					}
-				} else {
-					// Plusieurs tiers mais pas de duplication autorisée, ajouter à unranked
-					addEntryToUnrankedTier(entry)
-					console.log(`Multiple matching tiers but no duplicates allowed, kept in unranked`)
+			if (matchingTiers.length === 1) {
+				if (addEntryToTier(matchingTiers[0]!, entry, false)) rankedCount += 1
+			} else if (matchingTiers.length > 1 && allowDuplicates) {
+				if (entryCount.value + matchingTiers.length > MAX_TIERLIST_ENTRIES) {
+					continue
 				}
-			} else {
-				// Si aucun tier ne correspond, ajouter à unranked
-				addEntryToUnrankedTier(entry)
-				console.log(`No matching tier found for ${(entry as any)?.media?.title?.romaji}, kept in unranked`)
-			}
-		})
-
-		console.log("Ranking completed")
-	}
-
-	function checkOverlappingRanges(): string[] {
-		const overlaps: string[] = []
-
-		for (let i = 0; i < tiers.value.length; i++) {
-			for (let j = i + 1; j < tiers.value.length; j++) {
-				const tier1 = tiers.value[i]
-				const tier2 = tiers.value[j]
-
-				if (tier1?.range && tier2?.range) {
-					const range1Start = tier1.range[0] || 0
-					const range1End = tier1.range[1] || 100
-					const range2Start = tier2.range[0] || 0
-					const range2End = tier2.range[1] || 100
-
-					// Vérifier si les ranges se chevauchent
-					if (!(range1End < range2Start || range2End < range1Start)) {
-						overlaps.push(`${tier1.name} (${range1Start}-${range1End}) overlaps with ${tier2.name} (${range2Start}-${range2End})`)
-					}
+				let added = false
+				for (const tier of matchingTiers) {
+					added = addEntryToTier(tier, entry, true) || added
 				}
+				if (added) rankedCount += 1
+			} else if (addEntryToUnrankedTier(entry)) {
+				rankedCount += 1
 			}
 		}
 
-		return overlaps
+		return rankedCount
 	}
 
-	function autoRankAll() {
-		console.log("Auto-ranking all entries...")
+	function checkOverlappingRanges(): string[] {
+		return findOverlappingTierRanges(tiers.value)
+	}
 
-		// Récupérer toutes les entrées du unranked tier
-		const entriesToRank = [...unrankedTier.value]
-
-		// Vider le unranked tier
+	function autoRankAll(allowDuplicates = false): void {
+		const overlaps = checkOverlappingRanges()
+		if (overlaps.length > 0 && !allowDuplicates) {
+			throw new Error("OVERLAPPING_RANGES")
+		}
+		const entriesToRank = uniqueEntries([
+			...unrankedTier.value,
+			...tiers.value.flatMap(tier => tier.entries)
+		])
 		unrankedTier.value = []
-
-		// Utiliser la fonction factorisée
-		rankEntries(entriesToRank)
+		for (const tier of tiers.value) tier.entries = []
+		rankEntries(entriesToRank, allowDuplicates)
 	}
 
-	function unrankAll() {
-		console.log("Unranking all entries...")
+	function unrankAll(): void {
+		unrankedTier.value = uniqueEntries([
+			...unrankedTier.value,
+			...tiers.value.flatMap(tier => tier.entries)
+		]).slice(0, MAX_TIERLIST_ENTRIES_PER_LANE)
+		for (const tier of tiers.value) tier.entries = []
+	}
 
-		// Récupérer toutes les entrées de tous les tiers
-		const allEntries: unknown[] = []
+	function removeEntry(mediaId: number, laneId: TierlistLaneId): TierlistEntry | null {
+		const entries = laneEntries(laneId)
+		if (!entries) return null
+		const index = entries.findIndex(entry => entry.media.id === mediaId)
+		if (index < 0) return null
+		return entries.splice(index, 1)[0] ?? null
+	}
 
-		tiers.value.forEach((tier) => {
-			const entries = [...tier.entries]
-			allEntries.push(...entries)
-			tier.entries = [] // Vider le tier
+	function moveEntry(
+		mediaId: number,
+		fromLaneId: TierlistLaneId,
+		toLaneId: TierlistLaneId
+	): boolean {
+		if (fromLaneId === toLaneId) return false
+		const targetEntries = laneEntries(toLaneId)
+		if (!targetEntries || targetEntries.length >= MAX_TIERLIST_ENTRIES_PER_LANE) return false
+		if (targetEntries.some(entry => entry.media.id === mediaId)) return false
+
+		const entry = removeEntry(mediaId, fromLaneId)
+		if (!entry) return false
+		targetEntries.push(entry)
+		return true
+	}
+
+	function reorderEntry(mediaId: number, laneId: TierlistLaneId, direction: -1 | 1): boolean {
+		const entries = laneEntries(laneId)
+		if (!entries) return false
+		const currentIndex = entries.findIndex(entry => entry.media.id === mediaId)
+		const targetIndex = currentIndex + direction
+		if (currentIndex < 0 || targetIndex < 0 || targetIndex >= entries.length) return false
+		const entry = entries.splice(currentIndex, 1)[0]
+		if (!entry) return false
+		entries.splice(targetIndex, 0, entry)
+		return true
+	}
+
+	function getMoveTargets(currentLaneId: TierlistLaneId): TierlistMoveTarget[] {
+		return [
+			...tiers.value.map(tier => ({ id: tier.id, label: tier.name })),
+			{ id: "unranked", label: "Unranked" }
+		].filter(target => target.id !== currentLaneId)
+	}
+
+	function getAdjacentLane(
+		currentLaneId: TierlistLaneId,
+		direction: -1 | 1
+	): TierlistLaneId | null {
+		const laneIds: TierlistLaneId[] = [...tiers.value.map(tier => tier.id), "unranked"]
+		const currentIndex = laneIds.indexOf(currentLaneId)
+		return laneIds[currentIndex + direction] ?? null
+	}
+
+	function applySnapshot(snapshot: TierlistSnapshot): void {
+		const normalized = createTierlistSnapshot(snapshot)
+		tiers.value = normalized.tiers
+		unrankedTier.value = normalized.unranked
+		currentTemplate.value = normalized.settings.currentTemplate
+		gapSize.value = normalized.settings.gapSize
+		headingCorner.value = normalized.settings.headingCorner
+		rowCorner.value = normalized.settings.rowCorner
+		colWidth.value = normalized.settings.colWidth
+		selectedBackground.value = normalized.settings.selectedBackground
+		nbCol.value = normalized.settings.nbCol
+	}
+
+	function getSnapshot(): TierlistSnapshot {
+		return createTierlistSnapshot({
+			tiers: tiers.value,
+			unranked: unrankedTier.value,
+			settings: {
+				currentTemplate: currentTemplate.value,
+				gapSize: gapSize.value,
+				headingCorner: headingCorner.value,
+				rowCorner: rowCorner.value,
+				colWidth: colWidth.value,
+				selectedBackground: selectedBackground.value,
+				nbCol: nbCol.value
+			}
 		})
-
-		// Ajouter toutes les entrées au unranked tier
-		unrankedTier.value.push(...allEntries)
-
-		console.log(`Unranked ${allEntries.length} entries`)
 	}
 
 	return {
-		// State
 		templates,
 		currentTemplate,
 		tiers,
@@ -476,8 +469,6 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		filterFormats,
 		filterScore,
 		nbCol,
-
-		// Getters
 		neutralBackgrounds,
 		gapSizeText,
 		gapSizeClass,
@@ -485,8 +476,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		colWidthClass,
 		bodyColWidthClass,
 		nbColClass,
-
-		// Actions
+		entryCount,
 		setBackground,
 		setGapSize,
 		setHeadingCorner,
@@ -495,6 +485,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		setFilterScore,
 		setDefaultBackgroundForTheme,
 		addEntryToUnrankedTier,
+		addEntryToLane,
 		changeTemplate,
 		addTier,
 		removeTier,
@@ -505,7 +496,14 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		rankEntries,
 		checkOverlappingRanges,
 		autoRankAll,
-		unrankAll
+		unrankAll,
+		removeEntry,
+		moveEntry,
+		reorderEntry,
+		getMoveTargets,
+		getAdjacentLane,
+		applySnapshot,
+		getSnapshot
 	}
 }, {
 	persist: {
@@ -520,6 +518,10 @@ export const useTierlistStore = defineStore("tierlist", () => {
 			"colWidth",
 			"selectedBackground",
 			"nbCol"
-		]
+		],
+		serializer: {
+			serialize: serializeTierlistState,
+			deserialize: deserializeTierlistState
+		}
 	}
 })

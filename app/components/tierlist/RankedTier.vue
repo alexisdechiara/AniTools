@@ -1,61 +1,105 @@
 <template>
-	<div class="grid grid-cols-12 min-h-28 w-full transition-all duration-200 relative group/row rounded-lg"
-		:class="[selectedBackground, rowCornerClass, (hoveredTarget?.id === `row-${index}` && hoveredTarget?.type === 'row') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background cursor-pointer' : '']"
-		@click.stop="selectItem" @mouseover.stop="setHovered(`row-${index}`, 'row', 'Tier Row')" @mouseleave="clearHovered">
-		<!-- Invisible absolute padding for easier hovering -->
+	<div
+		class="group/row relative flex min-h-28 w-full flex-col rounded-lg transition-all duration-200 sm:grid sm:grid-cols-12"
+		:class="[
+			selectedBackground,
+			rowCornerClass,
+			hoveredTarget?.id === `row-${tier.id}` && hoveredTarget?.type === 'row'
+				? 'cursor-pointer ring-2 ring-primary ring-offset-2 ring-offset-default'
+				: ''
+		]"
+		@click.stop="selectItem"
+		@mouseover.stop="setHovered(`row-${tier.id}`, 'row', 'Tier Row')"
+		@mouseleave="clearHovered">
 		<div v-if="isInspectorEnabled" class="absolute -inset-6 z-10" />
 		<div
-			class="relative z-20 text-inverted text-lg font-semibold size-full flex justify-center items-center group/control transition-all duration-200"
-			:class="[colWidthClass, headingCorner ? rowCornerClass : 'rounded-none', tier.color, (hoveredTarget?.id === `header-${index}` && hoveredTarget?.type === 'header') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '', isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']">
-
-			<!-- Header Interaction Hitbox -->
-			<div v-if="isInspectorEnabled" class="absolute left-2 right-0 inset-y-4 z-10 pointer-events-auto cursor-pointer"
-				@click.stop="selectItem" @mouseover.stop="setHovered(`header-${index}`, 'header', 'Tier Header')"
+			class="group/control relative z-20 flex size-full min-h-20 items-center justify-center text-lg font-semibold text-inverted transition-all duration-200"
+			:class="[
+				colWidthClass,
+				headingCorner ? rowCornerClass : 'rounded-none',
+				!isHexColor ? tier.color : '',
+				hoveredTarget?.id === `header-${tier.id}` && hoveredTarget?.type === 'header'
+					? 'ring-2 ring-primary ring-offset-2 ring-offset-default'
+					: '',
+				isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto'
+			]"
+			:style="isHexColor ? { backgroundColor: tier.color } : undefined">
+			<div
+				v-if="isInspectorEnabled"
+				class="pointer-events-auto absolute inset-y-4 right-0 left-2 z-10 cursor-pointer"
+				@click.stop="selectItem"
+				@mouseover.stop="setHovered(`header-${tier.id}`, 'header', 'Tier Header')"
 				@mouseleave="clearHovered" />
 
-			<UTextarea v-model.lazy="tierName" autoresize variant="none"
+			<UTextarea
+				v-model.lazy="tierName"
+				autoresize
+				variant="none"
+				:aria-label="`Name of tier ${tier.name}`"
 				:ui="{ root: 'size-full', base: 'text-center text-lg font-semibold text-inverted bg-transparent flex-wrap place-content-center' }" />
 			<div
-				class="absolute flex flex-col -left-8 h-full items-center justify-center opacity-0 hover:opacity-100 group-hover/control:opacity-100 transition-opacity pointer-events-auto z-20">
-				<UButton icon="i-lucide-chevron-up" color="neutral" variant="link" class="cursor-pointer text-highlighted"
-					@click="moveTierUp(index)" :disabled="isFirst" />
-				<UButton icon="i-lucide-grip-vertical" color="neutral" variant="link"
-					class="cursor-grab grip-handle text-highlighted active:cursor-grabbing" />
-				<UButton icon="i-lucide-chevron-down" color="neutral" variant="link" class="cursor-pointer text-highlighted"
-					@click="moveTierDown(index)" :disabled="isLast" />
+				class="absolute -left-8 z-20 flex h-full flex-col items-center justify-center opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within/control:opacity-100 sm:group-hover/control:opacity-100">
+				<UButton
+					icon="i-lucide-chevron-up"
+					color="neutral"
+					variant="link"
+					class="cursor-pointer text-highlighted"
+					:aria-label="`Move ${tier.name} up`"
+					:disabled="isFirst"
+					@click="moveTierUp(index)" />
+				<UButton
+					icon="i-lucide-grip-vertical"
+					color="neutral"
+					variant="link"
+					:aria-label="`Drag ${tier.name} tier`"
+					data-tier-handle
+					class="cursor-grab text-highlighted active:cursor-grabbing" />
+				<UButton
+					icon="i-lucide-chevron-down"
+					color="neutral"
+					variant="link"
+					class="cursor-pointer text-highlighted"
+					:aria-label="`Move ${tier.name} down`"
+					:disabled="isLast"
+					@click="moveTierDown(index)" />
 			</div>
 		</div>
-		<div class="col-span-11 w-full relative z-20"
-			:class="[(hoveredTarget?.id === `content-${index}` && hoveredTarget?.type === 'content') ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '', isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']">
-			<!-- Content Interaction Hitbox -->
-			<div v-if="isInspectorEnabled" class="absolute inset-y-6 left-0 right-8 z-10 pointer-events-auto cursor-pointer"
-				@click.stop="selectItem" @mouseover.stop="setHovered(`content-${index}`, 'content', 'Tier Content')"
+		<div
+			class="relative z-20 w-full"
+			:class="[
+				bodyColWidthClass,
+				hoveredTarget?.id === `content-${tier.id}` && hoveredTarget?.type === 'content'
+					? 'ring-2 ring-primary ring-offset-2 ring-offset-default'
+					: '',
+				isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto'
+			]">
+			<div
+				v-if="isInspectorEnabled"
+				class="pointer-events-auto absolute inset-y-6 right-8 left-0 z-10 cursor-pointer"
+				@click.stop="selectItem"
+				@mouseover.stop="setHovered(`content-${tier.id}`, 'content', 'Tier Content')"
 				@mouseleave="clearHovered" />
-
-			<DraggableTier v-model="tierEntries"
-				:class="[isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto']" />
+			<DraggableTier
+				v-model="tierEntries"
+				:lane-id="tier.id"
+				:class="isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto'" />
 		</div>
 	</div>
 </template>
 
 <script lang="ts" setup>
-interface Tier {
-	name: string
-	color: string
-	range: Array<number>
-	entries: Array<unknown>
-}
+import type { TierlistTier } from "~/types/tierlist"
 
 const props = defineProps<{
-	tier: Tier,
-	index: number,
-	isFirst: boolean,
+	tier: TierlistTier
+	index: number
+	isFirst: boolean
 	isLast: boolean
 }>()
 
 const emit = defineEmits<{
 	"update:name": [value: string]
-	"update:entries": [value: Array<unknown>]
+	"update:entries": [value: TierlistTier["entries"]]
 }>()
 
 const tierName = computed({
@@ -66,18 +110,22 @@ const tierEntries = computed({
 	get: () => props.tier.entries,
 	set: value => emit("update:entries", value)
 })
+const isHexColor = computed(() => /^#[0-9a-f]{3,8}$/i.test(props.tier.color))
 
 const tierlistStore = useTierlistStore()
-
 const {
 	selectedBackground,
 	rowCornerClass,
 	colWidthClass,
+	bodyColWidthClass,
 	headingCorner
 } = storeToRefs(tierlistStore)
-
 const { moveTierUp, moveTierDown } = tierlistStore
-const { isInspectorEnabled, setHovered, clearHovered, selectItem, hoveredTarget } = useInspector()
+const {
+	isInspectorEnabled,
+	setHovered,
+	clearHovered,
+	selectItem,
+	hoveredTarget
+} = useInspector()
 </script>
-
-<style scoped></style>

@@ -23,17 +23,6 @@ interface RawTemplate {
 	value: RawTemplateTier[]
 }
 
-const colorToTailwind: Record<string, string> = {
-	"#E13333": "bg-red-400",
-	"#e58e2b": "bg-orange-400",
-	"#f9c62d": "bg-yellow-400",
-	"#6ac75a": "bg-green-500",
-	"#67aeed": "bg-blue-400",
-	"#6188E2": "bg-indigo-400",
-	"#673AB7": "bg-violet-500",
-	"#2B2D42": "bg-black"
-}
-
 function normalizeRange(range: number[]): [number, number] {
 	const min = Number(range[0] ?? 0)
 	const max = Number(range[1] ?? min)
@@ -47,7 +36,7 @@ export const tierlistTemplates: TierTemplate[] = (rawTemplatesJson as unknown as
 			const color = String(tier.color)
 			return {
 				name: String(tier.name),
-				color: colorToTailwind[color] ?? "bg-neutral-500",
+				color: /^#[0-9a-f]{6}$/i.test(color) ? color : "#737373",
 				range: normalizeRange(tier.range)
 			}
 		})

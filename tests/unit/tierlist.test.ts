@@ -29,7 +29,7 @@ describe("tierlist presentation mappings", () => {
 		expect(rowCornerToClass(42)).toBe("rounded-2xl")
 		expect(colWidthToClass(42)).toBe("col-span-1")
 		expect(bodyColWidthToClass(42)).toBe("col-span-11")
-		expect(nbColToClass(42)).toBe("grid-cols-10")
+		expect(nbColToClass(42)).toBe("grid-cols-2 sm:grid-cols-4 lg:grid-cols-10")
 	})
 
 	it("keeps heading and body column widths complementary", () => {
@@ -42,9 +42,12 @@ describe("tierlist presentation mappings", () => {
 	})
 
 	it("maps every supported grid column count", () => {
-		for (let count = 1; count <= 12; count += 1) {
-			expect(nbColToClass(count)).toBe(`grid-cols-${count}`)
-		}
+		expect(nbColToClass(1)).toBe("grid-cols-1")
+		expect(nbColToClass(2)).toBe("grid-cols-2")
+		expect(nbColToClass(3)).toBe("grid-cols-2 sm:grid-cols-3")
+		expect(nbColToClass(4)).toBe("grid-cols-2 sm:grid-cols-4")
+		expect(nbColToClass(10)).toBe("grid-cols-2 sm:grid-cols-4 lg:grid-cols-10")
+		expect(nbColToClass(12)).toBe("grid-cols-2 sm:grid-cols-4 lg:grid-cols-12")
 	})
 
 	it("returns the matching neutral palette for each theme", () => {

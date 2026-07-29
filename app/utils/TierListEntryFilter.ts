@@ -1,3 +1,46 @@
+import type { TierlistEntry, TierlistFilters } from "~/types/tierlist"
+
+function normalize(value: string | null | undefined): string {
+	return value?.trim().toLowerCase() ?? ""
+}
+
+export function matchesTierlistFilters(entry: TierlistEntry, filters: TierlistFilters): boolean {
+	const media = entry.media
+
+	if (filters.title) {
+		const title = media.title?.english
+			?? media.title?.romaji
+			?? media.title?.native
+			?? media.title?.userPreferred
+			?? ""
+		if (!normalize(title).includes(normalize(filters.title))) return false
+	}
+
+	if (
+		filters.genres.length > 0
+		&& !media.genres?.some(genre => filters.genres.includes(genre))
+	) return false
+
+	if (
+		filters.years.length > 0
+		&& (!media.startDate?.year || !filters.years.includes(media.startDate.year))
+	) return false
+
+	if (
+		filters.seasons.length > 0
+		&& (!media.season || !filters.seasons.includes(media.season))
+	) return false
+
+	if (
+		filters.formats.length > 0
+		&& (!media.format || !filters.formats.includes(media.format))
+	) return false
+
+	const [minimumScore, maximumScore] = filters.score
+	const score = entry.score ?? 0
+	return score >= minimumScore && score <= maximumScore
+}
+
 export function useTierListEntryFilter() {
 	const tierlistStore = useTierlistStore()
 	const {
@@ -9,57 +52,15 @@ export function useTierListEntryFilter() {
 		filterScore
 	} = storeToRefs(tierlistStore)
 
-	function filterEntry(entry: any): boolean {
-		if (!entry?.media) return true
-
-		// Filter by title
-		if (filterTitle.value) {
-			const title = entry.media.title?.english || entry.media.title?.romaji || entry.media.title?.native || ""
-			if (!title.toLowerCase().includes(filterTitle.value.toLowerCase())) {
-				return false
-			}
-		}
-
-		// Filter by genres
-		if (filterGenres.value.length > 0) {
-			if (!entry.media.genres?.some((genre: string) => filterGenres.value.includes(genre))) {
-				return false
-			}
-		}
-
-		// Filter by years
-		if (filterYears.value.length > 0) {
-			if (!entry.media.startDate?.year || !filterYears.value.includes(entry.media.startDate.year)) {
-				return false
-			}
-		}
-
-		// Filter by seasons
-		if (filterSeasons.value.length > 0) {
-			if (!entry.media.season || !filterSeasons.value.includes(entry.media.season)) {
-				return false
-			}
-		}
-
-		// Filter by formats
-		if (filterFormats.value.length > 0) {
-			if (!entry.media.format || !filterFormats.value.includes(entry.media.format)) {
-				return false
-			}
-		}
-
-		// Filter by score
-		if (filterScore.value && Array.isArray(filterScore.value)) {
-			const [minScore, maxScore] = filterScore.value
-			if (minScore !== undefined && maxScore !== undefined) {
-				const score = entry.score || 0
-				if (score < minScore || score > maxScore) {
-					return false
-				}
-			}
-		}
-
-		return true
+	function filterEntry(entry: TierlistEntry): boolean {
+		return matchesTierlistFilters(entry, {
+			title: filterTitle.value,
+			genres: filterGenres.value,
+			years: filterYears.value,
+			seasons: filterSeasons.value,
+			formats: filterFormats.value,
+			score: filterScore.value
+		})
 	}
 
 	return {
