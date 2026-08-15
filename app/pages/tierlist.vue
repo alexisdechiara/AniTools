@@ -7,9 +7,22 @@
 				accept=".json,application/json"
 				class="hidden"
 				@change="handleJsonFile">
-			<UHeader title="" :ui="{ center: 'grow w-xs' }">
+			<PageLoadingState
+				v-if="showPageLoader"
+				label="Restoring your tier list"
+				description="Applying your saved tiers and preparing drag and drop." />
+			<div v-show="!showPageLoader">
+				<div data-tier-toolbar class="ml-8 sm:mx-4 lg:mx-12">
+					<UHeader
+						title=""
+						:ui="{
+							center: 'w-xs grow',
+							container: 'max-w-none px-0 sm:px-0 lg:px-0'
+						}">
 				<div class="flex w-full items-center gap-2">
-					<UModal v-model:open="openSearch">
+					<UModal
+						v-model:open="openSearch"
+						:ui="{ content: 'sm:max-w-4xl' }">
 						<UButton
 							label="Search anime..."
 							color="neutral"
@@ -24,22 +37,12 @@
 							</template>
 						</UButton>
 						<template #content>
-							<UCommandPalette
-								v-model:search-term="searchTerm"
-								:loading="loadingSearch"
-								:groups="groups"
-								placeholder="Search anime..."
-								:ui="{ item: 'items-center', itemDescription: 'text-xs' }">
-								<template #item-trailing="{ item }">
-									<UButton
-										icon="i-lucide-plus"
-										variant="ghost"
-										color="neutral"
-										class="cursor-pointer rounded-full"
-										:aria-label="`Add ${item.label}`"
-										@click.prevent.stop="addAnime(item)" />
-								</template>
-							</UCommandPalette>
+							<AnimePicker
+								:suggestions="searchSuggestions"
+								:excluded-ids="tierlistMediaIds"
+								action-label="Add"
+								empty-label="Search AniList or load a profile to see anime here."
+								@select="addAnime" />
 						</template>
 					</UModal>
 					<UPopover>
@@ -91,9 +94,10 @@
 						aria-label="Toggle tier list inspector"
 						@click="toggleInspector" />
 				</template>
-			</UHeader>
+					</UHeader>
+				</div>
 
-			<div class="my-6 ml-8 flex flex-col sm:mx-4 sm:my-8 lg:mx-12" :class="gapSizeClass">
+			<div data-tier-board class="my-6 ml-8 flex flex-col sm:mx-4 sm:my-8 lg:mx-12" :class="gapSizeClass">
 				<VueDraggable
 					v-model="tiers"
 					group="tier-list"
@@ -106,7 +110,7 @@
 					:fallback-on-body="true"
 					:swap-threshold="0.65"
 					:delay="180"
-					:delay-on-touch-start="true">
+					:delay-on-touch-only="true">
 					<RankedTier
 						v-for="(tier, index) in tiers"
 						:key="tier.id"
@@ -119,23 +123,24 @@
 				</VueDraggable>
 
 				<div
-					v-if="unrankedTier.length > 0"
+					data-unranked-tier
 					class="mt-8 flex min-h-32 w-full"
-					:class="[selectedBackground, rowCornerClass]">
-					<DraggableTier v-model="unrankedTier" lane-id="unranked" />
+					:class="rowCornerClass">
+					<DraggableTier v-model="unrankedTier" lane-id="unranked">
+						<template #empty>
+							<UEmpty
+								data-tier-empty
+								variant="outline"
+								icon="i-lucide-file-question-mark"
+								title="No unranked anime"
+								class="col-span-full min-h-24"
+								:ui="{ root: 'border border-default border-dashed ring-0 flex items-center justify-center' }"
+								description="Drop an anime here, search for one, or import your AniList collection."
+								:actions="emptyActions"/>
+						</template>
+					</DraggableTier>
 				</div>
-				<UEmpty
-					v-else
-					variant="outline"
-					icon="i-lucide-file-question-mark"
-					title="No unranked anime"
-					class="mt-8"
-					:ui="{ root: `border border-default border-dashed ring-0 min-h-32 flex items-center justify-center transition-colors ${isDragOver ? 'border-primary bg-primary/5' : ''}` }"
-					description="Drop an anime here, search for one, or import your AniList collection."
-					:actions="emptyActions"
-					@drop="handleAnimeDrop"
-					@dragover="handleDragOver"
-					@dragleave="handleDragLeave" />
+			</div>
 			</div>
 		</UContainer>
 		<AnimesImportModal v-model:open="openImport" />
@@ -146,9 +151,10 @@
 </template>
 
 <script lang="ts" setup>
-import type { CommandPaletteItem, DropdownMenuItem } from "@nuxt/ui"
+import type { DropdownMenuItem } from "@nuxt/ui"
 import { VueDraggable } from "vue-draggable-plus"
 import { FEATURE_REGISTRY } from "#shared/config/features"
+import type { AniListMediaSummary } from "~~/shared/types/anilist"
 import type { TierlistImageFormat } from "~/utils/tierlist-export"
 import {
 	buildTierlistFilename,
@@ -158,7 +164,6 @@ import {
 } from "~/utils/tierlist-export"
 import {
 	MAX_TIERLIST_IMPORT_BYTES,
-	parseTierlistDragPayload,
 	parseTierlistExportText
 } from "~/utils/tierlist-model"
 import {
@@ -167,17 +172,6 @@ import {
 	tierlistSeasons,
 	tierlistYears
 } from "~/utils/tierlist-data"
-
-interface SearchPrediction {
-	id: number
-	title: string
-}
-
-interface SearchResponse {
-	result: {
-		predictions: SearchPrediction[]
-	}
-}
 
 definePageMeta({
 	feature: "tierlist",
@@ -203,16 +197,18 @@ const entriesStore = useEntriesStore()
 const userStore = useUserStore()
 const { isInspectorEnabled, toggleInspector, initializeInspector } = useInspector()
 const { isAuthenticated } = storeToRefs(userStore)
+const { getAllAnimes } = storeToRefs(entriesStore)
 
 const openSearch = ref(false)
 const openImport = ref(false)
 const openSlideover = ref(false)
 const jsonFileInput = ref<HTMLInputElement | null>(null)
-const isDragOver = ref(false)
 const exportingFormat = ref<"json" | TierlistImageFormat | null>(null)
-const searchTerm = ref("")
-const rawAnimes = ref<SearchPrediction[]>([])
-const loadingSearch = ref(false)
+const tierlistReady = ref(false)
+const { showPageLoader } = useProgressiveLoading(
+	computed(() => [tierlistReady.value]),
+	{ allowPartial: false }
+)
 
 const {
 	filterTitle,
@@ -224,7 +220,6 @@ const {
 	tiers,
 	unrankedTier,
 	gapSizeClass,
-	selectedBackground,
 	rowCornerClass
 } = storeToRefs(tierlistStore)
 
@@ -234,7 +229,13 @@ defineShortcuts({
 	}
 })
 
-onMounted(initializeInspector)
+onMounted(async () => {
+	initializeInspector()
+	await nextTick()
+	requestAnimationFrame(() => {
+		tierlistReady.value = true
+	})
+})
 
 watch(isAuthenticated, async (authenticated) => {
 	if (!authenticated || entriesStore.isInitialized) return
@@ -249,48 +250,13 @@ watch(isAuthenticated, async (authenticated) => {
 	}
 }, { immediate: true })
 
-const runSearch = useDebounceFn(async () => {
-	const query = searchTerm.value.trim()
-	if (query.length < 2) {
-		rawAnimes.value = []
-		return
-	}
-
-	loadingSearch.value = true
-	try {
-		const response = await $fetch<SearchResponse>("/api/search", {
-			query: { q: query }
-		})
-		rawAnimes.value = response.result.predictions
-	} catch {
-		rawAnimes.value = []
-		toast.add({
-			title: "Search unavailable",
-			description: "AniList could not be reached. Try again in a moment.",
-			color: "error"
-		})
-	} finally {
-		loadingSearch.value = false
-	}
-}, 400)
-
-watch(searchTerm, runSearch)
-
-const searchedAnimes = computed<CommandPaletteItem[]>(() =>
-	rawAnimes.value.map(result => ({
-		id: result.id,
-		label: result.title,
-		to: `https://anilist.co/anime/${result.id}`,
-		target: "_blank"
-	}))
-)
-
-const groups = computed(() => [{
-	id: "animes",
-	label: "Anime",
-	items: searchedAnimes.value,
-	ignoreFilter: true
-}])
+const searchSuggestions = computed(() => getAllAnimes.value.flatMap(entry =>
+	entry.media ? [entry.media] : []
+))
+const tierlistMediaIds = computed(() => [
+	...unrankedTier.value,
+	...tiers.value.flatMap(tier => tier.entries)
+].map(entry => entry.media.id))
 
 const emptyActions = computed(() => [
 	{
@@ -344,9 +310,9 @@ const settingsItems = computed<DropdownMenuItem[]>(() => [
 	}
 ])
 
-async function addAnime(item: CommandPaletteItem): Promise<void> {
+async function addAnime(media: AniListMediaSummary): Promise<void> {
 	try {
-		const added = await tierlistStore.addAnime(item)
+		const added = tierlistStore.addAnimeMedia(media)
 		toast.add({
 			title: added ? "Anime added" : "Anime not added",
 			description: added ? undefined : "It may already be present in this tier list.",
@@ -360,30 +326,6 @@ async function addAnime(item: CommandPaletteItem): Promise<void> {
 			color: "error"
 		})
 	}
-}
-
-function handleAnimeDrop(event: DragEvent): void {
-	event.preventDefault()
-	isDragOver.value = false
-	const serialized = event.dataTransfer?.getData("application/json")
-	if (!serialized) return
-
-	const payload = parseTierlistDragPayload(serialized)
-	if (!payload) {
-		toast.add({ title: "Invalid dropped item", color: "error" })
-		return
-	}
-	tierlistStore.moveEntry(payload.entry.media.id, payload.sourceLaneId, "unranked")
-}
-
-function handleDragOver(event: DragEvent): void {
-	event.preventDefault()
-	isDragOver.value = true
-}
-
-function handleDragLeave(event: DragEvent): void {
-	event.preventDefault()
-	isDragOver.value = false
 }
 
 async function exportTierlist(format: "json" | TierlistImageFormat): Promise<void> {

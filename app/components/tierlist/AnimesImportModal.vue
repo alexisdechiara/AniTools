@@ -7,6 +7,28 @@
 		description="Select the settings for importing anime from your lists.">
 		<template #body>
 			<div v-if="isAuthenticated" class="flex flex-col gap-3">
+				<UAlert
+					v-if="entriesError"
+					icon="i-lucide-triangle-alert"
+					title="AniList import unavailable"
+					:description="entriesError"
+					color="error"
+					variant="soft">
+					<template #actions>
+						<UButton
+							label="Retry"
+							color="error"
+							variant="soft"
+							:loading="entriesLoading"
+							@click="retryLoad" />
+					</template>
+				</UAlert>
+				<UAlert
+					v-else-if="entriesLoading && !isInitialized"
+					icon="i-lucide-loader-circle"
+					title="Loading your AniList collection"
+					color="neutral"
+					variant="subtle" />
 				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 					<div class="flex flex-col gap-3">
 						<div class="rounded-lg bg-muted p-5">
@@ -37,15 +59,15 @@
 									<label
 										for="allSeasons"
 										class="relative grid size-full cursor-pointer grid-cols-2 overflow-hidden rounded-md ring-primary ring-offset-2 peer-checked:ring-2">
-										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21459-nYh85uj2Fuwr.jpg" alt="">
-										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21856-gutauxhWAwn6.png" alt="">
-										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx100166-jUCZYbzn2XLw.jpg" alt="">
-										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx104276-SnEowMvesWIE.png" alt="">
+										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21459-nYh85uj2Fuwr.jpg" alt="" />
+										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21856-gutauxhWAwn6.png" alt="" />
+										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx100166-jUCZYbzn2XLw.jpg" alt="" />
+										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx104276-SnEowMvesWIE.png" alt="" />
 										<div class="absolute inset-0 z-40 bg-linear-to-t from-neutral-950/75 from-0% via-neutral-950/50 via-10% to-neutral-950/25 to-25%" />
 										<span class="absolute inset-x-2 bottom-2 z-50 text-center text-sm font-medium text-white">
 											All seasons
 										</span>
-									</nuxtimg></nuxtimg></nuxtimg></nuxtimg></label>
+									</label>
 								</div>
 								<div class="h-42 w-full">
 									<input
@@ -57,12 +79,12 @@
 									<label
 										for="franchise"
 										class="relative grid size-full cursor-pointer overflow-hidden rounded-md ring-primary ring-offset-2 peer-checked:ring-2">
-										<NuxtImg src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21459-nYh85uj2Fuwr.jpg" alt="">
+										<NuxtImg class="size-full object-cover" src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21459-nYh85uj2Fuwr.jpg" alt="" />
 										<div class="absolute inset-0 z-40 bg-linear-to-t from-neutral-950/75 from-0% via-neutral-950/50 via-10% to-neutral-950/25 to-25%" />
 										<span class="absolute inset-x-2 bottom-2 z-50 text-center text-sm font-medium text-white">
 											Franchise
 										</span>
-									</nuxtimg></label>
+									</label>
 								</div>
 							</UFormField>
 						</div>
@@ -129,8 +151,8 @@
 			<UButton
 				v-if="isAuthenticated"
 				label="Submit"
-				:loading="isLoading"
-				:disabled="isLoading || !isInitialized"
+				:loading="isLoading || entriesLoading"
+				:disabled="isLoading || entriesLoading || !isInitialized"
 				@click="handleSubmit(close)" />
 			<UButton
 				v-else
@@ -186,7 +208,11 @@ const entriesStore = useEntriesStore()
 const userStore = useUserStore()
 const router = useRouter()
 const toast = useToast()
-const { isInitialized } = storeToRefs(entriesStore)
+const {
+	isInitialized,
+	loading: entriesLoading,
+	error: entriesError
+} = storeToRefs(entriesStore)
 const { isAuthenticated } = storeToRefs(userStore)
 
 watch(isFranchise, (enabled) => {
@@ -217,6 +243,18 @@ function handleSubmit(close: () => void): void {
 	performImport(close, false)
 }
 
+async function retryLoad(): Promise<void> {
+	try {
+		await entriesStore.fetchAllAnimes(true)
+	} catch {
+		toast.add({
+			title: "AniList import unavailable",
+			description: "Your collection could not be loaded. Try again in a moment.",
+			color: "error"
+		})
+	}
+}
+
 function performImport(close: () => void, allowDuplicates: boolean): void {
 	isLoading.value = true
 	try {
@@ -240,6 +278,14 @@ function performImport(close: () => void, allowDuplicates: boolean): void {
 		})
 		close()
 		reset()
+	} catch (error) {
+		toast.add({
+			title: "Import failed",
+			description: error instanceof Error
+				? error.message
+				: "The selected anime could not be imported.",
+			color: "error"
+		})
 	} finally {
 		isLoading.value = false
 	}

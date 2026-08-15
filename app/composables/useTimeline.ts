@@ -1,15 +1,8 @@
 import type {
 	AniListActivitiesResponse,
-	AniListActivity,
-	AniListActivityKind,
+	AniListAnimeActivity,
 	AniListPageInfo
 } from "~~/shared/types/anilist"
-import {
-	getTimelineWindow,
-	groupTimelineActivities,
-	type TimelineView,
-	type TimelineWindow
-} from "~/utils/timeline"
 
 interface TimelineCacheEntry {
 	expiresAt: number
@@ -17,7 +10,8 @@ interface TimelineCacheEntry {
 }
 
 const CLIENT_CACHE_TTL_MS = 5 * 60_000
-const MAX_TIMELINE_PAGES = 8
+const MAX_TIMELINE_PAGES = 100
+const TIMELINE_ACTIVITY_KIND = "anime" as const
 const timelinePageCache = new Map<string, TimelineCacheEntry>()
 
 function errorMessage(error: unknown) {
@@ -28,10 +22,7 @@ function errorMessage(error: unknown) {
 
 export function useTimeline() {
 	const userStore = useUserStore()
-	const view = ref<TimelineView>("weeks")
-	const kind = ref<AniListActivityKind>("anime")
-	const window = ref<TimelineWindow>(getTimelineWindow("weeks"))
-	const activities = ref<AniListActivity[]>([])
+	const activities = ref<AniListAnimeActivity[]>([])
 	const pageInfo = ref<AniListPageInfo>({
 		currentPage: 1,
 		hasNextPage: false,
@@ -41,12 +32,13 @@ export function useTimeline() {
 	})
 	const loading = ref(false)
 	const loadingMore = ref(false)
+	const initialized = ref(false)
 	const error = ref<string | null>(null)
 	const safetyLimitReached = computed(() =>
 		pageInfo.value.hasNextPage
 		&& pageInfo.value.currentPage >= MAX_TIMELINE_PAGES
 	)
-	const groups = computed(() => groupTimelineActivities(activities.value, view.value))
+	const hasMore = computed(() => pageInfo.value.hasNextPage && !safetyLimitReached.value)
 
 	function accessQuery(): Record<string, string> {
 		if (userStore.authMode === "public" && userStore.publicUsername) {
@@ -62,9 +54,7 @@ export function useTimeline() {
 			: `oauth:${userStore.username}`
 		return [
 			source,
-			view.value,
-			kind.value,
-			window.value.from,
+			TIMELINE_ACTIVITY_KIND,
 			page
 		].join(":")
 	}
@@ -80,10 +70,8 @@ export function useTimeline() {
 				query: {
 					...accessQuery(),
 					page,
-					perPage: 20,
-					kind: kind.value,
-					from: window.value.from,
-					to: window.value.to
+					perPage: 50,
+					kind: TIMELINE_ACTIVITY_KIND
 				}
 			}
 		)
@@ -97,7 +85,7 @@ export function useTimeline() {
 		return response
 	}
 
-	function mergeActivities(nextActivities: readonly AniListActivity[]) {
+	function mergeActivities(nextActivities: readonly AniListAnimeActivity[]) {
 		const unique = new Map(activities.value.map(activity => [activity.id, activity]))
 		for (const activity of nextActivities) unique.set(activity.id, activity)
 		activities.value = [...unique.values()].toSorted((left, right) =>
@@ -108,18 +96,20 @@ export function useTimeline() {
 	async function load(force = false) {
 		loading.value = true
 		error.value = null
-		window.value = getTimelineWindow(view.value)
 
 		try {
 			const response = await fetchPage(1, force)
 			activities.value = []
-			mergeActivities(response.activities)
+			mergeActivities(response.activities.filter(
+				(activity): activity is AniListAnimeActivity => activity.kind === "anime"
+			))
 			pageInfo.value = response.pageInfo
 		} catch (caughtError) {
 			activities.value = []
 			error.value = errorMessage(caughtError)
 		} finally {
 			loading.value = false
+			initialized.value = true
 		}
 	}
 
@@ -135,7 +125,9 @@ export function useTimeline() {
 
 		try {
 			const response = await fetchPage(pageInfo.value.currentPage + 1)
-			mergeActivities(response.activities)
+			mergeActivities(response.activities.filter(
+				(activity): activity is AniListAnimeActivity => activity.kind === "anime"
+			))
 			pageInfo.value = response.pageInfo
 		} catch (caughtError) {
 			error.value = errorMessage(caughtError)
@@ -144,32 +136,16 @@ export function useTimeline() {
 		}
 	}
 
-	async function setView(nextView: TimelineView) {
-		if (view.value === nextView) return
-		view.value = nextView
-		await load()
-	}
-
-	async function setKind(nextKind: AniListActivityKind) {
-		if (kind.value === nextKind) return
-		kind.value = nextKind
-		await load()
-	}
-
 	return {
-		view,
-		kind,
-		window,
 		activities,
-		groups,
 		pageInfo,
 		loading,
 		loadingMore,
+		initialized,
 		error,
+		hasMore,
 		safetyLimitReached,
 		load,
-		loadMore,
-		setView,
-		setKind
+		loadMore
 	}
 }

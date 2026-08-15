@@ -19,7 +19,9 @@ export interface CreateArtworkOptions {
 	imageZoom: number
 	imagePositionX: number
 	imagePositionY: number
-	transparentBadge: boolean
+	fontFamily: string
+	titleScale: number
+	subtitleScale: number
 }
 
 function drawCoverImage(
@@ -56,31 +58,10 @@ function drawBackdrop(
 	options: CreateArtworkOptions,
 	image: HTMLImageElement | null
 ) {
-	const { width, height, id } = options.preset
-	const isTransparentBadge = id === "badge" && options.transparentBadge
+	const { width, height } = options.preset
 
-	if (!isTransparentBadge) {
-		context.fillStyle = options.backgroundColor
-		context.fillRect(0, 0, width, height)
-	}
-
-	if (id === "badge") {
-		context.save()
-		context.beginPath()
-		context.arc(width / 2, height / 2, width * 0.47, 0, Math.PI * 2)
-		context.clip()
-		context.fillStyle = options.backgroundColor
-		context.fillRect(0, 0, width, height)
-		if (image) drawCoverImage(context, image, options)
-		context.restore()
-
-		context.strokeStyle = options.accentColor
-		context.lineWidth = Math.max(8, width * 0.025)
-		context.beginPath()
-		context.arc(width / 2, height / 2, width * 0.44, 0, Math.PI * 2)
-		context.stroke()
-		return
-	}
+	context.fillStyle = options.backgroundColor
+	context.fillRect(0, 0, width, height)
 
 	if (image) drawCoverImage(context, image, options)
 
@@ -107,51 +88,52 @@ function drawText(
 ) {
 	const { width, height, id } = options.preset
 	const isWide = id === "banner"
-	const isBadge = id === "badge"
-	const padding = isBadge
-		? width * 0.13
-		: Math.max(48, Math.min(width, height) * 0.075)
-	const titleSize = isBadge
-		? Math.round(width * 0.105)
-		: Math.round(Math.min(width * (isWide ? 0.07 : 0.105), height * 0.15))
-	const subtitleSize = Math.max(20, Math.round(titleSize * 0.34))
+	const padding = Math.max(48, Math.min(width, height) * 0.075)
+	const baseTitleSize = Math.round(
+		Math.min(width * (isWide ? 0.07 : 0.105), height * 0.15)
+	)
+	const titleSize = Math.max(20, Math.round(baseTitleSize * options.titleScale))
+	const subtitleSize = Math.max(
+		16,
+		Math.round(baseTitleSize * 0.34 * options.subtitleScale)
+	)
 	const maxWidth = width - padding * 2
-	const baseline = isBadge ? height * 0.58 : height - padding
+	const baseline = height - padding
 
-	context.textAlign = isBadge ? "center" : "left"
+	context.textAlign = "left"
 	context.textBaseline = "alphabetic"
 	context.fillStyle = "#ffffff"
 	context.shadowColor = "rgba(0, 0, 0, 0.45)"
 	context.shadowBlur = Math.max(8, titleSize * 0.18)
 	context.shadowOffsetY = Math.max(3, titleSize * 0.06)
-	context.font = `800 ${titleSize}px ui-sans-serif, system-ui, sans-serif`
+	context.font = `800 ${titleSize}px ${options.fontFamily}`
 
 	const titleLines = wrapCreateText(
 		options.title || "AniTools",
 		maxWidth,
 		value => context.measureText(value).width,
-		isBadge ? 2 : isWide ? 2 : 4
+		isWide ? 2 : 4
 	)
 	const lineHeight = titleSize * 1.04
 	const titleHeight = titleLines.length * lineHeight
 	const subtitleGap = options.subtitle ? subtitleSize * 1.5 : 0
 	const startY = baseline - titleHeight - subtitleGap
-	const x = isBadge ? width / 2 : padding
+	const x = padding
 
 	titleLines.forEach((line, index) => {
 		context.fillText(line, x, startY + (index + 1) * lineHeight, maxWidth)
 	})
 
 	if (options.subtitle) {
-		context.font = `600 ${subtitleSize}px ui-sans-serif, system-ui, sans-serif`
+		context.font = `600 ${subtitleSize}px ${options.fontFamily}`
 		context.fillStyle = "#f3f4f6"
 		context.fillText(options.subtitle, x, baseline, maxWidth)
 	}
 
 	context.shadowColor = "transparent"
 	context.fillStyle = options.accentColor
-	const accentWidth = isBadge ? width * 0.18 : Math.min(width * 0.18, 180)
-	const accentX = isBadge ? (width - accentWidth) / 2 : padding
+	const accentWidth = Math.min(width * 0.18, 180)
+	const accentX = padding
 	context.fillRect(accentX, startY - titleSize * 0.38, accentWidth, Math.max(5, titleSize * 0.08))
 }
 

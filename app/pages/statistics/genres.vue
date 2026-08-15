@@ -11,7 +11,5 @@ definePageMeta({
 <template>
 	<StatisticsDimensionPage
 		page-id="statistics-genres"
-		title="Genres"
-		description="Compare the genres in your anime list by title count, mean score or watch time."
 		dimension="genres"/>
 </template>

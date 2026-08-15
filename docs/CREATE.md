@@ -8,15 +8,18 @@ Create is a browser-only artwork studio. It deliberately uses native Canvas APIs
 | --- | ---: | --- |
 | Story | 1080 × 1920 | 9:16 social story |
 | Square | 1080 × 1080 | Square social post |
-| Badge | 512 × 512 | Avatar or community badge; optional transparent exterior |
-| AniList thumbnail | 1000 × 1500 | 2:3 media-style thumbnail |
+| AniList thumbnail | 1200 × 630 | Landscape social preview |
 | Banner | 1500 × 500 | Wide profile or community banner |
 
-Every preset can be exported as PNG, JPEG or WebP. PNG and WebP preserve the transparent area of badges. JPEG exports are flattened over white because the format has no alpha channel.
+Every preset can be exported as PNG, JPEG or WebP. JPEG exports are flattened over white because the format has no alpha channel.
 
 ## Template and rendering rules
 
 - The source image is cropped with a cover strategy and adjustable zoom plus horizontal and vertical focal points.
+- AniList cover art or the available trailer thumbnail can be used as the source.
+- Automatic content can select the best rated, lowest rated, most popular, longest watched, most rewatched or favourite anime from the loaded AniList list.
+- English, Romaji, native and AniList-preferred titles are supported.
+- Font family, title scale and subtitle scale are rendered directly into the exported Canvas.
 - The accent, background and overlay are user-controlled.
 - Text is wrapped and truncated to bounded regions so it cannot escape the canvas.
 - The preview and download use the same canvas at the exact output dimensions.

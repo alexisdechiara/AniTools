@@ -29,6 +29,7 @@ async function getBackgroundImage(url: string | null): Promise<HTMLImageElement 
 	if (loadedImage && loadedImageUrl === url) return loadedImage
 
 	const image = new Image()
+	image.crossOrigin = "anonymous"
 	image.decoding = "async"
 	const result = await new Promise<HTMLImageElement>((resolve, reject) => {
 		image.addEventListener("load", () => resolve(image), { once: true })
@@ -88,10 +89,10 @@ defineExpose({ download, render })
 </script>
 
 <template>
-	<div class="relative flex size-full min-h-80 items-center justify-center overflow-hidden rounded-xl bg-elevated p-4 sm:p-8">
+	<div class="relative flex size-full min-h-80 items-center justify-center overflow-hidden rounded-xl bg-elevated p-2 sm:p-3">
 		<canvas
 			ref="canvas"
-			class="max-h-[70vh] max-w-full rounded-md shadow-2xl"
+			class="max-h-full max-w-full rounded-md shadow-2xl"
 			:style="{ aspectRatio: `${options.preset.width} / ${options.preset.height}` }"
 			role="img"
 			:aria-label="`Preview of ${options.preset.label} artwork`" />
@@ -103,9 +104,12 @@ defineExpose({ download, render })
 		</div>
 		<UAlert
 			v-if="renderError"
-			class="absolute inset-x-4 bottom-4"
+			class="absolute inset-x-4 top-4"
 			color="error"
 			variant="solid"
 			:title="renderError" />
+		<div class="absolute right-3 bottom-3 z-10">
+			<slot name="actions" />
+		</div>
 	</div>
 </template>

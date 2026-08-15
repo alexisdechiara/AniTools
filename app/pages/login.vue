@@ -13,7 +13,7 @@
 			<div class="mt-auto flex flex-col gap-5 pt-12">
 				<UButton
 					label="Continue with AniList"
-					icon="i-simple-icons-anilist"
+					icon="i-custom-anilist"
 					size="xl"
 					block
 					type="button"

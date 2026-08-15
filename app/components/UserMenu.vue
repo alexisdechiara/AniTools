@@ -147,7 +147,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
         }
       : {
           label: "Continue with AniList",
-          icon: "i-simple-icons-anilist",
+          icon: "i-custom-anilist",
           onSelect() {
             loginWithAniList();
           },

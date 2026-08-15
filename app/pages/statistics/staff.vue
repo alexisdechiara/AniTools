@@ -11,7 +11,5 @@ definePageMeta({
 <template>
 	<StatisticsPeoplePage
 		page-id="statistics-staff"
-		title="Staff"
-		description="Explore the directors, writers and other staff represented across your anime list."
 		kind="staff"/>
 </template>

@@ -1,6 +1,9 @@
 import type { CommandPaletteItem } from "@nuxt/ui"
 import { defineStore } from "pinia"
-import type { AniListMediaResponse } from "~~/shared/types/anilist"
+import type {
+	AniListMediaResponse,
+	AniListMediaSummary
+} from "~~/shared/types/anilist"
 import type {
 	TierlistEntry,
 	TierlistImportResult,
@@ -239,6 +242,15 @@ export const useTierlistStore = defineStore("tierlist", () => {
 			query: { id: mediaId }
 		})
 		const entry = formatMediaResultToTierlistEntry(response.media)
+		return entry ? addEntryToUnrankedTier(entry) : false
+	}
+
+	function addAnimeMedia(media: AniListMediaSummary): boolean {
+		const { getAllAnimes } = storeToRefs(useEntriesStore())
+		const existingEntry = getAllAnimes.value.find(entry => entry.media?.id === media.id)
+		if (existingEntry) return addEntryToUnrankedTier(existingEntry)
+
+		const entry = formatMediaResultToTierlistEntry(media)
 		return entry ? addEntryToUnrankedTier(entry) : false
 	}
 
@@ -488,6 +500,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		moveTierUp,
 		moveTierDown,
 		addAnime,
+		addAnimeMedia,
 		importAnimesFromEntries,
 		rankEntries,
 		checkOverlappingRanges,

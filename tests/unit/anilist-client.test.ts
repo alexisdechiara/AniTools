@@ -4,6 +4,7 @@ import {
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
 	getAniListAiringSchedulesPage,
+	getAniListAnimeListIdsResponse,
 	getAniListAnimeListResponse,
 	getAniListMediaByIds,
 	getAniListMediaResponse,
@@ -13,7 +14,9 @@ import {
 	parseAniListAnimeListQuery,
 	parseAniListMediaQuery,
 	parseAniListProfileQuery,
-	resolveAniListAccess
+	parseAniListSaveMediaListEntryBody,
+	resolveAniListAccess,
+	saveAniListMediaListEntry
 } from "../../server/utils/anilist-client"
 
 const publicAccess = {
@@ -129,6 +132,7 @@ describe("AniList endpoint query validation", () => {
 		expect(ANILIST_ALLOWED_OPERATIONS).toEqual([
 			"profile",
 			"anime-list",
+			"anime-list-ids",
 			"statistics",
 			"activities",
 			"recommendations",
@@ -136,7 +140,8 @@ describe("AniList endpoint query validation", () => {
 			"search",
 			"media",
 			"airing-schedules",
-			"media-by-ids"
+			"media-by-ids",
+			"save-media-list-entry"
 		])
 	})
 
@@ -199,6 +204,12 @@ describe("AniList endpoint query validation", () => {
 		]) {
 			expect(() => parseAniListMediaQuery(query)).toThrow()
 		}
+	})
+
+	it("accepts only a fixed bounded media-list update body", () => {
+		expect(parseAniListSaveMediaListEntryBody({ mediaId: 7 })).toEqual({ mediaId: 7 })
+		expect(() => parseAniListSaveMediaListEntryBody({ mediaId: 0 })).toThrow()
+		expect(() => parseAniListSaveMediaListEntryBody({ mediaId: 7, status: "DROPPED" })).toThrow()
 	})
 })
 
@@ -291,6 +302,41 @@ describe("AniList allowlisted client", () => {
 				code: "ANILIST_MEDIA_NOT_FOUND"
 			}
 		})
+	})
+
+	it("adds an anime to planning through the fixed authenticated mutation", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				SaveMediaListEntry: {
+					id: 99,
+					mediaId: 7,
+					status: "PLANNING"
+				}
+			}
+		}))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).resolves.toEqual({
+			entry: { id: 99, mediaId: 7, status: "PLANNING" }
+		})
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("mutation AniToolsSaveMediaListEntry")
+		expect(body.query).toContain("status: PLANNING")
+		expect(body.variables).toEqual({ mediaId: 7 })
+		expect(new Headers(request?.headers).get("Authorization")).toBe(
+			"Bearer secret-access-token"
+		)
+	})
+
+	it("rejects media-list mutations for public profiles", async () => {
+		await expect(saveAniListMediaListEntry(publicAccess, { mediaId: 7 }))
+			.rejects.toMatchObject({ statusCode: 403 })
 	})
 
 	it("loads a validated airing page through a fixed anonymous operation", async () => {
@@ -429,6 +475,7 @@ describe("AniList allowlisted client", () => {
 		}))
 
 		const result = await getAniListAnimeListResponse(publicAccess, {
+			username: "Alexis",
 			page: 2,
 			perPage: 10,
 			sort: "score",
@@ -455,6 +502,44 @@ describe("AniList allowlisted client", () => {
 			perPage: 10,
 			sort: ["SCORE_DESC"],
 			status: "COMPLETED"
+		})
+	})
+
+	it("loads every bounded anime-list ID chunk and de-duplicates the result", async () => {
+		let requestIndex = 0
+		const requester = fetchMock(async () => {
+			requestIndex += 1
+			return jsonResponse({
+				data: {
+					MediaListCollection: {
+						hasNextChunk: requestIndex === 1,
+						lists: [{
+							entries: requestIndex === 1
+								? [{ mediaId: 30 }, { mediaId: 10 }]
+								: [{ mediaId: 20 }, { mediaId: 30 }]
+						}]
+					}
+				}
+			})
+		})
+
+		const result = await getAniListAnimeListIdsResponse(publicAccess, {
+			fetch: requester
+		})
+		const requestBodies = requester.mock.calls.map(([, request]) =>
+			JSON.parse(String(request?.body)) as {
+				query: string
+				variables: Record<string, unknown>
+			}
+		)
+
+		expect(result.mediaIds).toEqual([10, 20, 30])
+		expect(requestBodies).toHaveLength(2)
+		expect(requestBodies[0]?.query).toContain("query AniToolsAnimeListIds")
+		expect(requestBodies.map(body => body.variables.chunk)).toEqual([1, 2])
+		expect(requestBodies[0]?.variables).toMatchObject({
+			username: "Alexis",
+			perChunk: 500
 		})
 	})
 

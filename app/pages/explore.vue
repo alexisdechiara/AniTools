@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { FEATURE_REGISTRY } from "#shared/config/features"
-import {
-	filterExploreMedia,
-	getExploreTitle
-} from "~/utils/explore"
+import type {
+	AniListMediaSummary,
+	AniListSaveMediaListEntryResponse
+} from "~~/shared/types/anilist"
+import ExploreInterestedDeck from "~/components/explore/InterestedDeck.vue"
+import ExploreSwipeDeck from "~/components/explore/SwipeDeck.vue"
+import { getExploreTitle } from "~/utils/explore"
 
 definePageMeta({
 	feature: "explore",
@@ -13,10 +16,18 @@ definePageMeta({
 
 useSeoMeta({
 	title: "Explore anime",
-	description: "Discover AniList recommendations and highly rated anime from your favourite studios.",
+	description: "Swipe through personalized AniList recommendations and discover what to watch next.",
 	robots: "noindex, nofollow"
 })
 
+type SwipeDirection = "left" | "right"
+interface SwipeDecision {
+	direction: SwipeDirection
+	media: AniListMediaSummary
+}
+
+const userStore = useUserStore()
+const toast = useToast()
 const {
 	existingMediaIds,
 	seeds,
@@ -27,9 +38,11 @@ const {
 	studioMedia,
 	recommendationPageInfo,
 	studioPageInfo,
-	loadingList,
 	loadingRecommendations,
 	loadingStudio,
+	listInitialized,
+	recommendationsInitialized,
+	studioInitialized,
 	listError,
 	recommendationError,
 	studioError,
@@ -38,36 +51,203 @@ const {
 	loadStudio
 } = useExplore()
 
-const genre = ref("")
-const format = ref("")
-const minimumScore = ref(0)
-const allMedia = computed(() => [...recommendations.value, ...studioMedia.value])
-const genreOptions = computed(() =>
-	[...new Set(allMedia.value.flatMap(media => media.genres))]
-		.toSorted((left, right) => left.localeCompare(right))
-)
-const formatOptions = computed(() =>
-	[...new Set(allMedia.value.flatMap(media => media.format ? [media.format] : []))]
-		.toSorted((left, right) => left.localeCompare(right))
-)
-const activeFilters = computed(() => ({
-	excludedMediaIds: existingMediaIds.value,
-	genre: genre.value || undefined,
-	format: format.value || undefined,
-	minimumScore: minimumScore.value
-}))
-const visibleRecommendations = computed(() =>
-	filterExploreMedia(recommendations.value, activeFilters.value)
-)
-const visibleStudioMedia = computed(() =>
-	filterExploreMedia(studioMedia.value, activeFilters.value)
-)
+const decidedMediaIds = ref<Set<number>>(new Set())
+const interestedMedia = ref<AniListMediaSummary[]>([])
+const decisionHistory = ref<SwipeDecision[]>([])
+const addedMediaIds = ref<Set<number>>(new Set())
+const addingMediaIds = ref<Set<number>>(new Set())
+const addingAllToPlanning = ref(false)
+const loadingMore = ref(false)
+
+const excludedMediaIds = computed(() => new Set([
+	...existingMediaIds.value,
+	...addedMediaIds.value
+]))
+const visibleRecommendations = computed(() => recommendations.value.filter(media =>
+	media.isAdult !== true && !excludedMediaIds.value.has(media.id)
+))
+const visibleStudioMedia = computed(() => studioMedia.value.filter(media =>
+	media.isAdult !== true && !excludedMediaIds.value.has(media.id)
+))
 const selectedSeed = computed(() =>
 	seeds.value.find(seed => seed.media.id === selectedSeedId.value)
 )
 const selectedStudio = computed(() =>
 	studios.value.find(studio => studio.id === selectedStudioId.value)
 )
+const recommendationIds = computed(() =>
+	new Set(visibleRecommendations.value.map(media => media.id))
+)
+const swipeQueue = computed(() => {
+	const uniqueMedia = new Map<number, AniListMediaSummary>()
+	for (const media of [...visibleRecommendations.value, ...visibleStudioMedia.value]) {
+		if (!decidedMediaIds.value.has(media.id)) uniqueMedia.set(media.id, media)
+	}
+	return [...uniqueMedia.values()]
+})
+const currentMedia = computed(() => swipeQueue.value[0] ?? null)
+const nextMedia = computed(() => swipeQueue.value.slice(1, 3))
+const currentReason = computed(() => {
+	if (!currentMedia.value) return "Recommended for you"
+	if (recommendationIds.value.has(currentMedia.value.id)) {
+		return selectedSeed.value
+			? `Because you liked ${getExploreTitle(selectedSeed.value.media)}`
+			: "Recommended for you"
+	}
+	return selectedStudio.value
+		? `From ${selectedStudio.value.name}`
+		: "From a favourite studio"
+})
+const hasMorePages = computed(() =>
+	recommendationPageInfo.value.hasNextPage || studioPageInfo.value.hasNextPage
+)
+const addingMediaIdList = computed(() => [...addingMediaIds.value])
+const { showPageLoader } = useProgressiveLoading(
+	computed(() => [
+		listInitialized.value,
+		recommendationsInitialized.value,
+		studioInitialized.value
+	]),
+	{
+		allowPartial: true,
+		layoutReady: listInitialized
+	}
+)
+
+async function loadMoreCandidates(): Promise<void> {
+	if (loadingMore.value) return
+	loadingMore.value = true
+
+	try {
+		const requests: Array<Promise<void>> = []
+		if (recommendationPageInfo.value.hasNextPage && !loadingRecommendations.value) {
+			requests.push(loadRecommendations(recommendationPageInfo.value.currentPage + 1))
+		}
+		if (studioPageInfo.value.hasNextPage && !loadingStudio.value) {
+			requests.push(loadStudio(studioPageInfo.value.currentPage + 1))
+		}
+		await Promise.all(requests)
+	} finally {
+		loadingMore.value = false
+	}
+}
+
+function handleDecision(payload: SwipeDecision): void {
+	decidedMediaIds.value = new Set([...decidedMediaIds.value, payload.media.id])
+	decisionHistory.value = [...decisionHistory.value, payload]
+
+	if (payload.direction === "right") {
+		interestedMedia.value = [
+			...interestedMedia.value.filter(media => media.id !== payload.media.id),
+			payload.media
+		]
+	}
+
+	if (swipeQueue.value.length <= 5 && hasMorePages.value) {
+		void loadMoreCandidates()
+	}
+}
+
+function restoreDecision(media: AniListMediaSummary): void {
+	const nextDecidedIds = new Set(decidedMediaIds.value)
+	nextDecidedIds.delete(media.id)
+	decidedMediaIds.value = nextDecidedIds
+	interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+	decisionHistory.value = decisionHistory.value.filter(
+		decision => decision.media.id !== media.id
+	)
+}
+
+function undoLastDecision(): void {
+	const previous = decisionHistory.value.at(-1)
+	if (!previous) return
+
+	decisionHistory.value = decisionHistory.value.slice(0, -1)
+	const nextDecidedIds = new Set(decidedMediaIds.value)
+	nextDecidedIds.delete(previous.media.id)
+	decidedMediaIds.value = nextDecidedIds
+	if (previous.direction === "right") {
+		interestedMedia.value = interestedMedia.value.filter(
+			media => media.id !== previous.media.id
+		)
+	}
+}
+
+function resetDecisions(): void {
+	decidedMediaIds.value = new Set()
+	interestedMedia.value = []
+	decisionHistory.value = []
+}
+
+async function saveToPlanning(
+	media: AniListMediaSummary,
+	notify = true
+): Promise<boolean> {
+	if (!userStore.isOAuthAuthenticated || addingMediaIds.value.has(media.id)) return false
+
+	addingMediaIds.value = new Set([...addingMediaIds.value, media.id])
+	try {
+		await $fetch<AniListSaveMediaListEntryResponse>("/api/anilist/media-list", {
+			method: "POST",
+			body: { mediaId: media.id }
+		})
+		addedMediaIds.value = new Set([...addedMediaIds.value, media.id])
+		interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+		if (notify) {
+			toast.add({
+				title: "Added to Plan to Watch",
+				description: `${getExploreTitle(media)} is now in your AniList planning list.`,
+				color: "warning",
+				icon: "i-lucide-bookmark-check"
+			})
+		}
+		return true
+	} catch (error) {
+		if (notify) {
+			toast.add({
+				title: "Could not update AniList",
+				description: error instanceof Error ? error.message : "Try again in a moment.",
+				color: "error",
+				icon: "i-lucide-triangle-alert"
+			})
+		}
+		return false
+	} finally {
+		const nextAddingIds = new Set(addingMediaIds.value)
+		nextAddingIds.delete(media.id)
+		addingMediaIds.value = nextAddingIds
+	}
+}
+
+async function addToPlanning(media: AniListMediaSummary): Promise<void> {
+	await saveToPlanning(media)
+}
+
+async function addAllToPlanning(): Promise<void> {
+	if (!userStore.isOAuthAuthenticated || addingAllToPlanning.value) return
+	const pendingMedia = [...interestedMedia.value]
+	if (!pendingMedia.length) return
+
+	addingAllToPlanning.value = true
+	let addedCount = 0
+	try {
+		for (const media of pendingMedia) {
+			if (await saveToPlanning(media, false)) addedCount += 1
+		}
+
+		const failedCount = pendingMedia.length - addedCount
+		toast.add({
+			title: failedCount ? "Plan to Watch partially updated" : "Plan to Watch updated",
+			description: failedCount
+				? `${addedCount} added, ${failedCount} could not be added.`
+				: `${addedCount} ${addedCount === 1 ? "anime was" : "anime were"} added to your AniList planning list.`,
+			color: failedCount ? "warning" : "success",
+			icon: failedCount ? "i-lucide-triangle-alert" : "i-lucide-bookmark-check"
+		})
+	} finally {
+		addingAllToPlanning.value = false
+	}
+}
 
 onMounted(() => {
 	void initialize()
@@ -75,247 +255,87 @@ onMounted(() => {
 </script>
 
 <template>
-	<UDashboardPanel id="explore">
+	<UDashboardPanel id="explore" :ui="{ body: 'pt-3 sm:pt-4' }">
 		<template #body>
-			<div class="mx-auto w-full max-w-7xl space-y-8">
-				<header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-					<div>
-						<p class="text-sm font-medium text-primary">Personal discovery</p>
-						<h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-							Explore anime
-						</h1>
-						<p class="mt-2 max-w-3xl text-muted">
-							Start from your highest-rated titles, then branch into the studios you enjoy most.
-							Anime found in the loaded list are hidden from the results.
-						</p>
-					</div>
-					<UButton
-						icon="i-lucide-refresh-cw"
-						label="Refresh"
-						color="neutral"
-						variant="soft"
-						:loading="loadingList"
-						@click="initialize"/>
-				</header>
-
+			<div class="mx-auto w-full max-w-304 space-y-4">
 				<UAlert
-					v-if="listError"
+					v-if="!showPageLoader && listError"
 					icon="i-lucide-triangle-alert"
 					title="Discovery data could not be loaded"
 					:description="listError"
 					color="error"
-					variant="soft"/>
+					variant="soft" />
+				<UAlert
+					v-else-if="recommendationError || studioError"
+					icon="i-lucide-triangle-alert"
+					title="Some suggestions could not be loaded"
+					:description="recommendationError || studioError || undefined"
+					color="warning"
+					variant="soft" />
 
-				<div
-					v-if="loadingList && !seeds.length"
-					class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
-					aria-label="Loading anime discovery"
-					aria-busy="true">
-					<USkeleton v-for="index in 6" :key="index" class="aspect-[3/4] rounded-xl" />
-				</div>
+				<PageLoadingState
+					v-if="showPageLoader"
+					label="Preparing your discovery deck"
+					description="Checking your full AniList collection and arranging personalized suggestions." />
 
 				<UEmpty
 					v-else-if="!listError && !seeds.length"
 					icon="i-lucide-heart-off"
 					title="No rated or favourite anime to start from"
-					description="Rate or favourite a few anime on AniList, then refresh this page to generate recommendations."/>
+					description="Rate or favourite a few anime on AniList, then return here to generate recommendations." />
 
-				<template v-else-if="seeds.length">
-					<section
-						class="grid gap-4 rounded-xl border border-default bg-muted/30 p-4 sm:grid-cols-2 lg:grid-cols-4"
-						aria-label="Discovery filters">
-						<label class="space-y-1 text-sm">
-							<span class="font-medium text-toned">Genre</span>
-							<select
-								v-model="genre"
-								class="h-10 w-full rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary">
-								<option value="">All genres</option>
-								<option v-for="option in genreOptions" :key="option" :value="option">
-									{{ option }}
-								</option>
-							</select>
-						</label>
-						<label class="space-y-1 text-sm">
-							<span class="font-medium text-toned">Format</span>
-							<select
-								v-model="format"
-								class="h-10 w-full rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary">
-								<option value="">All formats</option>
-								<option v-for="option in formatOptions" :key="option" :value="option">
-									{{ option.replaceAll("_", " ") }}
-								</option>
-							</select>
-						</label>
-						<label class="space-y-1 text-sm">
-							<span class="font-medium text-toned">Minimum AniList score</span>
-							<select
-								v-model.number="minimumScore"
-								class="h-10 w-full rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary">
-								<option :value="0">Any score</option>
-								<option :value="60">60% or higher</option>
-								<option :value="70">70% or higher</option>
-								<option :value="80">80% or higher</option>
-							</select>
-						</label>
-						<div class="flex items-end">
-							<UButton
-								icon="i-lucide-list-filter"
-								:label="`${visibleRecommendations.length + visibleStudioMedia.length} visible results`"
-								color="neutral"
-								variant="ghost"
-								disabled
-								class="w-full justify-center"/>
-						</div>
-					</section>
+				<div
+					v-else-if="seeds.length"
+					class="mx-auto grid w-full items-start justify-center gap-5 lg:grid-cols-[minmax(0,52rem)_22rem]">
+					<main class="w-full min-w-0 self-start justify-self-center">
+						<ExploreSwipeDeck
+							v-if="currentMedia"
+							:media="currentMedia"
+							:next-media="nextMedia"
+							:reason="currentReason"
+							@decision="handleDecision" />
 
-					<section class="space-y-4" aria-labelledby="recommendations-title">
-						<div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-							<div>
-								<h2 id="recommendations-title" class="text-2xl font-semibold text-highlighted">
-									Because you liked
-									<span class="text-primary">{{ selectedSeed ? getExploreTitle(selectedSeed.media) : "" }}</span>
-								</h2>
-								<p class="text-sm text-muted">
-									AniList community recommendations, ordered by recommendation rating.
-								</p>
-							</div>
-							<label class="space-y-1 text-sm">
-								<span class="sr-only">Recommendation source anime</span>
-								<select
-									v-model.number="selectedSeedId"
-									class="h-10 max-w-full rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary"
-									@change="loadRecommendations(1)">
-									<option
-										v-for="seed in seeds"
-										:key="seed.media.id"
-										:value="seed.media.id">
-										{{ getExploreTitle(seed.media) }} · {{ seed.score || "Favourite" }}
-									</option>
-								</select>
-							</label>
-						</div>
-
-						<UAlert
-							v-if="recommendationError"
-							title="Recommendations could not be loaded"
-							:description="recommendationError"
-							color="error"
-							variant="soft"/>
 						<div
-							v-if="loadingRecommendations"
-							class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
-							aria-label="Loading recommendations"
+							v-else-if="loadingRecommendations || loadingStudio || loadingMore"
+							class="mx-auto w-full max-w-md"
+							aria-label="Loading more suggestions"
 							aria-busy="true">
-							<USkeleton v-for="index in 6" :key="index" class="aspect-[3/4] rounded-xl" />
-						</div>
-						<div
-							v-else-if="visibleRecommendations.length"
-							class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-							<ExploreMediaCard
-								v-for="media in visibleRecommendations"
-								:key="media.id"
-								:media="media"/>
-						</div>
-						<UEmpty
-							v-else-if="!recommendationError"
-							icon="i-lucide-search-x"
-							title="No recommendations match"
-							description="Try another source anime, relax the filters or continue to the next page."/>
-						<div class="flex items-center justify-center gap-3">
-							<UButton
-								icon="i-lucide-chevron-left"
-								label="Previous"
-								color="neutral"
-								variant="soft"
-								:disabled="recommendationPageInfo.currentPage <= 1 || loadingRecommendations"
-								@click="loadRecommendations(recommendationPageInfo.currentPage - 1)"/>
-							<span class="text-sm text-muted">
-								Page {{ recommendationPageInfo.currentPage }}
-								<span v-if="recommendationPageInfo.lastPage">
-									of {{ recommendationPageInfo.lastPage }}
-								</span>
-							</span>
-							<UButton
-								trailing-icon="i-lucide-chevron-right"
-								label="Next"
-								color="neutral"
-								variant="soft"
-								:disabled="!recommendationPageInfo.hasNextPage || loadingRecommendations"
-								@click="loadRecommendations(recommendationPageInfo.currentPage + 1)"/>
-						</div>
-					</section>
-
-					<section class="space-y-4" aria-labelledby="studio-title">
-						<div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-							<div>
-								<h2 id="studio-title" class="text-2xl font-semibold text-highlighted">
-									More from {{ selectedStudio?.name || "your favourite studios" }}
-								</h2>
-								<p class="text-sm text-muted">
-									Main studio credits, ordered by AniList score and popularity.
-								</p>
-							</div>
-							<label class="space-y-1 text-sm">
-								<span class="sr-only">Studio</span>
-								<select
-									v-model.number="selectedStudioId"
-									class="h-10 max-w-full rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary"
-									@change="loadStudio(1)">
-									<option v-for="studio in studios" :key="studio.id" :value="studio.id">
-										{{ studio.name }} · {{ studio.count }} liked
-									</option>
-								</select>
-							</label>
+							<WidgetLoadingSkeleton label="Loading suggestion" variant="poster" />
 						</div>
 
-						<UAlert
-							v-if="studioError"
-							title="Studio anime could not be loaded"
-							:description="studioError"
-							color="error"
-							variant="soft"/>
-						<div
-							v-if="loadingStudio"
-							class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
-							aria-label="Loading studio anime"
-							aria-busy="true">
-							<USkeleton v-for="index in 6" :key="index" class="aspect-[3/4] rounded-xl" />
-						</div>
-						<div
-							v-else-if="visibleStudioMedia.length"
-							class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-							<ExploreMediaCard
-								v-for="media in visibleStudioMedia"
-								:key="media.id"
-								:media="media"/>
-						</div>
 						<UEmpty
-							v-else-if="!studioError"
-							icon="i-lucide-building-2"
-							title="No studio titles match"
-							description="Choose another studio, relax the filters or continue to the next page."/>
-						<div class="flex items-center justify-center gap-3">
-							<UButton
-								icon="i-lucide-chevron-left"
-								label="Previous"
-								color="neutral"
-								variant="soft"
-								:disabled="studioPageInfo.currentPage <= 1 || loadingStudio"
-								@click="loadStudio(studioPageInfo.currentPage - 1)"/>
-							<span class="text-sm text-muted">
-								Page {{ studioPageInfo.currentPage }}
-								<span v-if="studioPageInfo.lastPage">of {{ studioPageInfo.lastPage }}</span>
-							</span>
-							<UButton
-								trailing-icon="i-lucide-chevron-right"
-								label="Next"
-								color="neutral"
-								variant="soft"
-								:disabled="!studioPageInfo.hasNextPage || loadingStudio"
-								@click="loadStudio(studioPageInfo.currentPage + 1)"/>
-						</div>
-					</section>
-				</template>
+							v-else
+							icon="i-lucide-layers-2"
+							title="You reached the end of this deck"
+							description="Load more suggestions or revisit one of your decisions."
+							:actions="[
+								...(hasMorePages ? [{
+									label: 'Load more',
+									icon: 'i-lucide-chevrons-down',
+									onClick: loadMoreCandidates
+								}] : []),
+								{
+									label: 'Start over',
+									icon: 'i-lucide-rotate-ccw',
+									color: 'neutral',
+									variant: 'soft',
+									onClick: resetDecisions
+								}
+							]" />
+					</main>
+
+					<ExploreInterestedDeck
+						class="self-start lg:sticky lg:top-4"
+						:media="interestedMedia"
+						:can-add-to-planning="userStore.isOAuthAuthenticated"
+						:adding-media-ids="addingMediaIdList"
+						:adding-all="addingAllToPlanning"
+						:undo-disabled="!decisionHistory.length || addingAllToPlanning"
+						@add-to-planning="addToPlanning"
+						@add-all-to-planning="addAllToPlanning"
+						@undo="restoreDecision"
+						@undo-last="undoLastDecision" />
+				</div>
 			</div>
 		</template>
 	</UDashboardPanel>

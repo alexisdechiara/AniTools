@@ -1,45 +1,39 @@
 <script setup lang="ts">
-import { FEATURE_REGISTRY, type FeatureId } from "#shared/config/features"
-
 const props = withDefaults(defineProps<{
+	allowPartial?: boolean
 	pageId: string
-	title: string
-	description: string
 	loadData?: boolean
 	loadEntries?: boolean
 }>(), {
+	allowPartial: false,
 	loadData: true,
 	loadEntries: true
 })
 
 const entriesStore = useEntriesStore()
 const statisticsStore = useStatisticsStore()
-const { load, loading, error } = useAniListOverviewData()
+const { load, error } = useAniListOverviewData()
 
-const navigationIds = [
-	"statistics-overview",
-	"statistics-genres",
-	"statistics-tags",
-	"statistics-studios",
-	"statistics-voice-actors",
-	"statistics-staff"
-] as const satisfies readonly FeatureId[]
-
-const navigationItems = navigationIds.map(id => ({
-	id,
-	...FEATURE_REGISTRY[id]
-}))
-const hasData = computed(() =>
-	props.loadEntries
-		? entriesStore.isInitialized || statisticsStore.isInitialized
-		: statisticsStore.isInitialized
+const entriesSettled = computed(() =>
+	entriesStore.isInitialized
+	|| (!entriesStore.loading && Boolean(entriesStore.error))
 )
-const pageLoading = computed(() =>
-	props.loadEntries ? loading.value : statisticsStore.loading
+const statisticsSettled = computed(() =>
+	statisticsStore.isInitialized
+	|| (!statisticsStore.loading && Boolean(statisticsStore.error))
 )
 const pageError = computed(() =>
 	props.loadEntries ? error.value : statisticsStore.error
 )
+const readyStates = computed(() => props.loadEntries
+	? [entriesSettled.value, statisticsSettled.value]
+	: [statisticsSettled.value]
+)
+const { showPageLoader } = useProgressiveLoading(readyStates, {
+	allowPartial: props.allowPartial
+})
+const entriesPending = computed(() => props.loadEntries && !entriesSettled.value)
+const statisticsPending = computed(() => !statisticsSettled.value)
 
 async function retry() {
 	if (props.loadEntries) {
@@ -63,32 +57,6 @@ onMounted(() => {
 	<UDashboardPanel :id="pageId">
 		<template #body>
 			<div class="space-y-6">
-				<header>
-					<p class="text-sm font-medium text-primary">
-						AniList statistics
-					</p>
-					<h1 class="text-3xl font-semibold tracking-tight text-highlighted">
-						{{ title }}
-					</h1>
-					<p class="mt-1 max-w-3xl text-sm text-muted sm:text-base">
-						{{ description }}
-					</p>
-				</header>
-
-				<nav
-					class="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-default bg-muted/30 p-1"
-					aria-label="Statistics views">
-					<UButton
-						v-for="item in navigationItems"
-						:key="item.id"
-						:to="item.path"
-						:icon="item.icon"
-						:label="item.label"
-						color="neutral"
-						:variant="$route.path === item.path ? 'soft' : 'ghost'"
-						class="shrink-0"/>
-				</nav>
-
 				<UAlert
 					v-if="loadData && pageError"
 					icon="i-lucide-triangle-alert"
@@ -103,19 +71,39 @@ onMounted(() => {
 						onClick: retry
 					}]"/>
 
-				<div
-					v-if="loadData && pageLoading && !hasData"
-					class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-					aria-label="Loading statistics"
-					aria-busy="true">
-					<USkeleton
-						v-for="index in 8"
-						:key="index"
-						class="h-40"/>
-				</div>
-
-				<slot v-else />
+				<Transition name="statistics-ready" mode="out-in">
+					<PageLoadingState
+						v-if="loadData && showPageLoader"
+						key="statistics-loading"
+						label="Preparing your statistics"
+						description="Calculating your AniList overview and arranging every widget." />
+					<div v-else key="statistics-content">
+						<slot
+							:entries-loading="entriesPending"
+							:statistics-loading="statisticsPending" />
+					</div>
+				</Transition>
 			</div>
 		</template>
 	</UDashboardPanel>
 </template>
+
+<style scoped>
+.statistics-ready-enter-active,
+.statistics-ready-leave-active {
+	transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.statistics-ready-enter-from,
+.statistics-ready-leave-to {
+	opacity: 0;
+	transform: translateY(5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.statistics-ready-enter-active,
+	.statistics-ready-leave-active {
+		transition: none;
+	}
+}
+</style>

@@ -11,7 +11,5 @@ definePageMeta({
 <template>
 	<StatisticsDimensionPage
 		page-id="statistics-tags"
-		title="Tags"
-		description="Explore the themes and traits that appear across your AniList anime history."
 		dimension="tags"/>
 </template>

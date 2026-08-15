@@ -3,13 +3,24 @@
 		<VueDraggable
 			v-model="modelValue"
 			group="tiers"
+			:data-tier-lane="laneId"
+			draggable="[data-tier-entry]"
 			filter="[data-locked='true']"
-			class="grid size-full flex-wrap gap-2 p-4"
+			class="grid size-full min-h-32 flex-wrap content-start gap-2 p-4"
 			:class="nbColClass"
-			:disabled="isInspectorEnabled"
+			:disabled="isInspectorEnabled || hasHiddenEntries"
+			:animation="90"
+			:force-fallback="true"
+			:fallback-on-body="true"
+			:fallback-tolerance="4"
+			:empty-insert-threshold="48"
+			ghost-class="tierlist-drag-ghost"
+			chosen-class="tierlist-drag-chosen"
+			drag-class="tierlist-drag-active"
 			:delay="180"
-			:delay-on-touch-start="true"
-			:touch-start-threshold="5">
+			:delay-on-touch-only="true"
+			:touch-start-threshold="5"
+			@end="handleDragEnd">
 			<AnimeTier
 				v-for="entry in filteredEntries"
 				:key="entry.media.id"
@@ -28,11 +39,13 @@
 				@move-previous-lane="moveToAdjacentLane(entry, -1)"
 				@move-next-lane="moveToAdjacentLane(entry, 1)"
 				@reorder="reorderAnime(entry, $event)" />
+			<slot v-if="filteredEntries.length === 0" name="empty" />
 		</VueDraggable>
 	</UContextMenu>
 </template>
 
 <script lang="ts" setup>
+import type { SortableEvent } from "sortablejs"
 import { VueDraggable } from "vue-draggable-plus"
 import type { TierlistEntry, TierlistLaneId } from "~/types/tierlist"
 import { useTierListEntryFilter } from "~/utils/TierListEntryFilter"
@@ -56,6 +69,7 @@ const { nbColClass } = storeToRefs(tierlistStore)
 const { isInspectorEnabled } = useInspector()
 
 const filteredEntries = computed(() => modelValue.value.filter(filterEntry))
+const hasHiddenEntries = computed(() => filteredEntries.value.length !== modelValue.value.length)
 const moveTargets = computed(() => tierlistStore.getMoveTargets(props.laneId))
 const hasPreviousLane = computed(() =>
 	tierlistStore.getAdjacentLane(props.laneId, -1) !== null
@@ -63,6 +77,40 @@ const hasPreviousLane = computed(() =>
 const hasNextLane = computed(() =>
 	tierlistStore.getAdjacentLane(props.laneId, 1) !== null
 )
+
+function getDropPoint(event: Event | undefined): { x: number, y: number } | null {
+	if (event instanceof MouseEvent) {
+		return { x: event.clientX, y: event.clientY }
+	}
+	if (typeof TouchEvent !== "undefined" && event instanceof TouchEvent) {
+		const touch = event.changedTouches.item(0) ?? event.touches.item(0)
+		return touch ? { x: touch.clientX, y: touch.clientY } : null
+	}
+	return null
+}
+
+function handleDragEnd(event: SortableEvent): void {
+	const point = getDropPoint(event.originalEvent)
+	const mediaId = Number(event.item.dataset.mediaId)
+	if (!point || !Number.isInteger(mediaId) || mediaId <= 0) return
+
+	const targetLane = document.elementsFromPoint(point.x, point.y)
+		.map(element => element.closest<HTMLElement>("[data-tier-lane]"))
+		.find((element): element is HTMLElement => element !== null)
+	const targetLaneId = targetLane?.dataset.tierLane
+	if (
+		!targetLaneId
+		|| targetLaneId === props.laneId
+		|| (
+			targetLaneId !== "unranked"
+			&& !tierlistStore.tiers.some(tier => tier.id === targetLaneId)
+		)
+	) return
+
+	// Sortable handles empty lanes correctly. Its fallback mode can miss a
+	// populated CSS grid, so finish that cross-lane move from the drop point.
+	tierlistStore.moveEntry(mediaId, props.laneId, targetLaneId)
+}
 
 function entryIndex(item: TierlistEntry): number {
 	return modelValue.value.findIndex(entry => entry.media.id === item.media.id)
@@ -178,3 +226,17 @@ const actions = [
 	]
 ]
 </script>
+
+<style scoped>
+:deep(.tierlist-drag-ghost) {
+	opacity: 0.25;
+}
+
+:global(.tierlist-drag-chosen),
+:global(.tierlist-drag-active) {
+	z-index: 100 !important;
+	cursor: grabbing;
+	transition: none !important;
+	will-change: transform;
+}
+</style>

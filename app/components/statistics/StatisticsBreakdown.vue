@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StatisticsMediaStrip from "~/components/statistics/StatisticsMediaStrip.vue"
 import type { StatisticMetric } from "~/utils/statistics"
 import {
 	getCountChange,
@@ -7,6 +8,7 @@ import {
 } from "~/utils/statistics-breakdown"
 
 const props = withDefaults(defineProps<{
+	dimension: "genres" | "tags" | "studios"
 	items: readonly StatisticsBreakdownItem[]
 	previousItems?: readonly StatisticsBreakdownItem[]
 	comparisonLabel?: string
@@ -21,9 +23,9 @@ const selectedMetric = defineModel<StatisticMetric>("metric", {
 const search = ref("")
 
 const metricOptions = [
-	{ label: "Titles", value: "count" },
-	{ label: "Mean score", value: "meanScore" },
-	{ label: "Watch time", value: "minutesWatched" }
+	{ label: "Count", value: "count", icon: "i-lucide-list-ordered" },
+	{ label: "Mean score", value: "meanScore", icon: "i-lucide-percent" },
+	{ label: "Time watched", value: "minutesWatched", icon: "i-lucide-clock-3" }
 ]
 const previousCountByKey = computed(() =>
 	new Map(props.previousItems.map(item => [item.key, item.count]))
@@ -36,26 +38,18 @@ const filteredItems = computed(() => {
 		)
 		: [...props.items]
 
+	if (selectedMetric.value === "count") {
+		return matches.toSorted((left, right) => right.count - left.count)
+	}
+
 	return sortBreakdownItems(matches, selectedMetric.value)
 })
-const maxValue = computed(() =>
-	Math.max(0, ...filteredItems.value.map(item => item[selectedMetric.value]))
-)
-
-function formatMetric(item: StatisticsBreakdownItem): string {
-	if (selectedMetric.value === "meanScore") {
-		return `${Number(item.meanScore.toFixed(2))}%`
-	}
-	if (selectedMetric.value === "minutesWatched") {
-		return formatWatchTime(item.minutesWatched)
+function itemUrl(item: StatisticsBreakdownItem): string {
+	if (props.dimension === "studios") {
+		return `https://anilist.co/studio/${encodeURIComponent(item.key)}`
 	}
 
-	return item.count.toLocaleString()
-}
-
-function progressValue(item: StatisticsBreakdownItem): number {
-	if (maxValue.value === 0) return 0
-	return Math.round((item[selectedMetric.value] / maxValue.value) * 100)
+	return `https://anilist.co/search/anime?genres=${encodeURIComponent(item.name)}`
 }
 
 function comparison(item: StatisticsBreakdownItem): number | null {
@@ -65,70 +59,97 @@ function comparison(item: StatisticsBreakdownItem): number | null {
 
 <template>
 	<div class="space-y-4">
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
 			<UInput
 				v-model="search"
 				icon="i-lucide-search"
 				placeholder="Filter this breakdown"
 				aria-label="Filter statistics"
 				class="w-full sm:max-w-xs"/>
-			<USelect
+			<UTabs
 				v-model="selectedMetric"
 				:items="metricOptions"
-				aria-label="Statistic metric"
-				class="w-full sm:ml-auto sm:w-44"/>
+				:content="false"
+				aria-label="Rank statistics by"
+				class="w-full lg:ml-auto lg:w-fit"
+				:ui="{ trigger: 'cursor-pointer' }"/>
 		</div>
 
 		<div
 			v-if="filteredItems.length"
-			class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-			<UPageCard
+			class="grid gap-4 xl:grid-cols-2">
+			<article
 				v-for="(item, index) in filteredItems"
 				:key="item.key"
-				:ui="{ container: 'gap-y-3' }">
-				<div class="flex items-start gap-3">
-					<span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-						{{ index + 1 }}
-					</span>
-					<div class="min-w-0 flex-1">
-						<div class="flex items-start justify-between gap-3">
-							<h2 class="truncate text-sm font-medium text-highlighted">
-								{{ item.name }}
-							</h2>
-							<span class="shrink-0 text-sm font-semibold text-highlighted tabular-nums">
-								{{ formatMetric(item) }}
-							</span>
+				class="overflow-hidden rounded-xl border border-default bg-elevated shadow-sm transition hover:border-primary/40 hover:shadow-md">
+				<div class="p-4 sm:p-5">
+					<header class="flex items-start justify-between gap-3">
+						<NuxtLink
+							:to="itemUrl(item)"
+							external
+							target="_blank"
+							rel="noopener noreferrer"
+							class="min-w-0 truncate text-lg font-semibold text-highlighted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary sm:text-xl">
+							{{ item.name }}
+						</NuxtLink>
+						<span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-inverted shadow-sm">
+							{{ index + 1 }}
+						</span>
+					</header>
+
+					<dl class="mt-4 grid grid-cols-3 gap-2">
+						<div
+							class="rounded-lg px-2.5 py-2 transition"
+							:class="selectedMetric === 'count' ? 'bg-primary/10' : 'bg-muted/40'">
+							<dt class="text-[11px] text-muted sm:text-xs">
+								Count
+							</dt>
+							<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">
+								{{ item.count.toLocaleString() }}
+							</dd>
 						</div>
-						<UProgress
-							:model-value="progressValue(item)"
-							:max="100"
-							size="sm"
-							class="mt-2"
-							:aria-label="`${item.name}: ${formatMetric(item)}`"/>
-						<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-							<span>{{ item.count.toLocaleString() }} titles</span>
-							<span>{{ Number(item.meanScore.toFixed(2)) }}% mean</span>
-							<span>{{ formatWatchTime(item.minutesWatched) }}</span>
+						<div
+							class="rounded-lg px-2.5 py-2 transition"
+							:class="selectedMetric === 'meanScore' ? 'bg-primary/10' : 'bg-muted/40'">
+							<dt class="text-[11px] text-muted sm:text-xs">
+								Mean score
+							</dt>
+							<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">
+								{{ Number(item.meanScore.toFixed(2)) }}%
+							</dd>
 						</div>
-						<p
-							v-if="comparisonLabel"
-							class="mt-2 text-xs"
-							:class="comparison(item) === null
-								? 'text-muted'
-								: (comparison(item) ?? 0) >= 0
-									? 'text-success'
-									: 'text-error'">
-							<template v-if="comparison(item) === null">
-								New compared with {{ comparisonLabel }}
-							</template>
-							<template v-else>
-								{{ (comparison(item) ?? 0) > 0 ? '+' : '' }}{{ comparison(item) }}%
-								titles compared with {{ comparisonLabel }}
-							</template>
-						</p>
-					</div>
+						<div
+							class="rounded-lg px-2.5 py-2 transition"
+							:class="selectedMetric === 'minutesWatched' ? 'bg-primary/10' : 'bg-muted/40'">
+							<dt class="text-[11px] text-muted sm:text-xs">
+								Time watched
+							</dt>
+							<dd class="mt-0.5 truncate font-semibold text-highlighted tabular-nums">
+								{{ formatWatchTime(item.minutesWatched) }}
+							</dd>
+						</div>
+					</dl>
+
+					<p
+						v-if="comparisonLabel"
+						class="mt-3 text-xs"
+						:class="comparison(item) === null
+							? 'text-muted'
+							: (comparison(item) ?? 0) >= 0
+								? 'text-success'
+								: 'text-error'">
+						<template v-if="comparison(item) === null">
+							New compared with {{ comparisonLabel }}
+						</template>
+						<template v-else>
+							{{ (comparison(item) ?? 0) > 0 ? '+' : '' }}{{ comparison(item) }}%
+							titles compared with {{ comparisonLabel }}
+						</template>
+					</p>
 				</div>
-			</UPageCard>
+
+				<StatisticsMediaStrip :media-ids="item.mediaIds" :limit="7"/>
+			</article>
 		</div>
 
 		<UAlert

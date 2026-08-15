@@ -4,34 +4,6 @@
 			{{ calendarStatusMessage }}
 		</div>
 
-		<div
-			v-if="calendarError"
-			class="absolute inset-x-3 top-20 z-50 flex flex-wrap items-center gap-3 rounded-lg border border-error/30 bg-error/10 p-3 text-sm shadow-sm backdrop-blur sm:inset-x-auto sm:right-6 sm:max-w-md"
-			role="alert">
-			<Icon name="lucide:circle-alert" class="size-5 shrink-0 text-error" aria-hidden="true" />
-			<p class="min-w-0 flex-1">The calendar could not be loaded.</p>
-			<UButton
-				label="Try again"
-				size="xs"
-				color="error"
-				variant="soft"
-				@click="refreshCalendar" />
-		</div>
-		<div
-			v-else-if="hasCalendarWarning && !warningDismissed"
-			class="absolute inset-x-3 top-20 z-50 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm shadow-sm backdrop-blur sm:inset-x-auto sm:right-6 sm:max-w-md"
-			role="status">
-			<Icon name="lucide:triangle-alert" class="size-5 shrink-0 text-warning" aria-hidden="true" />
-			<p class="flex-1">Some simuldub details are temporarily unavailable. AniList broadcasts are still shown.</p>
-			<UButton
-				icon="i-lucide-x"
-				size="xs"
-				color="neutral"
-				variant="ghost"
-				aria-label="Dismiss calendar warning"
-				@click="warningDismissed = true" />
-		</div>
-
 		<vue-cal ref="vueCalRef" v-model:view="store.currentView" :time-step="store.timeStep" time-at-cursor week-numbers
 			aria-label="Anime release calendar"
 			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="store.handleWheel"
@@ -153,6 +125,18 @@
 			</template>
 		</vue-cal>
 
+		<Transition name="calendar-ready">
+			<div
+				v-if="showCalendarLoader"
+				class="absolute inset-0 z-60 flex bg-default"
+				aria-label="Loading calendar">
+				<PageLoadingState
+					class="min-h-full rounded-none"
+					label="Preparing your calendar"
+					description="Loading releases and waiting for the calendar layout to settle." />
+			</div>
+		</Transition>
+
 		<div
 			v-if="showEmptyState"
 			class="pointer-events-none absolute bottom-4 right-4 z-40 max-w-xs rounded-lg border border-default bg-default/95 px-4 py-3 text-sm text-muted shadow-sm"
@@ -203,9 +187,9 @@ useSeoMeta({
 addDatePrototypes()
 
 const vueCalRef = ref<{ view: VueCalView } | null>(null)
+const calendarReady = ref(false)
 const searchButtonToggle = ref(false)
 const searchQuery = ref("")
-const warningDismissed = ref(false)
 const inputRef = ref<{ $el?: HTMLElement } | null>(null)
 
 function openSearch() {
@@ -267,6 +251,13 @@ const {
 		warnings: []
 	})
 })
+const { showPageLoader: showCalendarLoader } = useProgressiveLoading(
+	computed(() => [calendarStatus.value !== "pending"]),
+	{
+		allowPartial: false,
+		layoutReady: calendarReady
+	}
+)
 
 const airingSchedules = computed(() => calendarData.value.airingSchedules)
 const simuldubs = computed(() => calendarData.value.simuldubs)
@@ -280,8 +271,6 @@ const missingSimuldubMediaById = computed(() => {
 })
 
 const toast = useToast()
-const isLoadingCalendar = computed(() => calendarStatus.value === "pending")
-const delayedPending = refDebounced(isLoadingCalendar, 500)
 
 function isCancelled(event: { status?: string }) {
 	return event.status === "cancelled"
@@ -291,22 +280,26 @@ function isUnconfirmed(event: { status?: string }) {
 	return event.status === "unconfirmed"
 }
 
-watch(delayedPending, (pending) => {
-	if (pending) {
+watch(calendarError, (caughtError) => {
+	if (caughtError) {
 		toast.add({
-			id: "loading-calendar-data",
-			title: "Loading airing schedules and simuldubs",
-			icon: "i-lucide-loader-circle",
-			close: false,
-			progress: false,
-			ui: {
-				icon: "animate-spin"
-			}
+			id: "calendar-load-error",
+			title: "Calendar could not be loaded",
+			description: "AniList broadcasts and simuldub events are temporarily unavailable.",
+			icon: "i-lucide-circle-alert",
+			color: "error",
+			duration: 0,
+			actions: [{
+				label: "Try again",
+				color: "error",
+				variant: "soft",
+				onClick: () => refreshCalendarData()
+			}]
 		})
 	} else {
-		toast.remove("loading-calendar-data")
+		toast.remove("calendar-load-error")
 	}
-})
+}, { immediate: true })
 
 const allCalendarEvents = computed(() =>
 	buildCalendarEvents(
@@ -353,6 +346,21 @@ const filteredCalendarEvents = computed(() => {
 })
 
 const hasCalendarWarning = computed(() => calendarData.value.warnings.length > 0)
+
+function syncCalendarWarningToast(hasWarning: boolean) {
+	if (hasWarning) {
+		toast.add({
+			id: "calendar-simuldub-warning",
+			title: "Some simuldub details are unavailable",
+			description: "AniList broadcasts are still displayed in the calendar.",
+			icon: "i-lucide-triangle-alert",
+			color: "warning"
+		})
+		return
+	}
+
+	toast.remove("calendar-simuldub-warning")
+}
 const showEmptyState = computed(() =>
 	calendarStatus.value !== "pending"
 	&& !calendarError.value
@@ -378,12 +386,11 @@ function getEventAriaLabel(event: CalendarEvent) {
 	return details.join(", ")
 }
 
-async function refreshCalendar() {
-	await refreshCalendarData()
-}
-
 const onCalendarReady = () => {
-	vueCalRef.value?.view?.scrollToCurrentTime()
+	requestAnimationFrame(() => {
+		vueCalRef.value?.view?.scrollToCurrentTime()
+		calendarReady.value = true
+	})
 }
 
 let scrollTimer: ReturnType<typeof setTimeout> | undefined
@@ -401,6 +408,7 @@ const onViewChange = (view: VueCalView) => {
 }
 
 onMounted(() => {
+	watch(hasCalendarWarning, syncCalendarWarningToast, { immediate: true })
 	if (window.matchMedia("(max-width: 639px)").matches && store.currentView === "week") {
 		store.currentView = "day"
 	}
@@ -414,7 +422,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	if (scrollTimer) clearTimeout(scrollTimer)
-	toast.remove("loading-calendar-data")
+	toast.remove("calendar-load-error")
+	toast.remove("calendar-simuldub-warning")
 })
 </script>
 
@@ -545,6 +554,16 @@ onBeforeUnmount(() => {
 .calendar-event-card {
 	container-type: inline-size;
 	container-name: event-card;
+}
+
+.calendar-ready-enter-active,
+.calendar-ready-leave-active {
+	transition: opacity 240ms ease;
+}
+
+.calendar-ready-enter-from,
+.calendar-ready-leave-to {
+	opacity: 0;
 }
 
 @container event-card (max-width: 90px) {

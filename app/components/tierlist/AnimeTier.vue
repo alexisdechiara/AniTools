@@ -1,17 +1,17 @@
 <template>
 	<div
-		class="group relative z-20 aspect-3/4 h-fit w-full transition-all duration-100 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+		class="group relative z-20 aspect-3/4 h-fit w-full transition-all duration-100 ease-out focus-within:z-50 hover:z-50 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
 		:class="[
 			!item.locked && !isInspectorEnabled ? 'hover:scale-102' : '',
 			hoveredTarget?.id === mediaId && hoveredTarget?.type === 'anime'
 				? 'cursor-pointer ring-2 ring-primary ring-offset-2 ring-offset-default'
 				: ''
 		]"
+		data-tier-entry
+		:data-media-id="item.media.id"
 		:data-locked="item.locked ? 'true' : undefined"
-		:draggable="!item.locked"
 		:aria-label="`${title}. Use arrow keys to reorder or change tier.`"
 		tabindex="0"
-		@dragstart="handleDragStart"
 		@click.stop="selectItem"
 		@mouseover.stop="setHovered(mediaId, 'anime', 'Anime')"
 		@mouseleave="clearHovered"
@@ -66,7 +66,7 @@
 			class="pointer-events-none absolute inset-0 z-40 rounded-lg bg-linear-to-t from-neutral-950/60 from-0% via-neutral-950/40 via-10% to-neutral-950/10 to-25% opacity-0 transition-all duration-100 ease-in-out group-focus-within:opacity-100 group-hover:opacity-100"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
-			class="invisible absolute inset-x-2 bottom-2 z-50 text-[10px] font-medium text-white group-focus-within:visible group-hover:visible"
+			class="pointer-events-none invisible absolute inset-x-2 bottom-2 z-50 text-[10px] font-medium text-white group-focus-within:visible group-hover:visible"
 			:class="isInspectorEnabled ? 'cursor-pointer' : 'cursor-move'">
 			{{ title }}
 		</span>
@@ -79,11 +79,7 @@ import type {
 	TierlistLaneId,
 	TierlistMoveTarget
 } from "~/types/tierlist"
-import {
-	createTierlistDragPayload,
-	getTierlistEntryTitle,
-	sanitizeTierlistEntry
-} from "~/utils/tierlist-model"
+import { getTierlistEntryTitle } from "~/utils/tierlist-model"
 
 const props = defineProps<{
 	item: TierlistEntry
@@ -119,25 +115,6 @@ const coverUrl = computed(() =>
 
 function removeAnime(): void {
 	emit("remove", props.item)
-}
-
-function handleDragStart(event: DragEvent): void {
-	if (props.item.locked) {
-		event.preventDefault()
-		return
-	}
-
-	const sanitized = sanitizeTierlistEntry(props.item)
-	if (!sanitized || !event.dataTransfer) {
-		event.preventDefault()
-		return
-	}
-	event.dataTransfer.setData(
-		"application/json",
-		createTierlistDragPayload(props.laneId, sanitized)
-	)
-	event.dataTransfer.setData("text/plain", title.value)
-	event.dataTransfer.effectAllowed = "move"
 }
 
 function handleKeydown(event: KeyboardEvent): void {

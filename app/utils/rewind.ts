@@ -30,6 +30,7 @@ export interface RewindSummary {
 	activityCounts: Record<string, number>
 	statuses: RewindBreakdown[]
 	genres: RewindBreakdown[]
+	tags: RewindBreakdown[]
 	seasons: RewindBreakdown[]
 	topAnime: RewindAnimeMetric[]
 	flopAnime: RewindAnimeMetric[]
@@ -300,6 +301,9 @@ export function buildRewindSummary(
 			entry.status ? [entry.status] : []
 		),
 		genres: createBreakdowns(accumulators, entry => entry.media?.genres ?? []),
+		tags: createBreakdowns(accumulators, entry =>
+			entry.media?.tags.map(tag => tag.name) ?? []
+		),
 		seasons: createBreakdowns(accumulators, entry =>
 			entry.media?.season ? [entry.media.season] : []
 		),

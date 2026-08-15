@@ -44,7 +44,7 @@ const { items: links } = useAppNavigation({
       </template>
     </UDashboardSidebar>
 
-		<main id="main-content" tabindex="-1" class="min-w-0 flex-1 overflow-hidden outline-none">
+		<main id="main-content" tabindex="-1" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto outline-none">
 			<slot />
 		</main>
   </UDashboardGroup>

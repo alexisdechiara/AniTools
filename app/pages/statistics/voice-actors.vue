@@ -11,7 +11,5 @@ definePageMeta({
 <template>
 	<StatisticsPeoplePage
 		page-id="statistics-voice-actors"
-		title="Voice Actors"
-		description="See which voice actors appear most across your AniList anime history."
 		kind="voiceActors"/>
 </template>

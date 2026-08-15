@@ -22,6 +22,39 @@ export interface ExploreMediaFilters {
 	minimumScore?: number
 }
 
+export interface ExploreRelationBadge {
+	label: string
+	description: string
+}
+
+const EXPLORE_RELATION_LABELS: Readonly<Record<string, string>> = {
+	PREQUEL: "Sequel",
+	SEQUEL: "Prequel",
+	PARENT: "Spin-off",
+	ADAPTATION: "Adaptation",
+	SOURCE: "Source material",
+	SPIN_OFF: "Related series",
+	SIDE_STORY: "Main story",
+	ALTERNATIVE: "Alternative version",
+	SUMMARY: "Full story",
+	CHARACTER: "Shared characters",
+	OTHER: "Related anime"
+}
+
+const EXPLORE_RELATION_PRIORITY = [
+	"PREQUEL",
+	"PARENT",
+	"ADAPTATION",
+	"SEQUEL",
+	"SPIN_OFF",
+	"SIDE_STORY",
+	"ALTERNATIVE",
+	"SUMMARY",
+	"SOURCE",
+	"CHARACTER",
+	"OTHER"
+] as const
+
 export function selectExploreSeeds(
 	entries: readonly AniListAnimeListEntry[],
 	limit = 8
@@ -107,4 +140,34 @@ export function getExploreTitle(media: AniListMediaSummary): string {
 		?? media.title?.romaji
 		?? media.title?.native
 		?? "Untitled anime"
+}
+
+export function getExploreRelationBadge(
+	media: AniListMediaSummary
+): ExploreRelationBadge | null {
+	const edges = media.relations?.edges ?? []
+	for (const relationType of EXPLORE_RELATION_PRIORITY) {
+		const edge = edges.find(item => item.relationType === relationType && item.node)
+		if (!edge?.node) continue
+		const relatedTitle = edge.node.title?.userPreferred
+			?? edge.node.title?.english
+			?? edge.node.title?.romaji
+			?? edge.node.title?.native
+			?? "a related anime"
+		const label = EXPLORE_RELATION_LABELS[relationType] ?? "Related anime"
+
+		if (relationType === "PREQUEL") {
+			return { label, description: `Sequel to ${relatedTitle}` }
+		}
+		if (relationType === "SEQUEL") {
+			return { label, description: `Precedes ${relatedTitle}` }
+		}
+		if (relationType === "ADAPTATION") {
+			return { label, description: `Adapted from ${relatedTitle}` }
+		}
+
+		return { label, description: `${label} · ${relatedTitle}` }
+	}
+
+	return null
 }

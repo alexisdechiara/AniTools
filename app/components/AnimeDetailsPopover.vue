@@ -1,12 +1,20 @@
 <template>
-	<UPopover :content="popoverContent" :reference="reference" v-bind="$attrs">
+	<UPopover
+		v-model:open="open"
+		:mode="props.mode"
+		:open-delay="props.openDelay"
+		:close-delay="props.closeDelay"
+		:enable-touch="props.enableTouch"
+		:content="popoverContent"
+		:reference="reference"
+		v-bind="$attrs">
 		<slot />
 		<template #content>
 			<div class="relative overflow-hidden" :class="isHorizontal ? 'h-64 max-w-lg' : 'h-fit max-w-xs'" ref="popoverEl"
 				:style="{ '--anime-theme-color': animeThemeColor }">
 				<div :class="isHorizontal ? 'grid grid-cols-3 size-full' : 'grid grid-cols-1 size-full'">
 					<div v-if="isHorizontal" class="col-span-1 h-full w-fit relative">
-						<NuxtPicture :src="data.media.coverImage.large" :imgAttrs="{ class: 'size-full rounded-l-md' }" />
+						<NuxtPicture v-if="coverUrl" :src="coverUrl" :imgAttrs="{ class: 'size-full rounded-l-md object-cover' }" />
 						<div class="absolute bottom-0 inset-x-0 flex py-3 items-center justify-center">
 							<UTabs v-if="showTabs" v-model="activeTab" size="xs" :items="items" :content="false" :ui="{
 								root: 'opacity-95',
@@ -105,6 +113,10 @@
 							</p>
 						</div>
 						<div v-show="showDetails" class="flex flex-col justify-evenly size-full gap-y-4">
+							<div v-if="detailsLoading" class="flex items-center justify-center gap-2 text-sm text-muted">
+								<UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+								Loading details…
+							</div>
 							<div class="flex justify-between w-full">
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="ratedRankText" description="Ranking" />
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="popularRankText" description="Popularity" />
@@ -120,10 +132,11 @@
 									:class="nbLinks < 4 ? 'col-span-11' : 'col-span-10'" />
 								<div class="grid auto-cols-max grid-flow-col grid-rows-5 gap-1 min-w-min h-fit flex-1 overflow-hidden"
 									:class="nbLinks < 4 ? 'col-span-1' : 'col-span-2'">
-									<ExternalLink v-for="(link, index) in data.media.externalLinks" :key="index" :color="link.color"
+									<ExternalLink v-for="(link, index) in externalLinks" :key="index" :color="link.color"
 										:site="link.site" :url="link.url" />
 								</div>
 							</div>
+							<p v-if="detailsError" class="text-xs text-error">{{ detailsError }}</p>
 						</div>
 						<div v-if="showBadges" class="static flex w-full items-center justify-center py-3"
 							:class="isHorizontal ? '' : '-mt-4'">
@@ -165,18 +178,27 @@
 </template>
 
 <script lang="ts" setup>
-import { useDraggable, useResizeObserver } from '@vueuse/core'
+import { useDraggable, useEventListener } from '@vueuse/core'
 import type { PopoverProps, TabsItem } from '@nuxt/ui'
+import type { AniListMediaResponse, AniListMediaSummary } from '~~/shared/types/anilist'
 import TextHover from './TextHover.vue';
 
 const props = withDefaults(defineProps<{
 	data: any;
 	orientation?: "vertical" | "horizontal";
 	draggable?: boolean;
-} & PopoverProps>(), {
+} & Omit<PopoverProps, 'open' | 'defaultOpen'>>(), {
 	orientation: "horizontal",
 	draggable: true
 });
+const open = defineModel<boolean>('open', { default: false })
+const remoteMedia = ref<AniListMediaSummary | null>(null)
+const detailsLoading = ref(false)
+const detailsError = ref<string | null>(null)
+const data = computed(() => remoteMedia.value
+	? { ...props.data, media: remoteMedia.value }
+	: props.data
+)
 
 const defaultPopoverContent = {
 	align: 'center',
@@ -215,9 +237,15 @@ const hoveredContent = ref(false);
 const showStudios = ref(true);
 const activeTab = ref("summary");
 
-const media = computed(() => props.data?.media);
-const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge: any) => edge.isMain) || []);
-const nbLinks = computed(() => Array(props.data.media.externalLinks).length);
+const media = computed(() => data.value?.media);
+const coverUrl = computed(() => media.value?.coverImage?.extraLarge
+	?? media.value?.coverImage?.large
+	?? media.value?.coverImage?.medium
+	?? null
+)
+const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge: any) => edge.isMain && edge.node) || []);
+const externalLinks = computed(() => media.value?.externalLinks ?? [])
+const nbLinks = computed(() => externalLinks.value.length);
 
 const ratedRankText = computed(() => {
 	const ranking = media.value?.rankings?.find((r: any) => r.type === 'RATED' && r.allTime);
@@ -230,7 +258,7 @@ const popularRankText = computed(() => {
 });
 
 const meanScoreText = computed(() => (media.value?.meanScore ? `${media.value.meanScore.toFixed(0)} %` : '-'));
-const favouritesText = computed(() => media.value?.favourites || '-');
+const favouritesText = computed(() => String(media.value?.favourites ?? '-'));
 const trailerUrl = computed(() => {
 	const trailer = media.value?.trailer
 	const id = typeof trailer?.id === "string" ? trailer.id.trim() : ""
@@ -243,8 +271,26 @@ const trailerUrl = computed(() => {
 	return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=0`
 })
 
-const animeThemeColor = computed(() => props.data?.media?.coverImage?.color || 'var(--ui-color-primary-400)');
-const sanitizedDescription = computed(() => (props.data?.media?.description || '').replace(/(<([^>]+)>)/ig, ''));
+const animeThemeColor = computed(() => media.value?.coverImage?.color || 'var(--ui-color-primary-400)');
+const sanitizedDescription = computed(() => (media.value?.description || '').replace(/(<([^>]+)>)/ig, ''));
+
+watch(open, async (isOpen) => {
+	const mediaId = Number(props.data?.media?.id)
+	if (!isOpen || remoteMedia.value || !Number.isInteger(mediaId) || mediaId <= 0) return
+
+	detailsLoading.value = true
+	detailsError.value = null
+	try {
+		const response = await $fetch<AniListMediaResponse>('/api/anilist/media', {
+			query: { id: mediaId }
+		})
+		remoteMedia.value = response.media
+	} catch {
+		detailsError.value = 'Some AniList details could not be loaded.'
+	} finally {
+		detailsLoading.value = false
+	}
+})
 
 
 const badgesEl = ref<HTMLElement | null>(null);
@@ -259,7 +305,7 @@ function updateBadgesOverflow() {
 	badgesOverflowing.value = el.scrollWidth > el.clientWidth + 1;
 }
 
-useResizeObserver(badgesEl, updateBadgesOverflow);
+useEventListener('resize', updateBadgesOverflow);
 onMounted(async () => {
 	await nextTick();
 	updateBadgesOverflow();

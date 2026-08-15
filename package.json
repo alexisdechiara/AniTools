@@ -42,8 +42,10 @@
 		"nuxt-site-config": "^4.1.2",
 		"pinia": "^4.0.2",
 		"pinia-plugin-persistedstate": "^4.7.1",
+		"reka-ui": "2.10.1",
 		"vue-cal": "^5.0.1-rc.46",
 		"vue-draggable-plus": "^0.6.1",
+		"vue-timeline-chart": "^5.1.0",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
@@ -57,10 +59,12 @@
 		"vue-tsc": "^3.3.8"
 	},
 	"overrides": {
-		"brace-expansion": "5.0.8",
+		"brace-expansion": "5.0.9",
 		"esbuild": "0.28.1",
 		"immutable": "5.1.9",
+		"js-yaml": "4.3.1",
 		"lodash": "4.18.1",
-		"minimatch": "10.2.6"
+		"minimatch": "10.2.6",
+		"nanoid": "3.3.18"
 	}
 }

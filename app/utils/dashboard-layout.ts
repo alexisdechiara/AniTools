@@ -18,6 +18,39 @@ export const DEFAULT_DASHBOARD_CARD_IDS: readonly DashboardCardId[] = [
 
 const VALID_CARD_IDS = new Set<DashboardCardId>(DASHBOARD_CARD_IDS)
 
+export interface DashboardDropTargetBounds {
+	bottom: number
+	left: number
+	right: number
+	top: number
+}
+
+export function isDashboardDeleteTargetHit(
+	point: { x: number, y: number },
+	bounds: DashboardDropTargetBounds | null,
+	padding = 16
+): boolean {
+	if (!bounds) return false
+	const safePadding = Math.max(0, padding)
+
+	return point.x >= bounds.left - safePadding
+		&& point.x <= bounds.right + safePadding
+		&& point.y >= bounds.top - safePadding
+		&& point.y <= bounds.bottom + safePadding
+}
+
+export function getDashboardDeleteAttractionOffset(
+	cardBounds: DashboardDropTargetBounds | null,
+	targetBounds: DashboardDropTargetBounds | null
+): { x: number, y: number } | null {
+	if (!cardBounds || !targetBounds) return null
+
+	return {
+		x: (targetBounds.left + targetBounds.right - cardBounds.left - cardBounds.right) / 2,
+		y: (targetBounds.top + targetBounds.bottom - cardBounds.top - cardBounds.bottom) / 2
+	}
+}
+
 export function isDashboardCardId(value: unknown): value is DashboardCardId {
 	return typeof value === "string"
 		&& VALID_CARD_IDS.has(value as DashboardCardId)

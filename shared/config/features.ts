@@ -190,7 +190,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 	},
 	login: {
 		label: "Sign in",
-		icon: "i-simple-icons-anilist",
+		icon: "i-custom-anilist",
 		path: "/login",
 		access: FEATURE_ACCESS.public,
 		indexable: false,

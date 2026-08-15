@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { FEATURE_REGISTRY } from "#shared/config/features"
-import type { AniListActivityKind } from "~~/shared/types/anilist"
+import type { AniListAnimeActivity } from "~~/shared/types/anilist"
+import TimelineActivityCard from "~/components/timeline/ActivityCard.vue"
+import TimelineGanttChart from "~/components/timeline/GanttChart.vue"
 import {
-	getTimelineGroupLabel,
-	type TimelineView
+	groupTimelineAnimeActivitiesByMonth,
+	type TimelineMonthGroup
 } from "~/utils/timeline"
 
 definePageMeta({
@@ -14,101 +16,96 @@ definePageMeta({
 
 useSeoMeta({
 	title: "AniList timeline",
-	description: "Review recent AniList activity by week or month.",
+	description: "Review anime list updates as a monthly activity feed or a Gantt timeline.",
 	robots: "noindex, nofollow"
 })
 
 const {
-	view,
-	kind,
-	groups,
+	activities,
 	pageInfo,
 	loading,
 	loadingMore,
+	initialized,
 	error,
+	hasMore,
 	safetyLimitReached,
 	load,
-	loadMore,
-	setView,
-	setKind
+	loadMore
 } = useTimeline()
 
-const views: Array<{ label: string, value: TimelineView }> = [
-	{ label: "Last weeks", value: "weeks" },
-	{ label: "Last months", value: "months" }
+type TimelineLayout = "vertical" | "horizontal"
+const layouts: Array<{ label: string, value: TimelineLayout, icon: string }> = [
+	{ label: "Activity feed", value: "vertical", icon: "i-lucide-list-tree" },
+	{ label: "Gantt", value: "horizontal", icon: "i-lucide-chart-no-axes-gantt" }
 ]
-const kinds: Array<{ label: string, value: AniListActivityKind }> = [
-	{ label: "Anime updates", value: "anime" },
-	{ label: "Text posts", value: "text" },
-	{ label: "All activity", value: "all" }
-]
+const layout = ref<TimelineLayout>("vertical")
+const loadMoreSentinel = ref<HTMLElement | null>(null)
+const monthGroups = computed(() =>
+	groupTimelineAnimeActivitiesByMonth(activities.value)
+)
+const { showPageLoader } = useProgressiveLoading(
+	computed(() => [initialized.value]),
+	{ allowPartial: false }
+)
+const dayFormatter = new Intl.DateTimeFormat(undefined, {
+	day: "2-digit"
+})
+const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
+	weekday: "short"
+})
+const timeFormatter = new Intl.DateTimeFormat(undefined, {
+	hour: "2-digit",
+	minute: "2-digit"
+})
 
-function changeKind(event: Event) {
-	const value = (event.target as HTMLSelectElement).value
-	const selected = kinds.find(item => item.value === value)
-	if (selected) void setKind(selected.value)
+function formatActivityDay(activity: AniListAnimeActivity) {
+	return dayFormatter.format(new Date(activity.createdAt * 1_000))
+}
+
+function formatActivityWeekday(activity: AniListAnimeActivity) {
+	return weekdayFormatter.format(new Date(activity.createdAt * 1_000))
+}
+
+function formatActivityTime(activity: AniListAnimeActivity) {
+	return timeFormatter.format(new Date(activity.createdAt * 1_000))
+}
+
+function monthStats(group: TimelineMonthGroup) {
+	return [
+		{ label: "Updates", value: group.stats.updates },
+		{ label: "Anime", value: group.stats.titles },
+		{ label: "Active days", value: group.stats.activeDays }
+	]
 }
 
 onMounted(() => {
 	void load()
 })
+
+useIntersectionObserver(loadMoreSentinel, ([entry]) => {
+	if (entry?.isIntersecting && layout.value === "vertical" && hasMore.value) {
+		void loadMore()
+	}
+}, { rootMargin: "320px" })
 </script>
 
 <template>
-	<UDashboardPanel id="timeline">
+	<UDashboardPanel id="timeline" :ui="{ body: 'pt-3 sm:pt-4' }">
 		<template #body>
-			<div class="mx-auto w-full max-w-5xl space-y-6">
-				<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-					<div>
-						<p class="text-sm font-medium text-primary">Recent activity</p>
-						<h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-							Timeline
-						</h1>
-						<p class="mt-2 max-w-2xl text-muted">
-							A paginated view of AniList activity, grouped into calendar weeks or months.
-						</p>
-					</div>
-					<UButton
-						icon="i-lucide-refresh-cw"
-						label="Refresh"
+			<div class="mx-auto w-full max-w-7xl space-y-6">
+				<header class="flex justify-end" aria-label="Timeline controls">
+					<UTabs
+						v-model="layout"
+						:items="layouts"
+						:content="false"
 						color="neutral"
-						variant="soft"
-						:loading="loading"
-						@click="load(true)"/>
+						size="sm"
+						aria-label="Timeline view"
+						:ui="{ trigger: 'cursor-pointer' }" />
 				</header>
 
-				<section
-					class="flex flex-col gap-3 rounded-xl border border-default bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
-					aria-label="Timeline controls">
-					<div class="inline-flex rounded-lg bg-elevated p-1" role="group" aria-label="Timeline period">
-						<button
-							v-for="option in views"
-							:key="option.value"
-							type="button"
-							class="rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-primary"
-							:class="view === option.value
-								? 'bg-primary text-inverted'
-								: 'text-muted hover:text-highlighted'"
-							:aria-pressed="view === option.value"
-							@click="setView(option.value)">
-							{{ option.label }}
-						</button>
-					</div>
-					<label class="flex items-center gap-2 text-sm">
-						<span class="font-medium text-toned">Activity type</span>
-						<select
-							:value="kind"
-							class="h-10 rounded-md border border-default bg-default px-3 text-highlighted focus-visible:outline-2 focus-visible:outline-primary"
-							@change="changeKind">
-							<option v-for="option in kinds" :key="option.value" :value="option.value">
-								{{ option.label }}
-							</option>
-						</select>
-					</label>
-				</section>
-
 				<UAlert
-					v-if="error"
+					v-if="!showPageLoader && error"
 					icon="i-lucide-triangle-alert"
 					title="Timeline could not be loaded"
 					:description="error"
@@ -121,64 +118,115 @@ onMounted(() => {
 						onClick: () => load(true)
 					}]"/>
 
+				<PageLoadingState
+					v-if="showPageLoader"
+					label="Preparing your timeline"
+					description="Loading recent AniList activity and arranging the timeline." />
+
 				<div
-					v-if="loading"
+					v-else-if="loading"
 					class="space-y-3"
 					aria-label="Loading timeline"
 					aria-busy="true">
-					<USkeleton v-for="index in 5" :key="index" class="h-28 rounded-xl" />
+					<WidgetLoadingSkeleton
+						v-for="index in 5"
+						:key="index"
+						label="Loading activity"
+						variant="timeline" />
 				</div>
 
-				<div v-else-if="groups.length" class="space-y-8">
+				<div
+					v-else-if="activities.length && layout === 'vertical'"
+					class="space-y-14 lg:space-y-20"
+					aria-label="Anime update feed">
 					<section
-						v-for="group in groups"
+						v-for="group in monthGroups"
 						:key="group.key"
-						class="space-y-3"
-						:aria-labelledby="`${group.key}-title`">
-						<div class="sticky top-0 z-10 flex items-center gap-3 bg-default/90 py-2 backdrop-blur">
-							<h2
-								:id="`${group.key}-title`"
-								class="text-lg font-semibold text-highlighted capitalize">
-								{{ getTimelineGroupLabel(group, view) }}
-							</h2>
-							<UBadge
-								:label="String(group.activities.length)"
-								color="neutral"
-								variant="soft"/>
-							<USeparator class="flex-1" />
-						</div>
-						<div class="space-y-3">
-							<TimelineActivityCard
+						class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10"
+						:data-timeline-month="group.key">
+						<aside class="self-start lg:sticky lg:top-6">
+							<p class="text-3xl font-bold tracking-tight text-highlighted">
+								{{ group.month }}
+							</p>
+							<p class="mt-1 text-sm font-medium text-muted">
+								{{ group.year }}
+							</p>
+							<dl class="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1">
+								<div
+									v-for="stat in monthStats(group)"
+									:key="stat.label"
+									class="rounded-lg border border-default bg-elevated/60 px-3 py-2.5">
+									<dt class="text-[0.68rem] font-medium tracking-wide text-muted uppercase">
+										{{ stat.label }}
+									</dt>
+									<dd class="mt-1 text-lg font-semibold text-highlighted">
+										{{ stat.value }}
+									</dd>
+								</div>
+							</dl>
+						</aside>
+
+						<ol class="space-y-5">
+							<li
 								v-for="activity in group.activities"
 								:key="activity.id"
-								:activity="activity"/>
-						</div>
+								class="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5"
+								data-timeline-activity>
+								<time
+									:datetime="new Date(activity.createdAt * 1_000).toISOString()"
+									class="relative flex min-h-24 flex-col items-center border-r border-default pr-3 text-center sm:pr-5">
+									<span class="text-xs font-semibold tracking-wide text-primary uppercase">
+										{{ formatActivityWeekday(activity) }}
+									</span>
+									<span class="mt-1 text-2xl font-bold text-highlighted">
+										{{ formatActivityDay(activity) }}
+									</span>
+									<span class="mt-1 text-xs text-dimmed">
+										{{ formatActivityTime(activity) }}
+									</span>
+									<span
+										class="absolute top-5 right-0 size-2 translate-x-1/2 rounded-full bg-primary ring-4 ring-default"
+										aria-hidden="true" />
+								</time>
+								<TimelineActivityCard
+									:activity="activity"
+									:show-timestamp="false"
+									side="right" />
+							</li>
+						</ol>
 					</section>
 				</div>
+
+				<TimelineGanttChart
+					v-else-if="activities.length"
+					:activities="activities"
+					:has-more="hasMore"
+					:loading-more="loadingMore"
+					@request-more="loadMore" />
 
 				<UEmpty
 					v-else-if="!error"
 					icon="i-lucide-calendar-x-2"
-					title="No activity in this period"
-					description="Try another activity type or switch between the weekly and monthly views."/>
+					title="No anime updates yet"
+					description="Anime list updates will appear here as soon as AniList records them."/>
 
-				<div v-if="!loading && groups.length" class="flex flex-col items-center gap-3">
-					<UButton
-						v-if="pageInfo.hasNextPage && !safetyLimitReached"
-						icon="i-lucide-chevrons-down"
-						label="Load more activity"
-						color="neutral"
-						variant="soft"
-						:loading="loadingMore"
-						@click="loadMore"/>
+				<div v-if="!loading && activities.length" class="flex flex-col items-center gap-3">
+					<div
+						v-if="layout === 'vertical' && hasMore"
+						ref="loadMoreSentinel"
+						class="flex min-h-16 items-center justify-center gap-2 text-sm text-muted"
+						aria-live="polite">
+						<UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+						{{ loadingMore ? "Loading older activity…" : "Scroll for older activity" }}
+					</div>
 					<p v-else-if="!pageInfo.hasNextPage" class="text-sm text-muted">
-						You reached the end of this period.
+						You reached the beginning of this activity history.
 					</p>
 					<UAlert
 						v-if="safetyLimitReached"
 						icon="i-lucide-shield-alert"
 						title="Activity safety limit reached"
-						description="AniTools loaded 8 pages for this view. Narrow the activity type to continue without issuing an unbounded number of AniList requests."
+						description="AniList's pagination limit was reached after 5,000 activities."
 						color="warning"
 						variant="soft"
 						class="w-full"/>

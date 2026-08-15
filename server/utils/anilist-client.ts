@@ -16,6 +16,7 @@ import {
 	type AniListActivity,
 	type AniListActivityKind,
 	type AniListAiringSchedulesPage,
+	type AniListAnimeListIdsResponse,
 	type AniListAnimeListResponse,
 	type AniListListSort,
 	type AniListMediaResponse,
@@ -24,6 +25,7 @@ import {
 	type AniListProfile,
 	type AniListProfileResponse,
 	type AniListRecommendationsResponse,
+	type AniListSaveMediaListEntryResponse,
 	type AniListSearchResponse,
 	type AniListSource,
 	type AniListStudioMediaResponse,
@@ -36,10 +38,13 @@ const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co"
 const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_PAGE = 100
 const MAX_LIST_PAGE_SIZE = 50
+const MAX_LIST_ID_CHUNKS = 20
+const LIST_IDS_PER_CHUNK = 500
 const MAX_ACTIVITY_PAGE_SIZE = 50
 const MAX_EXPLORE_PAGE_SIZE = 20
 const MAX_AIRING_PAGE_SIZE = 50
 const MAX_MEDIA_BATCH_SIZE = 50
+const MAX_MEDIA_RELATION_EDGES = 500
 const MAX_SEARCH_RESULTS = 10
 const MAX_SEARCH_LENGTH = 100
 const MAX_STATISTIC_GROUPS = 100
@@ -55,6 +60,7 @@ const GRAPHQL_INT_MAX = 2_147_483_647
 export const ANILIST_ALLOWED_OPERATIONS = [
 	"profile",
 	"anime-list",
+	"anime-list-ids",
 	"statistics",
 	"activities",
 	"recommendations",
@@ -62,7 +68,8 @@ export const ANILIST_ALLOWED_OPERATIONS = [
 	"search",
 	"media",
 	"airing-schedules",
-	"media-by-ids"
+	"media-by-ids",
+	"save-media-list-entry"
 ] as const
 
 const PROFILE_FIELDS = `
@@ -193,6 +200,30 @@ const ANIME_LIST_QUERY = `
 				completedAt { year month day }
 				media {
 					${MEDIA_SUMMARY_FIELDS}
+				}
+			}
+		}
+	}
+`
+
+const ANIME_LIST_IDS_QUERY = `
+	query AniToolsAnimeListIds(
+		$userId: Int
+		$username: String
+		$chunk: Int!
+		$perChunk: Int!
+	) {
+		MediaListCollection(
+			userId: $userId
+			userName: $username
+			type: ANIME
+			chunk: $chunk
+			perChunk: $perChunk
+		) {
+			hasNextChunk
+			lists {
+				entries {
+					mediaId
 				}
 			}
 		}
@@ -441,6 +472,16 @@ const MEDIA_BY_IDS_QUERY = `
 	}
 `
 
+const SAVE_MEDIA_LIST_ENTRY_MUTATION = `
+	mutation AniToolsSaveMediaListEntry($mediaId: Int!) {
+		SaveMediaListEntry(mediaId: $mediaId, status: PLANNING) {
+			id
+			mediaId
+			status
+		}
+	}
+`
+
 const usernameSchema = z.string()
 	.trim()
 	.min(2)
@@ -541,6 +582,10 @@ const mediaQuerySchema = z.object({
 	id: mediaIdSchema
 }).strict()
 
+const saveMediaListEntryBodySchema = z.object({
+	mediaId: mediaIdSchema
+}).strict()
+
 const airingSchedulesQuerySchema = z.object({
 	page: pageSchema,
 	perPage: z.coerce.number().int().min(1).max(MAX_AIRING_PAGE_SIZE)
@@ -585,6 +630,7 @@ export type AniListActivitiesQuery = z.infer<typeof activitiesQuerySchema>
 export type AniListRecommendationsQuery = z.infer<typeof recommendationsQuerySchema>
 export type AniListStudioMediaQuery = z.infer<typeof studioMediaQuerySchema>
 export type AniListMediaQuery = z.infer<typeof mediaQuerySchema>
+export type AniListSaveMediaListEntryBody = z.infer<typeof saveMediaListEntryBodySchema>
 
 export interface AniListRequestOptions {
 	fetch?: typeof globalThis.fetch
@@ -732,7 +778,7 @@ const mediaSchema = z.object({
 				format: z.string().max(64).nullable(),
 				title: titleSchema.nullable()
 			}).nullable()
-		}).nullable()).max(100).nullable()
+		}).nullable()).max(MAX_MEDIA_RELATION_EDGES).nullable()
 	}).nullable()
 })
 
@@ -955,6 +1001,10 @@ export function parseAniListStudioMediaQuery(query: unknown) {
 
 export function parseAniListMediaQuery(query: unknown) {
 	return parseQuery(mediaQuerySchema, query)
+}
+
+export function parseAniListSaveMediaListEntryBody(body: unknown) {
+	return parseQuery(saveMediaListEntryBodySchema, body)
 }
 
 export async function resolveAniListAccess(
@@ -1331,6 +1381,45 @@ export async function getAniListMediaResponse(
 	}
 }
 
+export async function saveAniListMediaListEntry(
+	access: AniListAccess,
+	body: AniListSaveMediaListEntryBody,
+	options: AniListRequestOptions = {}
+): Promise<AniListSaveMediaListEntryResponse> {
+	const validatedAccess = accessSchema.parse(access)
+	if (validatedAccess.mode !== "oauth") {
+		throw createError({
+			statusCode: 403,
+			statusMessage: "An AniList session is required to update a list"
+		})
+	}
+
+	const validatedBody = saveMediaListEntryBodySchema.parse(body)
+	const data = await requestAniList(
+		SAVE_MEDIA_LIST_ENTRY_MUTATION,
+		{ mediaId: validatedBody.mediaId },
+		z.object({
+			SaveMediaListEntry: z.object({
+				id: z.number().int().positive(),
+				mediaId: mediaIdSchema,
+				status: z.enum(ANILIST_LIST_STATUSES)
+			}).nullable()
+		}),
+		validatedAccess,
+		options
+	)
+
+	if (!data.SaveMediaListEntry) {
+		throw upstreamError(
+			502,
+			"AniList did not update the anime list",
+			"ANILIST_LIST_UPDATE_FAILED"
+		)
+	}
+
+	return { entry: data.SaveMediaListEntry }
+}
+
 export async function getAniListAiringSchedulesPage(
 	query: {
 		page: number
@@ -1479,11 +1568,12 @@ export async function getAniListProfileResponse(
 
 export async function getAniListAnimeListResponse(
 	access: AniListAccess,
-	query: Pick<AniListAnimeListQuery, "page" | "perPage" | "sort" | "status">,
+	query: AniListAnimeListQuery,
 	options: AniListRequestOptions = {}
 ): Promise<AniListAnimeListResponse> {
 	const validatedAccess = accessSchema.parse(access)
-	const validatedQuery = animeListQuerySchema.omit({ username: true }).parse(query)
+	const { username: _username, ...listQuery } = query
+	const validatedQuery = animeListQuerySchema.omit({ username: true }).parse(listQuery)
 	const data = await requestAniList(
 		ANIME_LIST_QUERY,
 		{
@@ -1527,6 +1617,71 @@ export async function getAniListAnimeListResponse(
 				...entry,
 				media: entry.media ? normalizeMedia(entry.media) : null
 			}))
+	}
+}
+
+export async function getAniListAnimeListIdsResponse(
+	access: AniListAccess,
+	options: AniListRequestOptions = {}
+): Promise<AniListAnimeListIdsResponse> {
+	const validatedAccess = accessSchema.parse(access)
+	const mediaIds = new Set<number>()
+	const responseSchema = z.object({
+		MediaListCollection: z.object({
+			hasNextChunk: z.boolean(),
+			lists: z.array(z.object({
+				entries: z.array(z.object({ mediaId: mediaIdSchema }).nullable())
+					.max(LIST_IDS_PER_CHUNK)
+					.nullable()
+			}).nullable()).max(100).nullable()
+		}).nullable()
+	})
+	let chunk = 1
+	let hasNextChunk = true
+
+	while (hasNextChunk && chunk <= MAX_LIST_ID_CHUNKS) {
+		const data = await requestAniList(
+			ANIME_LIST_IDS_QUERY,
+			{
+				userId: validatedAccess.mode === "oauth" ? validatedAccess.userId : undefined,
+				username: validatedAccess.mode === "public" ? validatedAccess.username : undefined,
+				chunk,
+				perChunk: LIST_IDS_PER_CHUNK
+			},
+			responseSchema,
+			validatedAccess,
+			options
+		)
+
+		if (!data.MediaListCollection) {
+			throw upstreamError(
+				404,
+				"AniList user or anime list was not found",
+				"ANILIST_LIST_NOT_FOUND"
+			)
+		}
+
+		for (const list of data.MediaListCollection.lists ?? []) {
+			for (const entry of list?.entries ?? []) {
+				if (entry) mediaIds.add(entry.mediaId)
+			}
+		}
+
+		hasNextChunk = data.MediaListCollection.hasNextChunk
+		chunk += 1
+	}
+
+	if (hasNextChunk) {
+		throw upstreamError(
+			502,
+			"AniList anime list exceeds the safe exclusion limit",
+			"ANILIST_LIST_EXCLUSION_LIMIT"
+		)
+	}
+
+	return {
+		source: sourceFromAccess(validatedAccess),
+		mediaIds: [...mediaIds].toSorted((left, right) => left - right)
 	}
 }
 

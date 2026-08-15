@@ -88,6 +88,16 @@
 	--ui-border-inverted: oklch(from var(--ui-color-primary-50) 0.01 c h);
 }
 
+:where(
+	button:not(:disabled),
+	[role="button"]:not([aria-disabled="true"]),
+	a[href],
+	select:not(:disabled),
+	summary
+) {
+	cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,

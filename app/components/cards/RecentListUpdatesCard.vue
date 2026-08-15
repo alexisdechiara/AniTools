@@ -4,9 +4,11 @@ import type { RecentListUpdate } from "~/types/dashboard"
 withDefaults(defineProps<{
 	items?: readonly RecentListUpdate[]
 	limit?: number
+	showViewMore?: boolean
 }>(), {
 	items: () => [],
-	limit: 5
+	limit: 5,
+	showViewMore: true
 })
 
 const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
@@ -40,9 +42,10 @@ function formatStatus(status: string): string {
 
 <template>
 	<MetricsCard title="Recent list updates">
-		<ol
-			v-if="items.length"
-			class="relative space-y-3 before:absolute before:inset-y-2 before:left-5 before:w-px before:bg-border">
+		<div class="flex size-full flex-col justify-start">
+			<ol
+				v-if="items.length"
+				class="relative space-y-3 before:absolute before:inset-y-2 before:left-5 before:w-px before:bg-border">
 			<li
 				v-for="item in items.slice(0, limit)"
 				:key="item.id"
@@ -75,16 +78,25 @@ function formatStatus(status: string): string {
 					</p>
 				</div>
 			</li>
-		</ol>
-		<div
-			v-else
-			class="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
-			<UIcon
-				name="i-lucide-history"
-				class="size-7 text-muted"/>
-			<p class="text-sm text-muted">
-				No recent list updates are available.
-			</p>
+			</ol>
+			<div
+				v-else
+				class="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
+				<UIcon
+					name="i-lucide-history"
+					class="size-7 text-muted"/>
+				<p class="text-sm text-muted">
+					No recent list updates are available.
+				</p>
+			</div>
+			<UButton
+				v-if="showViewMore"
+				to="/timeline"
+				label="View more"
+				trailing-icon="i-lucide-arrow-right"
+				variant="link"
+				size="xs"
+				class="ms-auto mt-auto w-fit"/>
 		</div>
 	</MetricsCard>
 </template>

@@ -29,10 +29,13 @@
       v-if="draggable"
       type="button"
       aria-label="Drag card"
+      title="Drag to reorder. Use Alt+Left or Alt+Right with the keyboard."
       data-card-drag-handle
       class="absolute top-1.5 right-1.5 z-50 cursor-grab rounded p-1 opacity-0 transition-opacity duration-75 ease-in group-hover/grab:opacity-50 hover:opacity-100 focus-visible:opacity-100"
       :class="{ 'cursor-grabbing': isDragging }"
-      @mousedown="onMouseDown">
+      @mousedown="onMouseDown"
+      @keydown.alt.left.prevent="emit('move', -1)"
+      @keydown.alt.right.prevent="emit('move', 1)">
       <Icon
         name="i-lucide-grip-vertical"
         aria-hidden="true"/>
@@ -67,6 +70,11 @@
 
 <script lang="ts" setup>
 import type { MetricSort } from "../../stores/Statistics";
+
+const emit = defineEmits<{
+  move: [direction: -1 | 1];
+}>();
+
 withDefaults(
   defineProps<{
     title?: string;

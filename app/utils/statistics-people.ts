@@ -96,12 +96,18 @@ export function filterAndSortPeopleStatistics(
 			})
 		: [...items]
 
-	return matches.toSorted((left, right) =>
-		right[metric] - left[metric]
-		|| right.count - left.count
-		|| left.name.localeCompare(right.name)
-		|| left.id - right.id
-	)
+	return matches.toSorted((left, right) => {
+		const metricDifference = right[metric] - left[metric]
+		if (metricDifference !== 0) return metricDifference
+
+		if (metric === "count") {
+			return 0
+		}
+
+		return right.count - left.count
+			|| left.name.localeCompare(right.name)
+			|| left.id - right.id
+	})
 }
 
 export function getAniListStaffUrl(staffId: number): string {

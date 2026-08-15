@@ -6,6 +6,7 @@ import type {
 import {
 	collectExploreStudios,
 	filterExploreMedia,
+	getExploreRelationBadge,
 	getExploreTitle,
 	selectExploreSeeds
 } from "../../app/utils/explore"
@@ -140,5 +141,29 @@ describe("Explore discovery helpers", () => {
 
 		expect(result.map(item => item.id)).toEqual([1])
 		expect(getExploreTitle(result[0]!)).toBe("Anime 1")
+	})
+
+	it("describes relations from the displayed anime point of view", () => {
+		const sequel = media(10, { title: "Second season" })
+		sequel.relations = {
+			edges: [{
+				relationType: "PREQUEL",
+				node: {
+					id: 9,
+					format: "TV",
+					title: {
+						english: "First season",
+						native: null,
+						romaji: null,
+						userPreferred: "First season"
+					}
+				}
+			}]
+		}
+
+		expect(getExploreRelationBadge(sequel)).toEqual({
+			label: "Sequel",
+			description: "Sequel to First season"
+		})
 	})
 })

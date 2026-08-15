@@ -232,6 +232,19 @@ export interface AniListAnimeListResponse {
 	entries: AniListAnimeListEntry[]
 }
 
+export interface AniListAnimeListIdsResponse {
+	source: AniListSource
+	mediaIds: number[]
+}
+
+export interface AniListSaveMediaListEntryResponse {
+	entry: {
+		id: number
+		mediaId: number
+		status: AniListListStatus
+	}
+}
+
 export interface AniListStatisticMetric {
 	count: number
 	meanScore: number

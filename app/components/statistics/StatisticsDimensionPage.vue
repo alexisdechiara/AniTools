@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { AniListStatisticMetric } from "~~/shared/types/anilist"
+import StatisticsBreakdown from "~/components/statistics/StatisticsBreakdown.vue"
+import StatisticsPageShell from "~/components/statistics/StatisticsPageShell.vue"
 import {
 	aggregateEntriesByDimension,
 	getStatisticsCompletionYears,
@@ -9,8 +11,6 @@ import {
 
 const props = defineProps<{
 	pageId: string
-	title: string
-	description: string
 	dimension: StatisticsDimension
 }>()
 
@@ -102,18 +102,21 @@ const comparisonLabel = computed(() =>
 
 <template>
 	<StatisticsPageShell
-		:page-id="pageId"
-		:title="title"
-		:description="description">
+		:page-id="pageId">
 		<div class="space-y-4">
-			<div class="flex flex-col gap-3 rounded-lg border border-default bg-muted/20 p-4 sm:flex-row sm:items-center">
-				<div>
-					<p class="text-sm font-medium text-highlighted">
-						Period
-					</p>
-					<p class="text-xs text-muted">
-						Year views use the completion date saved on each AniList entry and compare title counts with the previous year.
-					</p>
+			<div class="flex flex-col gap-3 rounded-xl border border-default bg-muted/20 px-4 py-3 sm:flex-row sm:items-center">
+				<div class="flex min-w-0 items-center gap-3">
+					<span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+						<UIcon name="i-lucide-calendar-range" class="size-4"/>
+					</span>
+					<div class="min-w-0">
+						<p class="text-sm font-medium text-highlighted">
+							Period
+						</p>
+						<p class="truncate text-xs text-muted">
+							Compare completed titles with the previous year.
+						</p>
+					</div>
 				</div>
 				<USelect
 					v-model="selectedPeriod"
@@ -124,6 +127,7 @@ const comparisonLabel = computed(() =>
 
 			<StatisticsBreakdown
 				v-model:metric="selectedMetric"
+				:dimension="dimension"
 				:items="items"
 				:previous-items="previousItems"
 				:comparison-label="comparisonLabel"/>

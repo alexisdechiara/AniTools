@@ -73,6 +73,11 @@ export function useDashboardCards() {
 		persist()
 	}
 
+	function reorder(nextCardIds: readonly DashboardCardId[]) {
+		cardIds.value = normalizeDashboardCardIds(nextCardIds, cardIds.value)
+		persist()
+	}
+
 	function reset() {
 		cardIds.value = [...DEFAULT_DASHBOARD_CARD_IDS]
 		persist()
@@ -88,6 +93,7 @@ export function useDashboardCards() {
 		add,
 		remove,
 		move,
+		reorder,
 		reset
 	}
 }

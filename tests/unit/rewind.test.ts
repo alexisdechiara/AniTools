@@ -162,6 +162,24 @@ describe("Rewind aggregation", () => {
 	it("builds annual metrics from real list activity and current media metadata", () => {
 		const firstMedia = media(1, ["Action", "Comedy"], "WINTER", 24)
 		const secondMedia = media(2, ["Action", "Drama"], "SPRING", 20)
+		firstMedia.tags = [{
+			id: 1,
+			name: "Found Family",
+			category: "Theme",
+			rank: 80,
+			isAdult: false,
+			isGeneralSpoiler: false,
+			isMediaSpoiler: false
+		}]
+		secondMedia.tags = [{
+			id: 1,
+			name: "Found Family",
+			category: "Theme",
+			rank: 70,
+			isAdult: false,
+			isGeneralSpoiler: false,
+			isMediaSpoiler: false
+		}]
 		const entries = [
 			entry(101, 90, "COMPLETED", firstMedia),
 			entry(102, 55, "DROPPED", secondMedia)
@@ -182,6 +200,12 @@ describe("Rewind aggregation", () => {
 		expect(summary.minutesWatched).toBe(116)
 		expect(summary.genres[0]).toMatchObject({
 			name: "Action",
+			count: 2,
+			meanScore: 72.5,
+			minutesWatched: 116
+		})
+		expect(summary.tags[0]).toMatchObject({
+			name: "Found Family",
 			count: 2,
 			meanScore: 72.5,
 			minutesWatched: 116

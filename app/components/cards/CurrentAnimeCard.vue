@@ -22,13 +22,15 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 	const episodes = entry.media?.episodes
 	return episodes ? `${progress} / ${episodes} episodes` : `${progress} episodes`
 }
+
 </script>
 
 <template>
 	<MetricsCard title="Anime in progress">
-		<ul
-			v-if="currentAnime.length"
-			class="space-y-3">
+		<div class="flex size-full flex-col justify-start">
+			<ul
+				v-if="currentAnime.length"
+				class="space-y-3">
 			<li
 				v-for="entry in currentAnime"
 				:key="entry.id"
@@ -63,16 +65,17 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 					variant="soft"
 					size="sm"/>
 			</li>
-		</ul>
-		<div
-			v-else
-			class="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
-			<UIcon
-				name="i-lucide-circle-pause"
-				class="size-7 text-muted"/>
-			<p class="text-sm text-muted">
-				No anime is currently marked as watching.
-			</p>
+			</ul>
+			<div
+				v-else
+				class="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
+				<UIcon
+					name="i-lucide-circle-pause"
+					class="size-7 text-muted"/>
+				<p class="text-sm text-muted">
+					No anime is currently marked as watching.
+				</p>
+			</div>
 		</div>
 	</MetricsCard>
 </template>

@@ -3,7 +3,9 @@ import type { RewindAnimeMetric } from "~/utils/rewind"
 import { formatWatchTime } from "~/utils/formatTime"
 
 const props = defineProps<{
+	emptyLabel?: string
 	selection: RewindAnimeMetric | null
+	selectionLabel?: string
 	longest: RewindAnimeMetric | null
 }>()
 
@@ -13,12 +15,14 @@ interface Highlight {
 	value: string
 }
 
+const currentIndex = ref(0)
+
 const highlights = computed<Highlight[]>(() => {
 	const result: Highlight[] = []
 
 	if (props.selection) {
 		result.push({
-			label: "Selection of the year",
+			label: props.selectionLabel ?? "Selection of the year",
 			item: props.selection,
 			value: `${props.selection.entry.score || "—"}/100`
 		})
@@ -50,35 +54,95 @@ function getCover(item: RewindAnimeMetric): string | undefined {
 		|| item.entry.media?.coverImage?.medium
 		|| undefined
 }
+
+watch(highlights, (items) => {
+	if (currentIndex.value >= items.length) {
+		currentIndex.value = Math.max(0, items.length - 1)
+	}
+})
+
+function indexToRotate(index: number): string {
+	switch (index) {
+		case 0:
+			return "rotate-[3deg] z-30"
+		case 1:
+			return "-rotate-[6deg] z-20"
+		default:
+			return "rotate-[1deg] z-10"
+	}
+}
+
+const currentHighlight = computed(() => highlights.value[currentIndex.value])
 </script>
 
 <template>
-	<MetricsCard title="Highlights" v-bind="$attrs">
-		<div v-if="highlights.length" class="mt-3 grid gap-4 sm:grid-cols-2">
-			<article
-				v-for="highlight in highlights"
-				:key="highlight.label"
-				class="flex min-w-0 gap-3 rounded-lg bg-elevated/60 p-3">
+	<MetricsCard v-bind="$attrs">
+		<div v-if="highlights.length" class="grid min-h-52 grid-cols-13 gap-x-6">
+			<div class="relative col-span-6 flex size-full max-w-50 items-center justify-center">
 				<NuxtImg
-					v-if="getCover(highlight.item)"
+					v-for="(highlight, index) in highlights"
+					v-show="index >= currentIndex"
+					:key="highlight.label"
 					:src="getCover(highlight.item)"
 					:alt="getTitle(highlight.item)"
-					class="h-24 w-16 shrink-0 rounded-md object-cover" />
-				<div class="min-w-0">
-					<p class="text-xs font-medium tracking-wide text-primary uppercase">
-						{{ highlight.label }}
-					</p>
-					<p class="mt-1 line-clamp-2 text-sm font-semibold text-highlighted">
-						{{ getTitle(highlight.item) }}
-					</p>
-					<p class="mt-2 text-lg font-bold text-highlighted">
-						{{ highlight.value }}
-					</p>
+					class="absolute aspect-3/4 h-fit w-full scale-90 rounded-lg object-cover transition-all"
+					:class="indexToRotate(index)"
+					:data-current="index === currentIndex ? '' : undefined" />
+			</div>
+			<div class="relative col-span-7 flex size-full min-w-0 flex-col gap-y-3">
+				<span class="text-xs font-medium text-toned capitalize">
+					{{ currentHighlight?.label }}
+				</span>
+				<span class="text-2xl font-semibold text-pretty text-highlighted">
+					{{ currentHighlight ? getTitle(currentHighlight.item) : "" }}
+				</span>
+				<span class="text-4xl font-bold text-highlighted">
+					{{ currentHighlight?.value }}
+				</span>
+				<div class="absolute top-0 right-0 flex h-fit gap-x-3">
+					<UButton
+						icon="i-lucide-chevron-left"
+						size="xs"
+						color="neutral"
+						variant="link"
+						aria-label="Previous highlight"
+						:disabled="currentIndex === 0"
+						:ui="{ base: 'cursor-pointer p-0' }"
+						@click="currentIndex > 0 && currentIndex--" />
+					<UButton
+						icon="i-lucide-chevron-right"
+						size="xs"
+						color="neutral"
+						variant="link"
+						aria-label="Next highlight"
+						:disabled="currentIndex >= highlights.length - 1"
+						:ui="{ base: 'cursor-pointer p-0' }"
+						@click="currentIndex < highlights.length - 1 && currentIndex++" />
 				</div>
-			</article>
+			</div>
 		</div>
 		<p v-else class="mt-4 text-sm text-muted">
-			No highlight is available for this year.
+			{{ emptyLabel ?? "No highlight is available for this year." }}
 		</p>
 	</MetricsCard>
 </template>
+
+<style scoped>
+img[data-current] {
+	animation: pulsing-jiggle 0.2s ease-in-out both;
+}
+
+@keyframes pulsing-jiggle {
+	0%, 100% {
+		transform: rotate(0deg) scale(1);
+	}
+
+	25%, 75% {
+		transform: rotate(1deg) scale(1.025);
+	}
+
+	50% {
+		transform: rotate(0deg) scale(1.05);
+	}
+}
+</style>

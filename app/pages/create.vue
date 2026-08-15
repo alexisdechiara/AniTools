@@ -1,15 +1,33 @@
 <script setup lang="ts">
 import { FEATURE_REGISTRY } from "#shared/config/features"
+import CreateCanvasPreview from "~/components/create/CanvasPreview.vue"
+import CreateGraduatedSlider from "~/components/create/GraduatedSlider.vue"
 import type {
+	AniListMediaSummary
+} from "~~/shared/types/anilist"
+import type {
+	CreateContentId,
 	CreateExportFormat,
+	CreateFontId,
+	CreateImageSource,
 	CreatePreset,
-	CreatePresetId
+	CreatePresetId,
+	CreateTitleLanguage
 } from "~/utils/create-artwork"
 import {
+	CREATE_CONTENT_OPTIONS,
 	CREATE_EXPORT_FORMATS,
+	CREATE_FONTS,
+	CREATE_FONT_IDS,
+	CREATE_IMAGE_SOURCE_OPTIONS,
 	CREATE_PRESETS,
 	CREATE_PRESET_IDS,
-	getCreatePreset
+	CREATE_TITLE_LANGUAGE_OPTIONS,
+	getCreateFont,
+	getCreateMediaImage,
+	getCreateMediaTitle,
+	getCreatePreset,
+	selectCreateContentEntries
 } from "~/utils/create-artwork"
 import type { CreateArtworkOptions } from "~/utils/create-canvas.client"
 
@@ -27,16 +45,17 @@ interface PreviewApi {
 	) => Promise<void>
 }
 
-const MAX_BACKGROUND_FILE_SIZE = 20 * 1024 * 1024
-const ALLOWED_BACKGROUND_TYPES = new Set([
-	"image/jpeg",
-	"image/png",
-	"image/webp"
-])
 const toast = useToast()
+const entriesStore = useEntriesStore()
+const userStore = useUserStore()
+const { getAllAnimes } = storeToRefs(entriesStore)
 const preview = ref<PreviewApi | null>(null)
 const selectedPresetId = ref<CreatePresetId>("story")
-const title = ref("My anime story")
+const contentMode = ref<CreateContentId>("anime")
+const titleLanguage = ref<CreateTitleLanguage>("userPreferred")
+const imageSource = ref<CreateImageSource>("cover")
+const fontId = ref<CreateFontId>("sans")
+const title = ref("")
 const subtitle = ref("Created with AniTools")
 const accentColor = ref("#8b5cf6")
 const backgroundColor = ref("#111827")
@@ -44,18 +63,59 @@ const overlayOpacity = ref(72)
 const imageZoom = ref(1)
 const imagePositionX = ref(0.5)
 const imagePositionY = ref(0.5)
-const transparentBadge = ref(true)
+const titleScale = ref(1)
+const subtitleScale = ref(1)
 const exportFormat = ref<CreateExportFormat>("png")
-const backgroundImageUrl = ref<string | null>(null)
-const backgroundFileName = ref<string | null>(null)
-const fileError = ref<string | null>(null)
+const selectedAnime = ref<AniListMediaSummary | null>(null)
+const animeSearchOpen = ref(false)
+const animeError = ref<string | null>(null)
 const exporting = ref(false)
 const preset = computed(() => getCreatePreset(selectedPresetId.value))
 const presetItems = CREATE_PRESET_IDS.map(id => CREATE_PRESETS[id])
+const fontItems = CREATE_FONT_IDS.map(id => ({
+	label: CREATE_FONTS[id].label,
+	value: id
+}))
 const exportItems = CREATE_EXPORT_FORMATS.map(value => ({
 	label: value === "jpeg" ? "JPEG" : value.toLocaleUpperCase("en"),
 	value
 }))
+const contentItems = computed(() => CREATE_CONTENT_OPTIONS.map(option => ({
+	label: option.label,
+	value: option.id,
+	icon: option.icon,
+	disabled: option.id !== "anime"
+		&& selectCreateContentEntries(getAllAnimes.value, option.id).length === 0
+})))
+const selectedContentOption = computed(() =>
+	CREATE_CONTENT_OPTIONS.find(option => option.id === contentMode.value)
+	?? CREATE_CONTENT_OPTIONS[0]
+)
+const selectedAnimeTitle = computed(() => {
+	const media = selectedAnime.value
+	return media ? getCreateMediaTitle(media, titleLanguage.value) : null
+})
+const selectedAnimeCover = computed(() => selectedAnime.value?.coverImage?.extraLarge
+	?? selectedAnime.value?.coverImage?.large
+	?? selectedAnime.value?.coverImage?.medium
+	?? null
+)
+const hasBanner = computed(() => Boolean(selectedAnime.value?.bannerImage))
+const imageSourceItems = computed(() => CREATE_IMAGE_SOURCE_OPTIONS.map(item => ({
+	...item,
+	disabled: item.value === "banner" && !hasBanner.value
+})))
+const backgroundImageUrl = computed(() => {
+	const media = selectedAnime.value
+	if (!media) return null
+	return getCreateMediaImage(media, imageSource.value)
+		?? getCreateMediaImage(media, "cover")
+})
+const contentCandidates = computed(() => contentMode.value === "anime"
+	? getAllAnimes.value.flatMap(entry => entry.media ? [entry.media] : [])
+	: selectCreateContentEntries(getAllAnimes.value, contentMode.value, 10)
+		.flatMap(entry => entry.media ? [entry.media] : [])
+)
 const artworkOptions = computed<CreateArtworkOptions>(() => ({
 	preset: preset.value,
 	title: title.value.trim().slice(0, 100),
@@ -66,35 +126,66 @@ const artworkOptions = computed<CreateArtworkOptions>(() => ({
 	imageZoom: imageZoom.value,
 	imagePositionX: imagePositionX.value,
 	imagePositionY: imagePositionY.value,
-	transparentBadge: transparentBadge.value
+	fontFamily: getCreateFont(fontId.value).family,
+	titleScale: titleScale.value,
+	subtitleScale: subtitleScale.value
 }))
 
-function releaseBackgroundUrl() {
-	if (backgroundImageUrl.value) URL.revokeObjectURL(backgroundImageUrl.value)
-	backgroundImageUrl.value = null
-	backgroundFileName.value = null
+function applySelectedAnime(media: AniListMediaSummary, automaticSubtitle?: string) {
+	selectedAnime.value = media
+	if (imageSource.value === "banner" && !media.bannerImage) {
+		imageSource.value = "cover"
+	}
+	title.value = getCreateMediaTitle(media, titleLanguage.value)
+	if (automaticSubtitle !== undefined) subtitle.value = automaticSubtitle
 }
 
-function handleBackgroundFile(event: Event) {
-	const input = event.target as HTMLInputElement
-	const file = input.files?.[0]
-	fileError.value = null
+watch(titleLanguage, () => {
+	if (selectedAnime.value) {
+		title.value = getCreateMediaTitle(selectedAnime.value, titleLanguage.value)
+	}
+})
 
-	if (!file) return
-	if (!ALLOWED_BACKGROUND_TYPES.has(file.type)) {
-		fileError.value = "Choose a PNG, JPEG or WebP image."
-		input.value = ""
+watch([contentMode, getAllAnimes], ([mode]) => {
+	if (mode === "anime") return
+	const entry = selectCreateContentEntries(getAllAnimes.value, mode, 10)[0]
+	if (!entry?.media) return
+	applySelectedAnime(entry.media, selectedContentOption.value.subtitle)
+})
+
+watch(() => userStore.isAuthenticated, async (authenticated) => {
+	if (!authenticated || entriesStore.isInitialized) return
+	try {
+		await entriesStore.fetchAllAnimes()
+	} catch {
+		toast.add({
+			title: "Automatic content unavailable",
+			description: "Your AniList entries could not be loaded. Anime search is still available.",
+			color: "warning",
+			icon: "i-lucide-triangle-alert"
+		})
+	}
+}, { immediate: true })
+
+function selectAnime(media: AniListMediaSummary) {
+	animeError.value = null
+	const image = media.coverImage?.extraLarge
+		?? media.coverImage?.large
+		?? media.coverImage?.medium
+		?? media.bannerImage
+
+	if (!image) {
+		animeError.value = "This anime does not have an image available on AniList."
 		return
 	}
-	if (file.size > MAX_BACKGROUND_FILE_SIZE) {
-		fileError.value = "The image must be 20 MB or smaller."
-		input.value = ""
-		return
-	}
 
-	releaseBackgroundUrl()
-	backgroundImageUrl.value = URL.createObjectURL(file)
-	backgroundFileName.value = file.name
+	applySelectedAnime(
+		media,
+		contentMode.value === "anime"
+			? CREATE_CONTENT_OPTIONS[0].subtitle
+			: selectedContentOption.value.subtitle
+	)
+	animeSearchOpen.value = false
 }
 
 async function download() {
@@ -122,35 +213,28 @@ async function download() {
 	}
 }
 
-onBeforeUnmount(releaseBackgroundUrl)
-
 useSeoMeta({
 	title: "Create anime artwork",
-	description: "Create and export anime stories, square posts, badges, thumbnails and banners locally in your browser.",
+	description: "Create and export anime stories, square posts, AniList thumbnails and banners locally in your browser.",
 	robots: "noindex, nofollow"
 })
 </script>
 
 <template>
-	<UDashboardPanel id="create">
+	<UDashboardPanel
+		id="create"
+		class="xl:h-dvh xl:min-h-0 xl:overflow-hidden"
+		:ui="{ body: 'p-2 pt-2 sm:p-3 sm:pt-3 xl:min-h-0 xl:overflow-hidden' }">
 		<template #body>
-			<UContainer class="py-8 sm:py-12">
-				<header class="mb-8">
-					<p class="mb-2 text-sm font-semibold text-primary">
-						Local artwork studio
-					</p>
-					<h1 class="text-3xl font-bold tracking-tight text-highlighted sm:text-4xl">
-						Create
-					</h1>
-					<p class="mt-2 max-w-2xl text-sm text-muted">
-						Design stories, posts, badges, AniList thumbnails and banners. Your source image stays in this browser.
-					</p>
-				</header>
-
-				<div class="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-					<aside class="space-y-5">
-						<UPageCard title="Format" description="Exports use the exact dimensions shown.">
-							<div class="grid grid-cols-2 gap-2">
+			<UContainer class="h-full max-w-none px-0 sm:px-0 lg:px-0">
+				<div class="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(34rem,0.9fr)_minmax(0,1.1fr)]">
+					<aside class="grid gap-3 xl:grid-cols-2 xl:content-start">
+						<UPageCard
+							title="Format"
+							description="Exact export dimensions."
+							class="xl:col-span-2"
+							:ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+							<div class="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
 								<UButton
 									v-for="item in presetItems"
 									:key="item.id"
@@ -159,16 +243,91 @@ useSeoMeta({
 									:color="selectedPresetId === item.id ? 'primary' : 'neutral'"
 									:variant="selectedPresetId === item.id ? 'soft' : 'ghost'"
 									:aria-pressed="selectedPresetId === item.id"
-									class="justify-start"
+									class="justify-start px-2"
 									@click="selectedPresetId = item.id" />
 							</div>
-							<p class="mt-3 text-xs text-muted">
+							<p class="mt-1 text-xs text-muted">
 								{{ preset.width }} × {{ preset.height }} px · {{ preset.description }}
 							</p>
 						</UPageCard>
 
-						<UPageCard title="Content">
-							<div class="space-y-4">
+						<UPageCard title="Content" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+							<div class="space-y-2">
+								<UFormField label="Content">
+									<USelect
+										v-model="contentMode"
+										:items="contentItems"
+										value-key="value"
+										class="w-full"
+										aria-label="Artwork content" />
+								</UFormField>
+								<UFormField label="Anime">
+									<UModal
+										v-model:open="animeSearchOpen"
+										:ui="{ content: 'sm:max-w-4xl' }">
+										<UButton
+											:label="selectedAnimeTitle || (contentMode === 'anime' ? 'Select anime...' : 'Choose from the top 10...')"
+											icon="i-lucide-search"
+											color="neutral"
+											variant="outline"
+											block
+											class="justify-start" />
+										<template #content>
+											<AnimePicker
+												:suggestions="contentCandidates"
+												:searchable="contentMode === 'anime'"
+												action-label="Use"
+												:empty-label="contentMode === 'anime'
+													? 'Search AniList or load a profile to see anime here.'
+													: 'No matching anime is available in this AniList profile.'"
+												@select="selectAnime" />
+										</template>
+									</UModal>
+								</UFormField>
+								<p
+									v-if="!userStore.isAuthenticated"
+									class="text-[11px] leading-tight text-muted">
+									Load an AniList profile to unlock automatic Statistics selections.
+								</p>
+								<div class="grid grid-cols-2 gap-2">
+									<UFormField label="Title language">
+										<USelect
+											v-model="titleLanguage"
+											:items="CREATE_TITLE_LANGUAGE_OPTIONS"
+											value-key="value"
+											class="w-full"
+											aria-label="Anime title language" />
+									</UFormField>
+									<UFormField label="Artwork source">
+										<USelect
+											v-model="imageSource"
+											:items="imageSourceItems"
+											value-key="value"
+											class="w-full"
+											aria-label="Anime artwork source" />
+									</UFormField>
+								</div>
+								<div
+									v-if="selectedAnime && (backgroundImageUrl || selectedAnimeCover)"
+									class="flex items-center gap-2 rounded-lg bg-elevated/60 p-2">
+									<NuxtImg
+										:src="backgroundImageUrl || selectedAnimeCover"
+										:alt="selectedAnimeTitle || 'Selected anime cover'"
+										class="h-14 w-10 shrink-0 rounded-md object-cover" />
+									<div class="min-w-0">
+										<p class="line-clamp-2 text-sm font-medium text-highlighted">
+											{{ selectedAnimeTitle }}
+										</p>
+										<p class="mt-1 text-xs text-muted">
+											{{ imageSource === "banner" ? "AniList banner" : "AniList cover" }} selected
+										</p>
+									</div>
+								</div>
+								<UAlert
+									v-if="animeError"
+									color="error"
+									variant="soft"
+									:title="animeError" />
 								<UFormField label="Title">
 									<UInput
 										v-model="title"
@@ -183,33 +342,19 @@ useSeoMeta({
 										class="w-full"
 										placeholder="Optional subtitle" />
 								</UFormField>
-								<UFormField
-									label="Background image"
-									:description="backgroundFileName || 'PNG, JPEG or WebP · 20 MB max'">
-									<input
-										type="file"
-										accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-										class="block w-full cursor-pointer rounded-md border border-default bg-default px-3 py-2 text-sm text-muted file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-medium file:text-highlighted"
-										@change="handleBackgroundFile">
-								</UFormField>
-								<UAlert
-									v-if="fileError"
-									color="error"
-									variant="soft"
-									:title="fileError" />
-								<UButton
-									v-if="backgroundImageUrl"
-									label="Remove image"
-									icon="i-lucide-trash-2"
-									color="neutral"
-									variant="soft"
-									size="sm"
-									@click="releaseBackgroundUrl" />
 							</div>
 						</UPageCard>
 
-						<UPageCard title="Style">
-							<div class="space-y-5">
+						<UPageCard title="Style" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+							<div class="space-y-2.5">
+								<UFormField label="Font">
+									<USelect
+										v-model="fontId"
+										:items="fontItems"
+										value-key="value"
+										class="w-full"
+										aria-label="Artwork font" />
+								</UFormField>
 								<div class="grid grid-cols-2 gap-3">
 									<UFormField label="Accent">
 										<input
@@ -224,72 +369,89 @@ useSeoMeta({
 											class="h-10 w-full cursor-pointer rounded-md border border-default bg-default p-1">
 									</UFormField>
 								</div>
-								<UFormField :label="`Overlay · ${overlayOpacity}%`">
-									<USlider v-model="overlayOpacity" :min="0" :max="95" :step="1" />
-								</UFormField>
+								<CreateGraduatedSlider
+									v-model="overlayOpacity"
+									label="Overlay"
+									:min="0"
+									:max="95"
+									:step="1"
+									unit="%" />
+								<CreateGraduatedSlider
+									v-model="titleScale"
+									label="Title size"
+									:min="0.6"
+									:max="1.6"
+									:step="0.05"
+									:decimals="2"
+									unit="×" />
+								<CreateGraduatedSlider
+									v-model="subtitleScale"
+									label="Subtitle size"
+									:min="0.6"
+									:max="1.6"
+									:step="0.05"
+									:decimals="2"
+									unit="×" />
 								<template v-if="backgroundImageUrl">
-									<UFormField :label="`Image zoom · ${imageZoom.toFixed(2)}×`">
-										<USlider v-model="imageZoom" :min="1" :max="3" :step="0.05" />
-									</UFormField>
-									<UFormField label="Horizontal focus">
-										<USlider v-model="imagePositionX" :min="0" :max="1" :step="0.01" />
-									</UFormField>
-									<UFormField label="Vertical focus">
-										<USlider v-model="imagePositionY" :min="0" :max="1" :step="0.01" />
-									</UFormField>
-								</template>
-								<div
-									v-if="selectedPresetId === 'badge'"
-									class="flex items-center justify-between gap-4">
-									<div>
-										<p class="text-sm font-medium text-highlighted">
-											Transparent outside
-										</p>
-										<p class="text-xs text-muted">
-											Best with PNG or WebP
-										</p>
+									<CreateGraduatedSlider
+										v-model="imageZoom"
+										label="Image zoom"
+										:min="1"
+										:max="3"
+										:step="0.05"
+										:decimals="2"
+										unit="×" />
+									<div class="grid grid-cols-2 gap-3">
+										<CreateGraduatedSlider
+											v-model="imagePositionX"
+											label="Horizontal focus"
+											:min="0"
+											:max="1"
+											:step="0.01"
+											display="percent" />
+										<CreateGraduatedSlider
+											v-model="imagePositionY"
+											label="Vertical focus"
+											:min="0"
+											:max="1"
+											:step="0.01"
+											display="percent" />
 									</div>
-									<USwitch v-model="transparentBadge" aria-label="Transparent badge background" />
-								</div>
-							</div>
-						</UPageCard>
-
-						<UPageCard title="Export">
-							<div class="flex gap-2">
-								<USelect
-									v-model="exportFormat"
-									:items="exportItems"
-									value-key="value"
-									class="w-28"
-									aria-label="Export format" />
-								<UButton
-									label="Download"
-									icon="i-lucide-download"
-									class="flex-1 justify-center"
-									:loading="exporting"
-									@click="download" />
+								</template>
 							</div>
 						</UPageCard>
 					</aside>
 
-					<section aria-label="Artwork preview" class="min-w-0">
+					<section aria-label="Artwork preview" class="min-h-0 min-w-0 xl:h-full">
 						<ClientOnly>
 							<CreateCanvasPreview
 								ref="preview"
 								:options="artworkOptions"
-								:background-image-url="backgroundImageUrl" />
+								:background-image-url="backgroundImageUrl">
+								<template #actions>
+									<div class="flex items-center gap-2 rounded-lg bg-default/90 p-2 shadow-lg ring ring-default backdrop-blur">
+										<USelect
+											v-model="exportFormat"
+											:items="exportItems"
+											value-key="value"
+											class="w-24"
+											aria-label="Export format" />
+										<UButton
+											label="Export"
+											icon="i-lucide-download"
+											class="justify-center"
+											:loading="exporting"
+											@click="download" />
+									</div>
+								</template>
+							</CreateCanvasPreview>
 							<template #fallback>
-								<USkeleton class="min-h-96 rounded-xl" />
+								<WidgetLoadingSkeleton
+									label="Preparing artwork preview"
+									class="min-h-96" />
 							</template>
 						</ClientOnly>
 
-						<UAlert
-							class="mt-4"
-							color="neutral"
-							variant="subtle"
-							icon="i-lucide-shield-check"
-							title="Rights and privacy"
-							description="Only use images you own or are licensed to reuse. Imported files and rendering remain local; AniTools does not upload them or claim rights to your export." />
 					</section>
 				</div>
 			</UContainer>
