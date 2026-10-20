@@ -49,9 +49,18 @@ supprimées.
 - Des overrides bornent plusieurs dépendances transitives ; ils doivent être
   réévalués lors des montées de version.
 
-Le dernier audit effectué sur cette branche ne signalait aucune vulnérabilité
-connue. `bun audit` doit néanmoins être rejoué dans la CI et avant chaque
-livraison, car le registre évolue.
+Au 20 octobre 2026, après `bun update` et la mise à jour des overrides, `bun audit`
+signale encore deux alertes hautes **sans version corrigée publiée** :
+
+- `braces` ≤ 3.0.3 (déni de service sur motifs imbriqués), via
+  `nitropack › globby › fast-glob › micromatch` et l'outillage stylelint. Les
+  motifs sont ceux de la configuration de build, jamais une saisie visiteur.
+- `node-forge` ≤ 1.4.0 (vérification de signature RSA), via `listhen`, qui ne
+  sert qu'à générer le certificat HTTPS du serveur de développement.
+
+Aucune des deux n'est atteignable depuis le serveur de production. Retirer les
+overrides correspondants dès qu'une version corrigée paraît. `bun audit` doit
+être rejoué dans la CI et avant chaque livraison, car le registre évolue.
 
 ### Réserves techniques
 

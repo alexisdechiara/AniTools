@@ -16,6 +16,11 @@ export default defineConfig({
 			]
 		: [["list"]],
 	outputDir: "test-results",
+	// The suite runs against `nuxt dev`: the first visit to a page compiles it, which can
+	// exceed the 5s default when every worker hits a cold page at once.
+	expect: {
+		timeout: 10_000
+	},
 	use: {
 		baseURL,
 		screenshot: "only-on-failure",

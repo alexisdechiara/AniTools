@@ -44,6 +44,24 @@ export default defineNuxtConfig({
 		enabled: process.env.NODE_ENV !== "production"
 	},
 
+	"vite": {
+		optimizeDeps: {
+			// Libraries imported by lazily loaded pages: without this, Vite discovers each one on
+			// the first visit, re-bundles and reloads the page, which breaks the first
+			// interactions on every fresh dev server (and every e2e run).
+			include: [
+				"@vue/devtools-core",
+				"@unovis/ts",
+				"@unovis/vue",
+				"date-fns",
+				"grid-layout-plus",
+				"vue-cal",
+				"vue-draggable-plus",
+				"vue-timeline-chart"
+			]
+		}
+	},
+
 	"eslint": {
 		config: {
 			stylistic: false
