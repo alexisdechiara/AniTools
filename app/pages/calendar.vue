@@ -1,5 +1,5 @@
 <template>
-	<UDashboardPanel id="calendar" class="relative h-dvh min-w-0">
+	<UDashboardPanel id="calendar" class="relative h-[calc(100dvh-3.5rem)] min-w-0 lg:h-dvh">
 		<div class="sr-only" aria-live="polite">
 			{{ calendarStatusMessage }}
 		</div>
@@ -37,8 +37,8 @@
 							size="sm" color="neutral" aria-label="Search calendar events" name="calendar-search"
 							@blur="closeSearch" @keyup.esc="clearSearch"
 							:ui="searchButtonToggle
-								? { base: 'w-48 sm:w-64 transition-all placeholder:text-dimmed duration-300 ease-in-out bg-elevated', leading: 'ps-1' }
-								: { base: 'w-8 px-0 transition-all placeholder:text-transparent duration-300 ease-in-out bg-elevated', leading: 'ps-1' }">
+								? { base: 'w-48 sm:w-64 transition-[width,color] placeholder:text-dimmed duration-300 ease-in-out bg-elevated', leading: 'ps-1' }
+								: { base: 'w-8 px-0 transition-[width,color] placeholder:text-transparent duration-300 ease-in-out bg-elevated', leading: 'ps-1' }">
 							<template #leading>
 								<UButton icon="i-lucide-search" aria-label="Open calendar search" @click="openSearch" size="xs" variant="link" color="neutral" :class="searchButtonToggle
 									? 'cursor-default text-muted'
@@ -57,7 +57,9 @@
 				</div>
 			</template>
 			<template #weekday-heading="{ date }">
-				<UButton size="sm" color="neutral" variant="soft" class="rounded-full uppercase m-2"
+				<UButton size="sm" :color="date.isToday() ? 'primary' : 'neutral'" :variant="date.isToday() ? 'solid' : 'soft'"
+					class="rounded-full uppercase m-2"
+					:aria-current="date.isToday() ? 'date' : undefined"
 					:class="!store.isMonthView && 'cursor-pointer'"
 					@click="!store.isMonthView ? vueCalRef?.view.switch('day', date) : ''">
 					{{ date.format("dddd") }}
@@ -69,6 +71,7 @@
 					<button
 						type="button"
 						:aria-label="getEventAriaLabel(event)"
+						:title="event.title"
 						class="calendar-event-card relative flex size-full cursor-pointer flex-col justify-center gap-0.5 rounded-lg border-l-4 border-(--anime-theme-color) bg-(--anime-theme-color)/25 px-1.5 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
 						:class="[
 							isCancelled(event)
@@ -99,17 +102,18 @@
 							<template v-if="event.streaming">
 								<UBadge v-for="platform in event.streaming" :key="platform" :label="platform"
 									:size="getBadgeSize(event, store.timeStep)" variant="subtle"
-									class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
+									class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-anime-theme"
 									:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
 							</template>
 							<UBadge v-else-if="event.media?.format" :label="event.media?.format"
 								:size="getBadgeSize(event, store.timeStep)" variant="subtle"
-								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-(--anime-theme-color)"
+								class="ring-(--anime-theme-color)/25 bg-(--anime-theme-color)/25 text-anime-theme"
 								:style="{ '--anime-theme-color': event.media?.coverImage?.color || 'var(--ui-color-primary-500)' }" />
-							<template v-if="event.languages">
+							<span v-if="event.languages.length" class="inline-flex items-center gap-1"
+								:title="`Dubbed in ${formatDubbingLanguages(event.languages)}`">
 								<Icon v-for="language in event.languages" :key="language" :name="`circle-flags:${language}`"
 									class="size-3" aria-hidden="true" />
-							</template>
+							</span>
 						</div>
 					</button>
 				</AnimeDetailsPopover>
@@ -151,7 +155,7 @@ import { VueCal, addDatePrototypes, type VueCalView } from "vue-cal"
 import "vue-cal/style"
 import { FEATURE_REGISTRY } from "#shared/config/features"
 import { useAiringSchedules } from "~/composables/useAiringSchedules"
-import { useCalendarStore } from "~/stores/Calendar"
+import { getDubbingLabel, useCalendarStore } from "~/stores/Calendar"
 import type {
 	CalendarApiResponse,
 	CalendarEvent,
@@ -282,10 +286,15 @@ function isUnconfirmed(event: { status?: string }) {
 
 watch(calendarError, (caughtError) => {
 	if (caughtError) {
+		// A 4xx means this request itself was refused, which retrying the same period won't fix.
+		const rejected = (caughtError.statusCode ?? 0) >= 400 && (caughtError.statusCode ?? 0) < 500
+			&& caughtError.statusCode !== 429
 		toast.add({
 			id: "calendar-load-error",
 			title: "Calendar could not be loaded",
-			description: "AniList broadcasts and simuldub events are temporarily unavailable.",
+			description: rejected
+				? "This period can't be loaded. Switch to Week view or move to another month."
+				: "AniList broadcasts and simuldub events are temporarily unavailable. Try again in a moment.",
 			icon: "i-lucide-circle-alert",
 			color: "error",
 			duration: 0,
@@ -375,12 +384,17 @@ const calendarStatusMessage = computed(() => {
 	return `Loaded ${filteredCalendarEvents.value.length} calendar events.`
 })
 
+function formatDubbingLanguages(languages: readonly string[]) {
+	return languages.map(getDubbingLabel).join(", ")
+}
+
 function getEventAriaLabel(event: CalendarEvent) {
 	const details = [
 		event.title,
 		event.episode ? `episode ${event.episode}` : null,
 		event.status === "cancelled" ? "cancelled" : null,
-		event.status === "unconfirmed" ? "unconfirmed" : null
+		event.status === "unconfirmed" ? "unconfirmed" : null,
+		event.languages.length ? `dubbed in ${formatDubbingLanguages(event.languages)}` : null
 	].filter((value): value is string => Boolean(value))
 
 	return details.join(", ")
@@ -431,7 +445,8 @@ onBeforeUnmount(() => {
 .vuecal.vuecal--default-theme {
 	--vuecal-primary-color: transparent !important;
 	--vuecal-event-border-color: transparent !important;
-	--vuecal-height: 100dvh !important;
+	/* The mobile navbar (3.5rem, see layouts/default.vue) sits above the calendar below lg. */
+	--vuecal-height: calc(100dvh - 3.5rem) !important;
 	--vuecal-weekday-bar-size: 3rem !important;
 	--vuecal-schedules-bar-size: 0rem !important;
 	--vuecal-min-cell-size: 1rem !important;
@@ -512,8 +527,14 @@ onBeforeUnmount(() => {
 	}
 }
 
+@media (min-width: 64rem) {
+	.vuecal.vuecal--default-theme {
+		--vuecal-height: 100dvh !important;
+	}
+}
+
 .vuecal__cell--today {
-	background-color: color-mix(in srgb, var(--ui-bg-muted) 25%, transparent) !important;
+	background-color: color-mix(in oklab, var(--ui-primary) 6%, transparent) !important;
 }
 
 .vuecal__week-number {

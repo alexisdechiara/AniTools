@@ -1,5 +1,5 @@
 <template>
-	<UModal v-model:open="isOpen" title="Inconsistency Detected" :close="false" :dismissible="false"
+	<UModal v-model:open="isOpen" title="Overlapping score ranges" :close="false" :dismissible="false"
 		description="Overlapping tier ranges have been detected. Animes with scores in these ranges will be duplicated in the corresponding tiers.">
 		<template #body>
 			<div class="flex flex-col gap-2">

@@ -27,6 +27,13 @@ interface userAvatar {
 
 type AuthMode = "oauth" | "public" | null
 
+const PUBLIC_PROFILE_COOKIE = "anitools-public-profile"
+
+function isNotFoundError(error: unknown): boolean {
+	return typeof error === "object" && error !== null
+		&& "statusCode" in error && error.statusCode === 404
+}
+
 interface SessionUser {
 	id: number
 	name: string
@@ -64,6 +71,10 @@ function isAniListScoreFormat(value: unknown): value is AniListScoreFormat {
 }
 
 export const useUserStore = defineStore("User", () => {
+	// Resolved once while the store is created: on the server, useRequestFetch() needs the
+	// Nuxt context, which is gone after the first await inside an action.
+	const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+
 	// State
 	const id = ref<number>()
 	const username = ref<string>("Not logged in")
@@ -84,6 +95,15 @@ export const useUserStore = defineStore("User", () => {
 		scoreFormat: "POINT_100",
 		rowOrder: "ANIME_BY_POPULARITY"
 	})
+	// localStorage is invisible to server rendering, so the public username also lives in a
+	// cookie: a reload or a shared link can then restore the profile before the route guard runs.
+	// It only ever holds a public AniList username, never a token.
+	const publicProfileCookie = useCookie<string | null>(PUBLIC_PROFILE_COOKIE, {
+		default: () => null,
+		maxAge: 60 * 60 * 24 * 365,
+		path: "/",
+		sameSite: "lax"
+	})
 
 	// Getters
 	const isAuthenticated = computed(() => !!id.value)
@@ -99,6 +119,7 @@ export const useUserStore = defineStore("User", () => {
 		updatedAt.value = user.updatedAt || undefined
 		authMode.value = mode
 		publicUsername.value = mode === "public" ? user.name : null
+		publicProfileCookie.value = publicUsername.value
 
 		if (user.options) {
 			const titleLanguage = user.options.titleLanguage
@@ -136,7 +157,7 @@ export const useUserStore = defineStore("User", () => {
 		error.value = null
 
 		try {
-			const fetcher = import.meta.server ? useRequestFetch() : $fetch
+			const fetcher = requestFetch
 			const response = await fetcher<AniListProfileResponse>("/api/anilist/profile", {
 				query: { username: normalizedUsername }
 			})
@@ -153,9 +174,7 @@ export const useUserStore = defineStore("User", () => {
 				mediaListOptions: mediaListOptions.value
 			}
 		} catch (caughtError) {
-			error.value = caughtError instanceof Error
-				? caughtError.message
-				: "Unable to load this AniList profile."
+			error.value = getApiErrorMessage(caughtError, "Unable to load this AniList profile.")
 			throw caughtError
 		} finally {
 			loading.value = false
@@ -169,6 +188,7 @@ export const useUserStore = defineStore("User", () => {
 		updatedAt.value = undefined
 		authMode.value = null
 		publicUsername.value = null
+		publicProfileCookie.value = null
 		sessionChecked.value = true
 		loading.value = false
 		error.value = null
@@ -188,7 +208,7 @@ export const useUserStore = defineStore("User", () => {
 		if (sessionChecked.value && !force) return isOAuthAuthenticated.value
 
 		try {
-			const fetcher = import.meta.server ? useRequestFetch() : $fetch
+			const fetcher = requestFetch
 			const session = await fetcher<SessionResponse>("/api/auth/session")
 			sessionChecked.value = true
 
@@ -199,12 +219,13 @@ export const useUserStore = defineStore("User", () => {
 
 			if (authMode.value === "oauth") {
 				$reset()
-			} else if (publicUsername.value) {
-				const savedUsername = publicUsername.value
+			} else if (publicUsername.value || publicProfileCookie.value) {
+				const savedUsername = publicUsername.value ?? publicProfileCookie.value ?? ""
 				try {
 					await fetchUserData(savedUsername)
-				} catch {
-					$reset()
+				} catch (caughtError) {
+					// Only forget a profile AniList says is gone; a network hiccup should not.
+					if (isNotFoundError(caughtError)) $reset()
 				}
 			}
 			return false

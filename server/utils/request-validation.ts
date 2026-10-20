@@ -1,7 +1,8 @@
 import { createError } from "h3"
 import * as z from "zod"
 
-const MAX_CALENDAR_RANGE_SECONDS = 42 * 24 * 60 * 60
+// The month view spans six full weeks; a daylight-saving change inside them adds one hour.
+const MAX_CALENDAR_RANGE_SECONDS = 42 * 24 * 60 * 60 + 60 * 60
 const MAX_SEARCH_LENGTH = 100
 const GRAPHQL_INT_MAX = 2_147_483_647
 

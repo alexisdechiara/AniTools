@@ -15,19 +15,19 @@
       <div class="p-6 space-y-3">
         <div class="flex gap-x-6 justify-between">
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Count</span>
+            <span class="text-xs text-toned font-medium">Count</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis">{{
               count
             }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Mean Score</span>
+            <span class="text-xs text-toned font-medium">Mean score</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis"
               >{{ meanScore }} %</span
             >
           </div>
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Watch Time</span>
+            <span class="text-xs text-toned font-medium">Watch time</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis">{{
               formatWatchTime(minutesWatched)
             }}</span>

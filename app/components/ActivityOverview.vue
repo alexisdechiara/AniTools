@@ -65,15 +65,26 @@
               />
             </template>
             <template #content>
-              {{
-                `${day.date.getDate()} ${day.date.toLocaleString("en-US", {
-                  month: "long",
-                })} ${day.date.getFullYear()}`
-              }}
+              {{ formatDayLabel(day) }}
             </template>
           </UTooltip>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="showLegend"
+      class="mt-2 flex items-center justify-end gap-1 text-[10px] text-muted"
+      aria-hidden="true"
+    >
+      <span class="me-1">Less</span>
+      <span
+        v-for="level in [0.2, 0.4, 0.6, 0.8, 1]"
+        :key="level"
+        class="size-2.5 rounded-[2px] bg-primary"
+        :style="{ opacity: level }"
+      />
+      <span class="ms-1">More</span>
     </div>
   </div>
 </template>
@@ -87,6 +98,7 @@ const props = withDefaults(
     year: number;
     showDays?: boolean;
     showMonths?: boolean;
+    showLegend?: boolean;
     size?: "sm" | "md" | "lg";
     activityData: ActivityDay[];
   }>(),
@@ -94,6 +106,7 @@ const props = withDefaults(
     year: () => new Date().getFullYear(),
     showDays: true,
     showMonths: true,
+    showLegend: true,
     size: "md",
     activityData: () => [],
   }
@@ -102,6 +115,14 @@ const props = withDefaults(
 const displayActivityData = computed(() =>
   props.activityData.length > 0 ? props.activityData : buildActivityGrid(props.year)
 );
+
+const dayFormatter = createDateFormatter({ day: "numeric", month: "long", year: "numeric" });
+
+function formatDayLabel(day: ActivityDay): string {
+  const date = dayFormatter.format(day.date);
+  if (!day.isCurrentMonth) return date;
+  return `${date} · ${day.count} ${day.count === 1 ? "update" : "updates"}`;
+}
 
 // Génère les libellés des mois pour la légende
 const months = computed((): string[] => {

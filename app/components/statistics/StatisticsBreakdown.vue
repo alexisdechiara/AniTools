@@ -105,7 +105,7 @@ function comparison(item: StatisticsBreakdownItem): number | null {
 								Count
 							</dt>
 							<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">
-								{{ item.count.toLocaleString() }}
+								{{ formatNumber(item.count) }}
 							</dd>
 						</div>
 						<div

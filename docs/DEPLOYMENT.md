@@ -64,6 +64,9 @@ Contrôles :
 - [ ] `NUXT_SESSION_PASSWORD` contient au moins 32 caractères aléatoires.
 - [ ] `NUXT_SESSION_PREVIOUS_PASSWORD` est vide au premier déploiement.
 - [ ] Aucune valeur réelle n'est committée dans `.env` ou `.env.example`.
+- [ ] `NUXT_ANILIST_DEV_CACHE` n'a pas besoin d'être défini : le cache disque
+  qu'il pilote n'existe qu'avec `bun run dev` (`nitro.devStorage`) et n'est jamais
+  inclus dans un build.
 
 Une clé de session peut être générée avec Bun :
 
@@ -167,8 +170,10 @@ le garantit pas.
 
 ## 7. Préparer le multi-instance ou le serverless
 
-Aujourd'hui, les caches Calendar et les buckets de rate limiting vivent dans la
-mémoire du processus. Ils conviennent à une recette ou à une instance unique,
+Aujourd'hui, les caches Calendar, le cache des lectures AniList
+(`server/utils/anilist-request-cache.ts` : 1 min pour les données d'un
+utilisateur, 10 min pour le catalogue, requêtes identiques mutualisées) et les
+buckets de rate limiting vivent dans la mémoire du processus. Ils conviennent à une recette ou à une instance unique,
 mais chaque instance possède ses propres compteurs et son propre cache.
 
 Avant plusieurs réplicas, autoscaling ou fonctions serverless :
@@ -195,7 +200,9 @@ juste avant la mise en ligne ; elles peuvent évoluer.
 - [ ] Ne pas utiliser AniList comme système de sauvegarde ou base de données.
 - [ ] Ne pas aspirer, hoarder ou collecter massivement le catalogue.
 - [ ] Mettre en cache uniquement ce qui est nécessaire au fonctionnement et
-  avec une durée limitée.
+  avec une durée limitée. En production, le cache des lectures AniList expire
+  après 1 à 10 minutes. Le cache disque de développement est permanent mais local
+  au poste du développeur, exclu du dépôt (`.data`) et absent des builds.
 - [ ] Respecter les consignes de nommage et indiquer clairement que le produit
   est une intégration non officielle si la marque AniList est utilisée.
 - [ ] Vérifier le seuil commercial en vigueur. Les conditions consultées lors de
@@ -229,7 +236,8 @@ juste avant la mise en ligne ; elles peuvent évoluer.
 - [ ] `bun audit` ne signale aucune vulnérabilité connue non acceptée.
 - [ ] OAuth fonctionne avec un vrai compte, puis logout invalide la session.
 - [ ] Le mode profil public fonctionne sans autorisation OAuth.
-- [ ] `/calendar`, `/tierlist` et `/create` fonctionnent sans compte.
+- [ ] `/calendar`, `/tierlist`, `/create`, `/settings` et `/support` fonctionnent
+  sans compte.
 - [ ] Les pages personnalisées refusent proprement une identité absente.
 - [ ] Les callbacks invalides, erreurs AniList et quotas `429` sont lisibles.
 - [ ] Calendar reste fonctionnel quand Directus est indisponible.

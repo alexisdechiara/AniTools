@@ -118,13 +118,10 @@ const items = computed<DropdownMenuItem[][]>(() => [
           icon: "i-lucide-moon",
           type: "checkbox",
           checked: colorMode.value === "dark",
-          onUpdateChecked(checked: boolean) {
-            if (checked) {
-              colorMode.preference = "dark";
-            }
-          },
           onSelect(e: Event) {
             e.preventDefault();
+
+            colorMode.preference = "dark";
           },
         },
       ],
@@ -183,8 +180,8 @@ const items = computed<DropdownMenuItem[][]>(() => [
     <template #chip-leading="{ item }">
       <span
         :style="{
-	'--chip-light': `var(--color-${(item as any).chip}-500)`,
-	'--chip-dark': `var(--color-${(item as any).chip}-400)`,
+	'--chip-light': `var(--color-${(item as DropdownMenuItem).chip}-500)`,
+	'--chip-dark': `var(--color-${(item as DropdownMenuItem).chip}-400)`,
 }"
         class="ms-0.5 size-2 rounded-full bg-(--chip-light) dark:bg-(--chip-dark)"
       />

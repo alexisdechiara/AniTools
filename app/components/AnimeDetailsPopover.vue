@@ -20,15 +20,15 @@
 								root: 'opacity-95',
 								indicator: `bg-(--anime-theme-color)`,
 								trigger:
-									'cursor-pointer ring-0! ring-transparent! focus-visible:ring-transparent! focus-visible:ring-0!',
+									'cursor-pointer ring-0 ring-transparent focus-visible:ring-2 focus-visible:ring-primary',
 							}" />
 						</div>
 					</div>
 					<div class="col-span-2 justify-center flex flex-col p-4 sm:p-6"
 						:class="[isHorizontal ? 'h-64' : 'h-full gap-y-4', showBadges ? 'pb-0 sm:pb-0' : '']">
-						<div class="relative flex flex-col gap-y-2 h-full" @mouseover="hoveredContent = true"
-							@mouseleave="hoveredContent = false"
-							:class="[hoveredContent || isVertical ? 'overflow-y-auto' : 'overflow-y-hidden', isHorizontal ? '' : '']"
+						<div class="relative flex flex-col gap-y-2 h-full overflow-y-auto" @mouseover="hoveredContent = true"
+							@mouseleave="hoveredContent = false" @focusin="hoveredContent = true"
+							@focusout="hoveredContent = false"
 							v-if="showSummary" :style="{ 'scrollbar-gutter': isHorizontal ? 'stable' : 'auto' }">
 							<div class="flex justify-between items-start">
 								<div class="flex w-full flex-col gap-y-0.5">
@@ -36,7 +36,7 @@
 										<template #default>
 											<div class="inline-flex gap-x-1 items-center">
 												<span> {{ data?.media?.format }} </span>
-												<span v-if="data.media.episodes && data.media.format"
+												<span v-if="data?.media?.episodes && data?.media?.format"
 													class="size-1 rounded-full bg-(--ui-text-dimmed)" />
 												<span v-if="data?.media?.episodes">
 													<!-- Exemple to use for franchise only -->
@@ -56,43 +56,43 @@
 										</template>
 										<template #hover>
 											<span v-if="data?.media?.season || data?.media?.seasonYear">
-												{{ data.media.season }} {{ data.media.seasonYear }}
+												{{ data?.media?.season }} {{ data?.media?.seasonYear }}
 											</span>
 										</template>
 									</TextHover>
 									<TextHover class="text-base text-pretty font-semibold text-highlighted leading-tight">
 										<template #default>
-											{{ data.media.title.english || data.media.title.romaji }}
+											{{ data?.media?.title?.english || data?.media?.title?.romaji }}
 										</template>
 										<template #hover>
-											{{ data.media.title.romaji }}
+											{{ data?.media?.title?.romaji }}
 										</template>
 									</TextHover>
 									<TextHover class="inline-flex text-xs">
 										<template #default>
-											<div v-if="showStudios" class="inline-flex group-hover/subtitle:hidden text-(--anime-theme-color)"
-												:style="{ '--anime-theme-color': data.media.coverImage.color }">
-												<span v-for="(studio, index) in mainStudios" :key="studio.node.name">
-													{{ Number(index) > 0 ? ", " : "" }} {{ studio.node.name }}
+											<div v-if="showStudios" class="inline-flex group-hover/subtitle:hidden text-anime-theme"
+												:style="{ '--anime-theme-color': animeThemeColor }">
+												<span v-for="(studio, index) in mainStudios" :key="studio.node?.name ?? index">
+													{{ Number(index) > 0 ? ", " : "" }} {{ studio.node?.name }}
 												</span>
 											</div>
 										</template>
 										<template #hover>
-											<div v-if="data.media.relations?.edges?.length"
+											<div v-if="data?.media?.relations?.edges?.length"
 												class="hidden group-hover/subtitle:inline-flex text-dimmed font-light italic truncate">
-												<span v-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'PREQUEL')">
-													Sequel to "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
-														'PREQUEL')?.node.title.english || data.media.title}}"
+												<span v-if="data.media.relations.edges.some((edge) => edge.relationType === 'PREQUEL')">
+													Sequel to "{{data.media.relations.edges.find((edge) => edge.relationType ===
+														'PREQUEL')?.node?.title?.english || data.media.title}}"
 												</span>
 												<span
-													v-else-if="data.media.relations.edges.some((edge: any) => edge.relationType === 'ADAPTATION')">
-													Adapted from "{{data.media.relations.edges.find((edge: any) => edge.relationType ===
-	'ADAPTATION')?.node.title.english || data.media.title.romaji}}"
+													v-else-if="data.media.relations.edges.some((edge) => edge.relationType === 'ADAPTATION')">
+													Adapted from "{{data.media.relations.edges.find((edge) => edge.relationType ===
+	'ADAPTATION')?.node?.title?.english || data.media.title?.romaji}}"
 												</span>
 												<span v-else>
 													Source : "{{
-														data.media.relations.edges[0].node.title.english ||
-														data.media.title.romaji
+														data.media.relations.edges[0]?.node?.title?.english ||
+														data.media.title?.romaji
 													}}"
 												</span>
 											</div>
@@ -100,14 +100,14 @@
 									</TextHover>
 								</div>
 								<span v-if="data?.score" class="text-right font-medium text-2xl text-highlighted w-fit">
-									{{ data.score }} %
+									{{ formatScore(data.score) }}
 								</span>
 							</div>
-							<p class="text-muted text-sm w-full leading-tight" :class="isHorizontal
+							<p tabindex="0" role="group" aria-label="Synopsis" class="text-muted text-sm w-full leading-tight outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm" :class="isHorizontal
 								? hoveredContent
 									? 'overflow-y-visible h-max'
-									: 'overflow-y-hidden h-max max-h-22'
-								: 'max-h-22 h-full overflow-y-hidden hover:overflow-y-auto'
+									: 'overflow-y-auto h-max max-h-22'
+								: 'max-h-22 h-full overflow-y-auto'
 								">
 								{{ sanitizedDescription }}
 							</p>
@@ -120,7 +120,7 @@
 							<div class="flex justify-between w-full">
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="ratedRankText" description="Ranking" />
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="popularRankText" description="Popularity" />
-								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="meanScoreText" description="Mean Score" />
+								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="meanScoreText" description="Mean score" />
 								<UUser :ui="{ wrapper: 'flex flex-col-reverse' }" :name="favouritesText" description="Favourites" />
 							</div>
 							<div class="grid grid-cols-12 gap-2 justify-between w-full">
@@ -132,8 +132,8 @@
 									:class="nbLinks < 4 ? 'col-span-11' : 'col-span-10'" />
 								<div class="grid auto-cols-max grid-flow-col grid-rows-5 gap-1 min-w-min h-fit flex-1 overflow-hidden"
 									:class="nbLinks < 4 ? 'col-span-1' : 'col-span-2'">
-									<ExternalLink v-for="(link, index) in externalLinks" :key="index" :color="link.color"
-										:site="link.site" :url="link.url" />
+									<ExternalLink v-for="(link, index) in externalLinks" :key="index" :color="link.color ?? undefined"
+										:site="link.site ?? ''" :url="link.url ?? ''" />
 								</div>
 							</div>
 							<p v-if="detailsError" class="text-xs text-error">{{ detailsError }}</p>
@@ -144,34 +144,39 @@
 								? 'relative col-span-2 flex gap-2 w-full items-center cursor-default'
 								: 'relative flex gap-2 w-full items-center cursor-default'
 								">
-								<div ref="badgesEl" :class="[
-									'flex gap-1 overflow-x-auto w-full z-50 scroll-auto snap-x touch-pan-x select-none',
+								<div ref="badgesEl" role="group" aria-label="Genres"
+									:tabindex="badgesOverflowing ? 0 : -1" :class="[
+									'flex gap-1 overflow-x-auto w-full z-50 scroll-auto snap-x touch-pan-x select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary',
 									badgesOverflowing
 										? isBadgesDragging
 											? 'cursor-grabbing'
 											: 'cursor-grab'
 										: 'cursor-default',
 								]" style="scrollbar-width: none">
-									<UBadge v-for="genre in data.media.genres" :key="genre" variant="subtle" size="md"
-										class="rounded-full whitespace-nowrap font-medium bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-(--anime-theme-color)">
+									<UBadge v-for="genre in data?.media?.genres" :key="genre" variant="subtle" size="md"
+										class="rounded-full whitespace-nowrap font-medium bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-anime-theme">
 										{{ genre }}
 									</UBadge>
 								</div>
 								<UButton
-									:to="`https://anilist.co/anime/${data.media.id}`"
+									:to="`https://anilist.co/anime/${data?.media?.id}`"
 									target="_blank"
 									rel="noopener noreferrer"
 									aria-label="Open this anime on AniList"
 									variant="subtle"
 									size="sm"
-									class="rounded-full z-10 bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-(--anime-theme-color) hover:bg-(--anime-theme-color)/50"
+									class="rounded-full z-10 bg-(--anime-theme-color)/10 ring-(--anime-theme-color)/25 text-anime-theme hover:bg-(--anime-theme-color)/50"
 									icon="i-lucide-external-link" />
 							</div>
 						</div>
 					</div>
 				</div>
-				<Icon v-if="draggable" name="i-lucide-grip-vertical" class="absolute right-3 top-3 text-dimmed hover:text-muted"
-					:class="isDraggingPopover ? 'cursor-grabbing' : 'cursor-grab'" @mousedown="startDrag" />
+				<button v-if="draggable" type="button" aria-label="Move this popover with the arrow keys"
+					class="absolute end-3 top-3 rounded-sm p-1.5 text-dimmed outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-primary"
+					:class="isDraggingPopover ? 'cursor-grabbing' : 'cursor-grab'" @mousedown="startDrag"
+					@keydown="onHandleKeydown">
+					<Icon name="i-lucide-grip-vertical" class="size-4" aria-hidden="true" />
+				</button>
 			</div>
 		</template>
 	</UPopover>
@@ -183,8 +188,66 @@ import type { PopoverProps, TabsItem } from '@nuxt/ui'
 import type { AniListMediaResponse, AniListMediaSummary } from '~~/shared/types/anilist'
 import TextHover from './TextHover.vue';
 
+interface AnimeDetailsPopoverTitle {
+	english?: string | null
+	native?: string | null
+	romaji?: string | null
+	userPreferred?: string | null
+}
+
+interface AnimeDetailsPopoverMedia {
+	id: number
+	title?: AnimeDetailsPopoverTitle | null
+	coverImage?: {
+		color?: string | null
+		extraLarge?: string | null
+		large?: string | null
+		medium?: string | null
+	} | null
+	description?: string | null
+	format?: string | null
+	episodes?: number | null
+	season?: string | null
+	seasonYear?: number | null
+	genres?: readonly string[] | null
+	favourites?: number | null
+	meanScore?: number | null
+	studios?: {
+		edges?: ReadonlyArray<{
+			isMain?: boolean | null
+			node?: { name?: string | null } | null
+		}> | null
+	} | null
+	rankings?: ReadonlyArray<{
+		type?: string | null
+		allTime?: boolean | null
+		rank?: number | null
+	}> | null
+	relations?: {
+		edges?: ReadonlyArray<{
+			relationType?: string | null
+			node?: { title?: AnimeDetailsPopoverTitle | null } | null
+		}> | null
+	} | null
+	externalLinks?: ReadonlyArray<{
+		color?: string | null
+		language?: string | null
+		site?: string | null
+		url?: string | null
+	}> | null
+	trailer?: {
+		id?: string | null
+		site?: string | null
+	} | null
+}
+
+export interface AnimeDetailsPopoverData {
+	score?: number | null
+	media?: AnimeDetailsPopoverMedia | null
+}
+
 const props = withDefaults(defineProps<{
-	data: any;
+	data: AnimeDetailsPopoverData;
 	orientation?: "vertical" | "horizontal";
 	draggable?: boolean;
 } & Omit<PopoverProps, 'open' | 'defaultOpen'>>(), {
@@ -236,6 +299,7 @@ const items: TabsItem[] = [
 const hoveredContent = ref(false);
 const showStudios = ref(true);
 const activeTab = ref("summary");
+const { format: formatScore } = usePersonalScore();
 
 const media = computed(() => data.value?.media);
 const coverUrl = computed(() => media.value?.coverImage?.extraLarge
@@ -243,17 +307,17 @@ const coverUrl = computed(() => media.value?.coverImage?.extraLarge
 	?? media.value?.coverImage?.medium
 	?? null
 )
-const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge: any) => edge.isMain && edge.node) || []);
+const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge) => edge.isMain && edge.node) || []);
 const externalLinks = computed(() => media.value?.externalLinks ?? [])
 const nbLinks = computed(() => externalLinks.value.length);
 
 const ratedRankText = computed(() => {
-	const ranking = media.value?.rankings?.find((r: any) => r.type === 'RATED' && r.allTime);
+	const ranking = media.value?.rankings?.find((r) => r.type === 'RATED' && r.allTime);
 	return ranking ? `#${ranking.rank}` : '-';
 });
 
 const popularRankText = computed(() => {
-	const ranking = media.value?.rankings?.find((r: any) => r.type === 'POPULAR' && r.allTime);
+	const ranking = media.value?.rankings?.find((r) => r.type === 'POPULAR' && r.allTime);
 	return ranking ? `#${ranking.rank}` : '-';
 });
 
@@ -272,7 +336,25 @@ const trailerUrl = computed(() => {
 })
 
 const animeThemeColor = computed(() => media.value?.coverImage?.color || 'var(--ui-color-primary-400)');
-const sanitizedDescription = computed(() => (media.value?.description || '').replace(/(<([^>]+)>)/ig, ''));
+const HTML_ENTITIES: Record<string, string> = {
+	amp: '&', apos: "'", gt: '>', hellip: '…', lt: '<', ldquo: '“', lsquo: '‘',
+	mdash: '—', nbsp: ' ', ndash: '–', quot: '"', rdquo: '”', rsquo: '’'
+};
+
+// AniList descriptions arrive HTML-encoded: strip tags, then render entities as their characters.
+function decodeHtmlEntities(value: string): string {
+	return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+		if (entity.startsWith('#')) {
+			const codePoint = entity[1]?.toLowerCase() === 'x'
+				? Number.parseInt(entity.slice(2), 16)
+				: Number.parseInt(entity.slice(1), 10);
+			return Number.isFinite(codePoint) && codePoint > 0 ? String.fromCodePoint(codePoint) : match;
+		}
+		return HTML_ENTITIES[entity.toLowerCase()] ?? match;
+	});
+}
+
+const sanitizedDescription = computed(() => decodeHtmlEntities((media.value?.description || '').replace(/(<([^>]+)>)/ig, '')));
 
 watch(open, async (isOpen) => {
 	const mediaId = Number(props.data?.media?.id)
@@ -344,10 +426,47 @@ const popoverOffset = reactive({ x: 0, y: 0 });
 const dragStart = reactive({ mouseX: 0, mouseY: 0, startX: 0, startY: 0 });
 let draggedPanel: HTMLElement | null = null;
 
+// Target the parent element (the Popover Panel) to move the entire popover including shadow/ring
+function getPopoverPanel(): HTMLElement | null {
+	return popoverEl.value?.parentElement ?? null;
+}
+
+// Use translate property to compose with Popper's transform
+function applyPopoverOffset(panel: HTMLElement) {
+	panel.style.translate = `${popoverOffset.x}px ${popoverOffset.y}px`;
+}
+
+const KEYBOARD_MOVE_STEP = 16;
+const KEYBOARD_MOVES: Record<string, readonly [number, number]> = {
+	ArrowLeft: [-KEYBOARD_MOVE_STEP, 0],
+	ArrowRight: [KEYBOARD_MOVE_STEP, 0],
+	ArrowUp: [0, -KEYBOARD_MOVE_STEP],
+	ArrowDown: [0, KEYBOARD_MOVE_STEP]
+};
+
+function onHandleKeydown(event: KeyboardEvent) {
+	const panel = getPopoverPanel();
+	if (!panel) return;
+
+	if (event.key === 'Home') {
+		event.preventDefault();
+		popoverOffset.x = 0;
+		popoverOffset.y = 0;
+		applyPopoverOffset(panel);
+		return;
+	}
+
+	const move = KEYBOARD_MOVES[event.key];
+	if (!move) return;
+
+	event.preventDefault();
+	popoverOffset.x += move[0];
+	popoverOffset.y += move[1];
+	applyPopoverOffset(panel);
+}
+
 function startDrag(event: MouseEvent) {
-	if (!popoverEl.value) return;
-	// Target the parent element (the Popover Panel) to move the entire popover including shadow/ring
-	const panel = popoverEl.value.parentElement;
+	const panel = getPopoverPanel();
 	if (!panel) return;
 
 	event.preventDefault();
@@ -372,8 +491,7 @@ function onDragMove(event: MouseEvent) {
 	popoverOffset.x = dragStart.startX + dx;
 	popoverOffset.y = dragStart.startY + dy;
 
-	// Use translate property to compose with Popper's transform
-	draggedPanel.style.translate = `${popoverOffset.x}px ${popoverOffset.y}px`;
+	applyPopoverOffset(draggedPanel);
 }
 
 function stopDrag() {

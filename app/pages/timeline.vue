@@ -47,15 +47,11 @@ const { showPageLoader } = useProgressiveLoading(
 	computed(() => [initialized.value]),
 	{ allowPartial: false }
 )
-const dayFormatter = new Intl.DateTimeFormat(undefined, {
+const dayFormatter = createDateFormatter({
 	day: "2-digit"
 })
-const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
+const weekdayFormatter = createDateFormatter({
 	weekday: "short"
-})
-const timeFormatter = new Intl.DateTimeFormat(undefined, {
-	hour: "2-digit",
-	minute: "2-digit"
 })
 
 function formatActivityDay(activity: AniListAnimeActivity) {
@@ -64,10 +60,6 @@ function formatActivityDay(activity: AniListAnimeActivity) {
 
 function formatActivityWeekday(activity: AniListAnimeActivity) {
 	return weekdayFormatter.format(new Date(activity.createdAt * 1_000))
-}
-
-function formatActivityTime(activity: AniListAnimeActivity) {
-	return timeFormatter.format(new Date(activity.createdAt * 1_000))
 }
 
 function monthStats(group: TimelineMonthGroup) {
@@ -90,19 +82,24 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 </script>
 
 <template>
-	<UDashboardPanel id="timeline" :ui="{ body: 'pt-3 sm:pt-4' }">
+	<UDashboardPanel id="timeline" :ui="{ body: 'pt-3 px-0 sm:pt-4' }">
 		<template #body>
-			<div class="mx-auto w-full max-w-7xl space-y-6">
-				<header class="flex justify-end" aria-label="Timeline controls">
-					<UTabs
-						v-model="layout"
-						:items="layouts"
-						:content="false"
-						color="neutral"
-						size="sm"
-						aria-label="Timeline view"
-						:ui="{ trigger: 'cursor-pointer' }" />
-				</header>
+			<div class="mx-auto w-full max-w-7xl space-y-6 px-4 sm:px-6">
+				<PageHeader
+					eyebrow="Activity"
+					title="Timeline"
+					description="Every AniList update, month by month or laid out as a Gantt chart.">
+					<template #actions>
+						<UTabs
+							v-model="layout"
+							:items="layouts"
+							:content="false"
+							color="neutral"
+							size="sm"
+							aria-label="Timeline view"
+							:ui="{ trigger: 'cursor-pointer' }" />
+					</template>
+				</PageHeader>
 
 				<UAlert
 					v-if="!showPageLoader && error"
@@ -142,77 +139,68 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 					<section
 						v-for="group in monthGroups"
 						:key="group.key"
-						class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10"
+						class="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10"
 						:data-timeline-month="group.key">
-						<aside class="self-start lg:sticky lg:top-6">
+						<aside class="self-start text-center lg:sticky lg:top-6 lg:text-center">
 							<p class="text-3xl font-bold tracking-tight text-highlighted">
 								{{ group.month }}
 							</p>
 							<p class="mt-1 text-sm font-medium text-muted">
 								{{ group.year }}
 							</p>
-							<dl class="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1">
-								<div
+							<div class="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-3">
+								<UPageCard
 									v-for="stat in monthStats(group)"
 									:key="stat.label"
-									class="rounded-lg border border-default bg-elevated/60 px-3 py-2.5">
-									<dt class="text-[0.68rem] font-medium tracking-wide text-muted uppercase">
+									:ui="{ container: 'gap-y-1 p-3', root: 'bg-elevated/60' }"
+									class="text-center lg:text-left">
+									<p class="text-[0.68rem] font-medium tracking-wide text-toned uppercase">
 										{{ stat.label }}
-									</dt>
-									<dd class="mt-1 text-lg font-semibold text-highlighted">
+									</p>
+									<p class="text-2xl font-semibold text-ellipsis text-highlighted">
 										{{ stat.value }}
-									</dd>
-								</div>
-							</dl>
+									</p>
+								</UPageCard>
+							</div>
 						</aside>
 
-						<ol class="space-y-5">
+						<ol class="space-y-3">
 							<li
 								v-for="activity in group.activities"
 								:key="activity.id"
-								class="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5"
+								class="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)]"
 								data-timeline-activity>
 								<time
 									:datetime="new Date(activity.createdAt * 1_000).toISOString()"
-									class="relative flex min-h-24 flex-col items-center border-r border-default pr-3 text-center sm:pr-5">
-									<span class="text-xs font-semibold tracking-wide text-primary uppercase">
+									class="relative flex min-h-16 flex-col items-center border-r border-default pr-3 text-center">
+									<span class="text-[0.65rem] font-semibold tracking-wide text-primary uppercase">
 										{{ formatActivityWeekday(activity) }}
 									</span>
-									<span class="mt-1 text-2xl font-bold text-highlighted">
+									<span class="mt-0.5 text-lg font-bold text-highlighted">
 										{{ formatActivityDay(activity) }}
 									</span>
-									<span class="mt-1 text-xs text-dimmed">
-										{{ formatActivityTime(activity) }}
-									</span>
 									<span
-										class="absolute top-5 right-0 size-2 translate-x-1/2 rounded-full bg-primary ring-4 ring-default"
+										class="absolute top-4 right-0 size-1.5 translate-x-1/2 rounded-full bg-primary ring-4 ring-default"
 										aria-hidden="true" />
 								</time>
 								<TimelineActivityCard
 									:activity="activity"
-									:show-timestamp="false"
+									compact
 									side="right" />
 							</li>
 						</ol>
 					</section>
 				</div>
 
-				<TimelineGanttChart
-					v-else-if="activities.length"
-					:activities="activities"
-					:has-more="hasMore"
-					:loading-more="loadingMore"
-					@request-more="loadMore" />
-
 				<UEmpty
-					v-else-if="!error"
+					v-else-if="!activities.length && !error"
 					icon="i-lucide-calendar-x-2"
 					title="No anime updates yet"
 					description="Anime list updates will appear here as soon as AniList records them."/>
 
-				<div v-if="!loading && activities.length" class="flex flex-col items-center gap-3">
+				<div v-if="!loading && activities.length && layout === 'vertical'" class="flex flex-col items-center gap-3">
 					<div
-						v-if="layout === 'vertical' && hasMore"
+						v-if="hasMore"
 						ref="loadMoreSentinel"
 						class="flex min-h-16 items-center justify-center gap-2 text-sm text-muted"
 						aria-live="polite">
@@ -232,6 +220,19 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 						class="w-full"/>
 				</div>
 
+				<p v-if="layout === 'vertical'" class="text-center text-xs text-dimmed">
+					Public responses use a short HTTP cache. Signed-in activity is never persisted and is cached only in this browser tab for five minutes.
+				</p>
+			</div>
+
+			<div
+				v-if="!showPageLoader && !loading && activities.length && layout === 'horizontal'"
+				class="w-full space-y-3 px-4 sm:px-6">
+				<TimelineGanttChart
+					:activities="activities"
+					:has-more="hasMore"
+					:loading-more="loadingMore"
+					@request-more="loadMore" />
 				<p class="text-center text-xs text-dimmed">
 					Public responses use a short HTTP cache. Signed-in activity is never persisted and is cached only in this browser tab for five minutes.
 				</p>

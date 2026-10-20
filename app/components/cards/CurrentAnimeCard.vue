@@ -51,7 +51,7 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 						class="size-5 text-muted"/>
 				</div>
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-medium text-highlighted">
+					<p class="truncate text-sm font-medium text-highlighted" :title="getTitle(entry)">
 						{{ getTitle(entry) }}
 					</p>
 					<p class="text-xs text-muted">

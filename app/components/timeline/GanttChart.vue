@@ -14,6 +14,7 @@ import "vue-timeline-chart/style.css"
 import type { AniListActivity } from "~~/shared/types/anilist"
 import {
 	buildTimelineGanttChartData,
+	type TimelineGanttItem,
 	type TimelineGanttRow,
 	type TimelineGanttSection,
 	TIMELINE_GANTT_STACKING
@@ -79,11 +80,11 @@ const chartItems = computed(() => chartData.value.items.map((item) => {
 	}
 }))
 const timestampFormatters: Partial<Record<TimelineBaseUnits, Intl.DateTimeFormat>> = {
-	years: new Intl.DateTimeFormat(undefined, { year: "numeric" }),
-	months: new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" }),
-	weeks: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }),
-	days: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }),
-	hours: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" })
+	years: createDateFormatter({ year: "numeric" }),
+	months: createDateFormatter({ month: "short", year: "numeric" }),
+	weeks: createDateFormatter({ day: "numeric", month: "short" }),
+	days: createDateFormatter({ day: "numeric", month: "short" }),
+	hours: createDateFormatter({ hour: "2-digit", minute: "2-digit" })
 }
 function renderTimestampLabel(
 	timestamp: number,
@@ -120,6 +121,15 @@ function episodeActivities(row: TimelineGanttRow) {
 function episodeLabel(activity: AniListActivity): string {
 	if (activity.kind !== "anime" || !activity.progress?.trim()) return "Anime update"
 	return `Episode ${activity.progress.trim()}`
+}
+
+function itemTitle(item: TimelineGanttItem): string | undefined {
+	return "title" in item ? item.title : undefined
+}
+
+function latestEpisode(row: TimelineGanttRow): string {
+	const latest = row.activities.at(-1)
+	return latest?.kind === "anime" ? latest.progress ?? "" : ""
 }
 
 function episodeMarkerStyle(activity: AniListActivity, row: TimelineGanttRow) {
@@ -159,7 +169,7 @@ watch(initialDuration, duration => {
 			<ScrollAreaViewport
 				class="size-full focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
 				aria-label="Scrollable timeline period">
-				<div class="min-w-320 py-3 pr-5 pb-5">
+				<div class="min-w-320 py-3 pr-5 pb-5 xl:min-w-[130vw]">
 					<Timeline
 						class="min-h-96"
 						data-gantt-timeline-chart
@@ -268,14 +278,14 @@ watch(initialDuration, duration => {
 									class="absolute inset-[18%] flex rotate-45 items-center justify-center rounded-[3px] border border-black/20 text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
 									:style="{ backgroundColor: item.row.color || 'var(--ui-primary)' }"
 									:aria-label="`Open details for ${item.row.label}, ${episodeLabel(item.row.activities.at(-1)!)}`"
-									:title="item.title">
+									:title="itemTitle(item)">
 									<span class="-rotate-45 text-[8px] font-bold">
-										{{ item.row.activities.at(-1)?.kind === 'anime' ? item.row.activities.at(-1)?.progress : '' }}
+										{{ latestEpisode(item.row) }}
 									</span>
 								</button>
 							</AnimeDetailsPopover>
 
-							<UTooltip v-else :text="item.title">
+							<UTooltip v-else :text="itemTitle(item)">
 								<div class="absolute inset-0 flex items-center justify-center rounded-full bg-primary text-white">
 									<UIcon :name="groupIcon(item.row.section)" class="size-4" />
 								</div>

@@ -4,6 +4,7 @@ import {
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
 	getAniListAiringSchedulesPage,
+	getAniListAnimeCollectionResponse,
 	getAniListAnimeListIdsResponse,
 	getAniListAnimeListResponse,
 	getAniListMediaByIds,
@@ -543,6 +544,56 @@ describe("AniList allowlisted client", () => {
 		})
 	})
 
+	it("loads the whole list in 500-entry chunks and keeps one row per entry", async () => {
+		const listEntry = (id: number, status: string) => ({
+			id,
+			status,
+			score: 80,
+			progress: 3,
+			repeat: 0,
+			priority: 0,
+			updatedAt: 1_800_000_000,
+			startedAt: { year: null, month: null, day: null },
+			completedAt: { year: null, month: null, day: null },
+			media: null
+		})
+		let requestIndex = 0
+		const requester = fetchMock(async () => {
+			requestIndex += 1
+			return jsonResponse({
+				data: {
+					MediaListCollection: {
+						hasNextChunk: requestIndex === 1,
+						lists: requestIndex === 1
+							// A custom list repeats entry 2 from its status list.
+							? [{ entries: [listEntry(1, "CURRENT"), listEntry(2, "COMPLETED")] }, { entries: [listEntry(2, "COMPLETED")] }]
+							: [{ entries: [listEntry(3, "PLANNING")] }]
+					}
+				}
+			})
+		})
+
+		const result = await getAniListAnimeCollectionResponse(publicAccess, { fetch: requester })
+		const requestBodies = requester.mock.calls.map(([, request]) =>
+			JSON.parse(String(request?.body)) as { query: string, variables: Record<string, unknown> }
+		)
+
+		expect(result.entries.map(entry => entry.id)).toEqual([1, 2, 3])
+		expect(result.truncated).toBe(false)
+		expect(result.source).toEqual({ mode: "public", username: "Alexis" })
+		expect(requestBodies).toHaveLength(2)
+		expect(requestBodies[0]?.query).toContain("query AniToolsAnimeCollection")
+		expect(requestBodies.map(body => body.variables.chunk)).toEqual([1, 2])
+		expect(requestBodies[0]?.variables).toMatchObject({ username: "Alexis", perChunk: 500 })
+	})
+
+	it("reports an unknown user while loading the full list", async () => {
+		const requester = fetchMock(async () => jsonResponse({ data: { MediaListCollection: null } }))
+
+		await expect(getAniListAnimeCollectionResponse(publicAccess, { fetch: requester }))
+			.rejects.toMatchObject({ statusCode: 404 })
+	})
+
 	it("normalizes the fixed statistics response into bounded arrays", async () => {
 		const requester = fetchMock(async () => jsonResponse({
 			data: {
@@ -795,6 +846,25 @@ describe("AniList allowlisted client", () => {
 			data: { User: null },
 			errors: [{ message: "User not found.", status: 404 }]
 		}))
+
+		await expect(fetchAniListProfile(publicAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 404,
+			data: {
+				code: "ANILIST_USER_NOT_FOUND"
+			}
+		})
+	})
+
+	it("maps an HTTP 404 carrying a GraphQL error envelope to the same 404", async () => {
+		const requester = fetchMock(async () => jsonResponse(
+			{
+				data: { User: null },
+				errors: [{ message: "Not Found", status: 404 }]
+			},
+			404
+		))
 
 		await expect(fetchAniListProfile(publicAccess, {
 			fetch: requester

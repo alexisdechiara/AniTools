@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
 				</div>
 
 				<div class="flex min-h-0 flex-1 flex-col p-5 sm:p-6 lg:p-8">
-					<p class="text-xs font-semibold tracking-wide text-(--anime-theme-color) uppercase">{{ reason }}</p>
+					<p class="text-xs font-semibold tracking-wide text-anime-theme uppercase">{{ reason }}</p>
 					<h2 class="mt-2 line-clamp-2 text-2xl font-bold tracking-tight text-highlighted sm:text-3xl">
 						{{ title }}
 					</h2>
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
 							:key="item"
 							:label="item"
 							variant="subtle"
-							class="rounded-full bg-(--anime-theme-color)/10 text-(--anime-theme-color) ring-(--anime-theme-color)/25" />
+							class="rounded-full bg-(--anime-theme-color)/10 text-anime-theme ring-(--anime-theme-color)/25" />
 					</div>
 					<p class="mt-4 hidden items-center gap-2 text-xs text-dimmed lg:flex">
 						<UIcon name="i-lucide-mouse-pointer-2" class="size-4" />

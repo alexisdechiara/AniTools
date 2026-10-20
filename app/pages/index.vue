@@ -11,9 +11,12 @@ import {
 } from "~/config/components"
 import type { RecentListUpdate } from "~/types/dashboard"
 import {
+	DASHBOARD_GRID_COLUMNS,
+	type DashboardGridBreakpoint,
 	getDashboardDeleteAttractionOffset,
 	isDashboardCardId,
-	isDashboardDeleteTargetHit
+	isDashboardDeleteTargetHit,
+	packDashboardLayout
 } from "~/utils/dashboard-layout"
 
 definePageMeta({
@@ -74,47 +77,42 @@ const cardCatalogueGroups = computed(() => CARD_GROUPS.map(group => ({
 	cards: DASHBOARD_CARDS.filter(card => card.group === group.id)
 })))
 
+function cardSizes(ids: readonly DashboardCardId[]) {
+	return ids.map(id => ({ id, size: getDashboardCard(id).size }))
+}
+
+// The layout handed to the grid must match the active breakpoint: a 12-column layout given to
+// the 2-column phone grid is only clamped, not reflowed, and the cards end up stacked on top
+// of each other.
+const currentBreakpoint = ref<DashboardGridBreakpoint>("lg")
+
 function createDashboardLayout(ids: readonly DashboardCardId[]): DashboardLayoutItem[] {
-	const occupied = new Set<string>()
+	return packDashboardLayout(cardSizes(ids), DASHBOARD_GRID_COLUMNS[currentBreakpoint.value])
+}
 
-	return ids.map((id) => {
-		const size = getDashboardCard(id).size
-		let position = { x: 0, y: 0 }
-		let placed = false
-
-		for (let y = 0; !placed; y += 1) {
-			for (let x = 0; x <= 12 - size.w; x += 1) {
-				let available = true
-				for (let row = y; row < y + size.h && available; row += 1) {
-					for (let column = x; column < x + size.w; column += 1) {
-						if (occupied.has(`${column}:${row}`)) {
-							available = false
-							break
-						}
-					}
-				}
-
-				if (!available) continue
-				position = { x, y }
-				placed = true
-				break
-			}
-		}
-
-		for (let row = position.y; row < position.y + size.h; row += 1) {
-			for (let column = position.x; column < position.x + size.w; column += 1) {
-				occupied.add(`${column}:${row}`)
-			}
-		}
-
-		const item: DashboardLayoutItem = { ...position, ...size, i: id }
-		return item
-	})
+function handleBreakpointChanged(breakpoint: DashboardGridBreakpoint): void {
+	currentBreakpoint.value = breakpoint
 }
 
 const dashboardLayout = ref<DashboardLayoutItem[]>(
 	createDashboardLayout(cardIds.value)
 )
+// Without a layout per breakpoint, grid-layout-plus squeezes the 12-column one and leaves holes.
+const responsiveLayouts = computed(() => {
+	const order = dashboardLayout.value
+		.toSorted((left, right) => left.y - right.y || left.x - right.x)
+		.map(item => item.i)
+	const sizes = cardSizes(order)
+	// Positions always derive from the card order (dragging reorders the list), so each
+	// breakpoint is repacked from it rather than copied from whichever layout is active.
+	return {
+		lg: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.lg),
+		md: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.md),
+		sm: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.sm),
+		xs: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.xs),
+		xxs: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.xxs)
+	}
+})
 const layoutCards = computed(() => dashboardLayout.value.map(item => ({
 	item,
 	card: getDashboardCard(item.i)
@@ -130,7 +128,14 @@ watch(cardIds, (ids) => {
 	dashboardLayout.value = createDashboardLayout(ids)
 })
 
+// grid-layout-plus also emits layout-updated on mount and on every reflow. Only a drag the user
+// made may change the saved card order; a narrow grid packing cards differently must not.
+let reorderOnNextLayoutUpdate = false
+
 function handleLayoutUpdated(nextLayout: LayoutItem[]) {
+	if (!reorderOnNextLayoutUpdate) return
+	reorderOnNextLayoutUpdate = false
+
 	const visibleIds = new Set(cardIds.value)
 	const nextOrder = nextLayout
 		.toSorted((left, right) => left.y - right.y || left.x - right.x)
@@ -269,6 +274,11 @@ function cleanupDragListeners(): void {
 
 function finishCardDrag(event: PointerEvent): void {
 	if (event.pointerId !== activePointerId) return
+	// The grid reports the dropped layout synchronously during this pointerup; a press on the
+	// handle that moved nothing must not leave the next reflow allowed to reorder.
+	setTimeout(() => {
+		reorderOnNextLayoutUpdate = false
+	})
 	const cardId = activeDragCardId.value
 	const shouldRemove = Boolean(cardId && deleteTargetActive.value)
 	cleanupDragListeners()
@@ -291,6 +301,7 @@ function finishCardDrag(event: PointerEvent): void {
 
 function cancelCardDrag(event: PointerEvent): void {
 	if (event.pointerId !== activePointerId) return
+	reorderOnNextLayoutUpdate = false
 	cleanupDragListeners()
 	deleteTargetActive.value = false
 	Object.assign(deleteAttractionOffset, { x: 0, y: 0 })
@@ -302,6 +313,7 @@ function beginCardDrag(cardId: DashboardCardId, event: PointerEvent): void {
 	if (!import.meta.client) return
 
 	cleanupDragListeners()
+	reorderOnNextLayoutUpdate = true
 	activeDragCardId.value = cardId
 	deleteTargetActive.value = false
 	deleteConfirmed.value = false
@@ -464,8 +476,10 @@ onBeforeUnmount(() => {
 					:is-resizable="false"
 					:responsive="true"
 					:breakpoints="{ lg: 900, md: 700, sm: 500, xs: 320, xxs: 0 }"
-					:cols="{ lg: 12, md: 8, sm: 4, xs: 2, xxs: 1 }"
+					:cols="DASHBOARD_GRID_COLUMNS"
+					:responsive-layouts="responsiveLayouts"
 					data-dashboard-grid
+					@breakpoint-changed="handleBreakpointChanged"
 					@layout-updated="handleLayoutUpdated">
 					<GridItem
 						v-for="({ item, card }, index) in layoutCards"

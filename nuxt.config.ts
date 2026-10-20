@@ -75,11 +75,22 @@ export default defineNuxtConfig({
 		"pinia-plugin-persistedstate/nuxt"
 	],
 
+	"nitro": {
+		// Development only: AniList responses recorded once and replayed (see
+		// server/utils/anilist-request-cache.ts). devStorage never ships in a build.
+		devStorage: {
+			"anilist-dev-cache": {
+				driver: "fs",
+				base: "./.data/anilist-dev-cache"
+			}
+		}
+	},
+
 	"robots": {
 		metaTag: false,
 		sitemap: ["/sitemap.xml"],
-		allow: ["/calendar", "/tierlist"],
-		disallow: ["/create", "/explore", "/login", "/statistics", "/rewind", "/timeline"]
+		allow: ["/calendar", "/tierlist", "/support"],
+		disallow: ["/create", "/explore", "/login", "/statistics", "/rewind", "/timeline", "/podium", "/settings"]
 	},
 
 	"routeRules": {
@@ -137,6 +148,6 @@ export default defineNuxtConfig({
 			changefreq: "weekly",
 			priority: 0.7
 		},
-		include: ["/calendar", "/tierlist"]
+		include: ["/calendar", "/tierlist", "/support"]
 	}
 })

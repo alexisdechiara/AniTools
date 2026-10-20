@@ -45,8 +45,9 @@
               />
             </div>
             <div class="flex flex-col w-full gap-y-1">
-              <div class="flex justify-between w-full">
-                <span class="text-xs font-medium">{{ item.name }}</span>
+              <div class="flex justify-between gap-2 w-full min-w-0">
+                <span class="truncate text-xs font-medium">{{ item.name }}</span>
+                <span class="shrink-0 text-xs text-muted tabular-nums">{{ formatMetric(item) }}</span>
               </div>
               <UProgress
                 v-model="progressValues[item.name]"
@@ -75,14 +76,22 @@ const hoveredItem = ref<string | null>(null);
 
 const sortItems = [
   { value: "count", label: "Count" },
-  { value: "meanScore", label: "Mean Score" },
-  { value: "minutesWatched", label: "Watch Time" },
+  { value: "meanScore", label: "Mean score" },
+  { value: "minutesWatched", label: "Watch time" },
 ];
 
 const selectedSort = defineModel<MetricSort>("sort", {
   default: "count",
   required: true,
 });
+
+const { formatPercent } = usePersonalScore();
+
+function formatMetric(item: listType): string {
+  if (selectedSort.value === "meanScore") return formatPercent(item.meanScore);
+  if (selectedSort.value === "minutesWatched") return formatWatchTime(item.minutesWatched ?? 0);
+  return formatNumber(item.count ?? 0);
+}
 
 const handleMouseOver = (name: string) => {
   hoveredItem.value = name;

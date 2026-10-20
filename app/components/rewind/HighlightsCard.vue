@@ -16,6 +16,7 @@ interface Highlight {
 }
 
 const currentIndex = ref(0)
+const { format: formatScore } = usePersonalScore()
 
 const highlights = computed<Highlight[]>(() => {
 	const result: Highlight[] = []
@@ -24,7 +25,7 @@ const highlights = computed<Highlight[]>(() => {
 		result.push({
 			label: props.selectionLabel ?? "Selection of the year",
 			item: props.selection,
-			value: `${props.selection.entry.score || "—"}/100`
+			value: formatScore(props.selection.entry.score)
 		})
 	}
 	if (
@@ -85,12 +86,12 @@ const currentHighlight = computed(() => highlights.value[currentIndex.value])
 					:key="highlight.label"
 					:src="getCover(highlight.item)"
 					:alt="getTitle(highlight.item)"
-					class="absolute aspect-3/4 h-fit w-full scale-90 rounded-lg object-cover transition-all"
+					class="absolute aspect-3/4 h-fit w-full scale-90 rounded-lg object-cover transition-[scale,translate,opacity]"
 					:class="indexToRotate(index)"
 					:data-current="index === currentIndex ? '' : undefined" />
 			</div>
 			<div class="relative col-span-7 flex size-full min-w-0 flex-col gap-y-3">
-				<span class="text-xs font-medium text-toned capitalize">
+				<span class="text-xs font-medium text-toned">
 					{{ currentHighlight?.label }}
 				</span>
 				<span class="text-2xl font-semibold text-pretty text-highlighted">

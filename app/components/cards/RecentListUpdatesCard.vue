@@ -66,7 +66,7 @@ function formatStatus(status: string): string {
 						class="size-4 text-muted"/>
 				</div>
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-medium text-highlighted">
+					<p class="truncate text-sm font-medium text-highlighted" :title="item.title">
 						{{ item.title }}
 					</p>
 					<p class="text-xs text-muted">

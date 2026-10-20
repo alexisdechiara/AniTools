@@ -1,8 +1,6 @@
 import type {
 	AniListAnimeListEntry,
-	AniListAnimeListResponse,
-	AniListListStatus,
-	AniListSource
+	AniListListStatus
 } from "~~/shared/types/anilist"
 
 export interface AnimeListGroup {
@@ -18,36 +16,6 @@ const STATUS_LABELS: Readonly<Record<AniListListStatus, string>> = {
 	DROPPED: "Dropped",
 	PAUSED: "Paused",
 	REPEATING: "Rewatching"
-}
-
-export async function collectAniListAnimeEntries(
-	fetchPage: (page: number) => Promise<AniListAnimeListResponse>,
-	maxPages = 100
-): Promise<{
-	entries: AniListAnimeListEntry[]
-	source: AniListSource | null
-}> {
-	const uniqueEntries = new Map<number, AniListAnimeListEntry>()
-	let page = 1
-	let hasNextPage = true
-	let source: AniListSource | null = null
-
-	while (hasNextPage && page <= Math.max(1, maxPages)) {
-		const response = await fetchPage(page)
-		source = response.source
-
-		for (const entry of response.entries) {
-			uniqueEntries.set(entry.id, entry)
-		}
-
-		hasNextPage = response.pageInfo.hasNextPage
-		page += 1
-	}
-
-	return {
-		entries: [...uniqueEntries.values()],
-		source
-	}
 }
 
 export function groupAnimeEntries(

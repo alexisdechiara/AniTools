@@ -197,7 +197,7 @@ async function saveToPlanning(
 			toast.add({
 				title: "Added to Plan to Watch",
 				description: `${getExploreTitle(media)} is now in your AniList planning list.`,
-				color: "warning",
+				color: "success",
 				icon: "i-lucide-bookmark-check"
 			})
 		}
@@ -206,7 +206,7 @@ async function saveToPlanning(
 		if (notify) {
 			toast.add({
 				title: "Could not update AniList",
-				description: error instanceof Error ? error.message : "Try again in a moment.",
+				description: getApiErrorMessage(error, "Try again in a moment."),
 				color: "error",
 				icon: "i-lucide-triangle-alert"
 			})
@@ -258,6 +258,11 @@ onMounted(() => {
 	<UDashboardPanel id="explore" :ui="{ body: 'pt-3 sm:pt-4' }">
 		<template #body>
 			<div class="mx-auto w-full max-w-304 space-y-4">
+				<PageHeader
+					eyebrow="Discover"
+					title="Explore"
+					description="Suggestions from the anime you rated highest and the studios you love. Swipe, or use the buttons and arrow keys." />
+
 				<UAlert
 					v-if="!showPageLoader && listError"
 					icon="i-lucide-triangle-alert"
@@ -287,7 +292,7 @@ onMounted(() => {
 				<div
 					v-else-if="seeds.length"
 					class="mx-auto grid w-full items-start justify-center gap-5 lg:grid-cols-[minmax(0,52rem)_22rem]">
-					<main class="w-full min-w-0 self-start justify-self-center">
+					<section aria-label="Suggestion deck" class="w-full min-w-0 self-start justify-self-center">
 						<ExploreSwipeDeck
 							v-if="currentMedia"
 							:media="currentMedia"
@@ -322,7 +327,7 @@ onMounted(() => {
 									onClick: resetDecisions
 								}
 							]" />
-					</main>
+					</section>
 
 					<ExploreInterestedDeck
 						class="self-start lg:sticky lg:top-4"

@@ -15,6 +15,10 @@ import type { StatisticMetric as MetricSort } from "~/utils/statistics"
 export type { StatisticMetric as MetricSort } from "~/utils/statistics"
 
 export const useStatisticsStore = defineStore("Statistics", () => {
+	// Resolved once while the store is created: on the server, useRequestFetch() needs the
+	// Nuxt context, which is gone after the first await inside an action.
+	const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+
 	const user = useUserStore()
 	const { getAllAnimes: animes } = storeToRefs(useEntriesStore())
 	const statistics = ref<AniListStatistics | null>(null)
@@ -73,7 +77,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 			}
 
 			try {
-				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const fetcher = requestFetch
 				const username = user.authMode === "public" ? user.getUsername : undefined
 				const response = await fetcher<AniListStatisticsResponse>("/api/anilist/statistics", {
 					query: username ? { username } : undefined
@@ -89,9 +93,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 				source.value = null
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = false
-				error.value = caughtError instanceof Error
-					? caughtError.message
-					: "Unable to load AniList statistics."
+				error.value = getApiErrorMessage(caughtError, "Unable to load AniList statistics.")
 				return false
 			} finally {
 				loading.value = false

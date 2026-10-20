@@ -25,7 +25,7 @@ v-if="episode.media?.title && episode.media.nextAiringEpisode?.airingAt && index
 					:content="{ sideOffset: 32 }">
 					<UUser
 :name="episode.media.title.userPreferred || episode.media.title.english || episode.media.title.romaji || ''"
-						:description="new Date(episode.media.nextAiringEpisode.airingAt * 1000).toLocaleString()"
+						:description="formatAiringTime(new Date(episode.media.nextAiringEpisode.airingAt * 1000))"
 :ui="{
 							root: 'cursor-pointer transition duration-100 hover:scale-101',
 							wrapper:

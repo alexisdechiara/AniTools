@@ -13,11 +13,16 @@ Create is a browser-only artwork studio. It deliberately uses native Canvas APIs
 
 Every preset can be exported as PNG, JPEG or WebP. JPEG exports are flattened over white because the format has no alpha channel.
 
+## Card types
+
+- **Anime card**: a selected anime over its cover or banner, with an optional personal score badge (shown in the score format chosen in Settings), a short personal note and up to three genres.
+- **Stats card**: the loaded AniList profile's anime count, episodes, watch time and mean score. Export is disabled until a profile with statistics is loaded.
+
 ## Template and rendering rules
 
 - The source image is cropped with a cover strategy and adjustable zoom plus horizontal and vertical focal points.
 - AniList cover art or the available trailer thumbnail can be used as the source.
-- Automatic content can select the best rated, lowest rated, most popular, longest watched, most rewatched or favourite anime from the loaded AniList list.
+- Automatic content can select the currently watched (most recently updated first), best rated, lowest rated, most popular, longest watched, most rewatched or favourite anime from the loaded AniList list.
 - English, Romaji, native and AniList-preferred titles are supported.
 - Font family, title scale and subtitle scale are rendered directly into the exported Canvas.
 - The accent, background and overlay are user-controlled.

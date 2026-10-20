@@ -232,6 +232,13 @@ export interface AniListAnimeListResponse {
 	entries: AniListAnimeListEntry[]
 }
 
+export interface AniListAnimeCollectionResponse {
+	source: AniListSource
+	entries: AniListAnimeListEntry[]
+	/** True when the list is longer than the server's chunk ceiling. */
+	truncated: boolean
+}
+
 export interface AniListAnimeListIdsResponse {
 	source: AniListSource
 	mediaIds: number[]

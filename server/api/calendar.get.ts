@@ -28,6 +28,20 @@ const DEFAULT_DIRECTUS_URL = "https://api.anitools.geekly.blog"
 
 const airingCache = new Map<string, { data: AniListAiringSchedule[], expiresAt: number }>()
 const simuldubCache = new Map<string, { data: ValidatedSimuldubItem[], expiresAt: number }>()
+function buildDirectusClient(directusUrl: string) {
+	return createDirectus(directusUrl).with(rest())
+}
+
+const directusClients = new Map<string, ReturnType<typeof buildDirectusClient>>()
+
+function getDirectusClient(directusUrl: string) {
+	let client = directusClients.get(directusUrl)
+	if (!client) {
+		client = buildDirectusClient(directusUrl)
+		directusClients.set(directusUrl, client)
+	}
+	return client
+}
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -110,7 +124,7 @@ async function fetchSimuldubs(rangeStart: string, rangeEnd: string, directusUrl:
 		return cached.data
 	}
 
-	const directus = createDirectus(directusUrl).with(rest())
+	const directus = getDirectusClient(directusUrl)
 	const simuldubs = await withTimeout(
 		directus.request(
 			readItems("simuldub", {

@@ -7,6 +7,7 @@ const props = defineProps<{
 	layout?: "vertical" | "horizontal"
 	side?: "left" | "right"
 	showTimestamp?: boolean
+	compact?: boolean
 }>()
 
 const mediaTitle = computed(() => {
@@ -49,7 +50,7 @@ const imageOrderClass = computed(() =>
 <template>
 	<article
 		class="flex h-full overflow-hidden rounded-xl border border-default bg-default shadow-sm"
-		:class="isHorizontal ? 'flex-col' : 'min-h-44 flex-col sm:flex-row'">
+		:class="isHorizontal ? 'flex-col' : compact ? 'min-h-28 flex-col sm:flex-row' : 'min-h-44 flex-col sm:flex-row'">
 		<NuxtLink
 			v-if="activity.kind === 'anime' && mediaUrl"
 			:to="mediaUrl"
@@ -57,7 +58,10 @@ const imageOrderClass = computed(() =>
 			target="_blank"
 			rel="noopener noreferrer"
 			class="relative shrink-0 overflow-hidden bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-			:class="[isHorizontal ? 'h-52 w-full' : 'h-48 w-full sm:h-auto sm:w-32', imageOrderClass]"
+			:class="[
+				isHorizontal ? 'h-52 w-full' : compact ? 'h-28 w-full sm:h-auto sm:w-20' : 'h-48 w-full sm:h-auto sm:w-32',
+				imageOrderClass
+			]"
 			:aria-label="`Open ${mediaTitle} on AniList`">
 			<template v-if="cover">
 				<NuxtImg
@@ -78,14 +82,15 @@ const imageOrderClass = computed(() =>
 			</span>
 		</NuxtLink>
 
-		<div class="flex min-w-0 flex-1 flex-col p-4">
+		<div class="flex min-w-0 flex-1 flex-col" :class="compact ? 'p-3' : 'p-4'">
 			<div class="flex items-start justify-between gap-3">
-				<UBadge :label="badge" color="neutral" variant="soft" size="sm"/>
+				<UBadge v-if="!compact" :label="badge" color="neutral" variant="soft" size="sm"/>
 				<time
 					v-if="props.showTimestamp !== false"
 					:datetime="timestamp.toISOString()"
-					class="shrink-0 text-xs text-dimmed">
-					{{ timestamp.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) }}
+					class="shrink-0 text-xs text-dimmed"
+					:class="compact ? 'ml-auto' : ''">
+					{{ formatDateTime(timestamp, compact ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }) }}
 				</time>
 			</div>
 
@@ -95,22 +100,26 @@ const imageOrderClass = computed(() =>
 				external
 				target="_blank"
 				rel="noopener noreferrer"
-				class="mt-3 line-clamp-2 font-semibold text-highlighted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+				class="line-clamp-2 font-semibold text-highlighted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+				:class="compact ? 'mt-1.5 text-sm' : 'mt-3'">
 				{{ mediaTitle }}
 			</NuxtLink>
-			<p v-else class="mt-3 font-semibold text-highlighted">
+			<p v-else class="font-semibold text-highlighted" :class="compact ? 'mt-1.5 text-sm' : 'mt-3'">
 				{{ actorName }}
 			</p>
 
-			<p v-if="activity.kind === 'anime'" class="mt-1 text-sm text-toned">
+			<p v-if="activity.kind === 'anime'" class="mt-1 text-toned" :class="compact ? 'text-xs' : 'text-sm'">
 				{{ activity.status || "updated" }}
 				<span v-if="activity.progress"> · {{ activity.progress }}</span>
 			</p>
-			<p v-else class="mt-2 line-clamp-6 text-sm break-words whitespace-pre-wrap text-toned">
+			<p
+				v-else
+				class="mt-2 break-words whitespace-pre-wrap text-toned"
+				:class="compact ? 'line-clamp-2 text-xs' : 'line-clamp-6 text-sm'">
 				{{ text }}
 			</p>
 
-			<p v-if="activity.replyCount" class="mt-auto pt-3 text-xs text-muted">
+			<p v-if="activity.replyCount && !compact" class="mt-auto pt-3 text-xs text-muted">
 				{{ activity.replyCount }} {{ activity.replyCount === 1 ? "reply" : "replies" }}
 			</p>
 		</div>

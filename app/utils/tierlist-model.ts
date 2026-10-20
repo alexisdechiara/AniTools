@@ -47,7 +47,8 @@ const backgroundSchema = z.enum([
 	"bg-neutral-900",
 	"bg-neutral-950"
 ])
-const legacyTierColors: Readonly<Record<string, string>> = {
+export const TIER_COLOR_HEX_BY_CLASS: Readonly<Record<string, string>> = {
+	"bg-transparent": "transparent",
 	"bg-black": "#000000",
 	"bg-white": "#ffffff",
 	"bg-neutral-50": "#fafafa",
@@ -290,7 +291,7 @@ function normalizeTier(input: unknown, index: number, scope: string): TierlistTi
 		...input,
 		id: typeof input.id === "string" && input.id.trim() ? input.id : fallbackId,
 		color: typeof input.color === "string"
-			? legacyTierColors[input.color] ?? input.color
+			? TIER_COLOR_HEX_BY_CLASS[input.color] ?? input.color
 			: input.color,
 		entries: Array.isArray(input.entries)
 			? input.entries

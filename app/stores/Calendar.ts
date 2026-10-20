@@ -16,6 +16,11 @@ const DUBBING_LABELS: Readonly<Record<string, string>> = {
 	kr: "Korean"
 }
 
+/** Dubbing languages are stored as the country code of their flag icon; this is the readable name. */
+export function getDubbingLabel(code: string): string {
+	return DUBBING_LABELS[code] ?? code.toUpperCase()
+}
+
 export const useCalendarStore = defineStore("Calendar", () => {
 	const userStore = useUserStore()
 	const entriesStore = useEntriesStore()
@@ -189,10 +194,10 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 		const dubbingItems: DropdownMenuItem[] = [...new Set(availableLanguages)]
 			.sort((left, right) =>
-				(DUBBING_LABELS[left] ?? left).localeCompare(DUBBING_LABELS[right] ?? right)
+				getDubbingLabel(left).localeCompare(getDubbingLabel(right))
 			)
 			.map(language => ({
-				label: DUBBING_LABELS[language] ?? language.toUpperCase(),
+				label: getDubbingLabel(language),
 				type: "checkbox" as const,
 				checked: dubbing.value.includes(language),
 				onUpdateChecked: (_checked: boolean) => toggleDubbing(language),

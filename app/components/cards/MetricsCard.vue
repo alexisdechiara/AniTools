@@ -1,16 +1,16 @@
 <template>
   <UPageCard
     :ui="{
-      title: 'text-xs capitalize text-toned font-medium',
-      container: 'gap-y-2 group/grab',
-      root: 'bg-white dark:bg-black',
-      body: 'size-full',
+      title: 'text-xs text-toned font-medium',
+      container: 'gap-y-2 group/grab min-w-0 lg:grid-cols-[minmax(0,1fr)]',
+      root: 'bg-white dark:bg-black min-w-0 overflow-hidden',
+      body: 'size-full min-w-0',
     }"
     :class="{ 'cursor-grabbing': isDragging }">
     <template v-if="title" #title>
       <div class="flex items-center justify-between gap-3">
         <span
-          class="truncate text-xs font-medium text-nowrap text-toned capitalize">{{ title }}</span>
+          class="truncate text-xs font-medium text-nowrap text-toned">{{ title }}</span>
         <USelect
           v-if="enableSortSelect"
           v-model="selectedSort"
@@ -42,8 +42,11 @@
     </button>
     <div
       v-if="value !== undefined && value !== null && value !== ''"
-      class="flex h-fit items-center">
-      <span class="text-2xl font-semibold text-ellipsis text-highlighted">
+      class="@container flex h-fit items-center">
+      <!-- Narrow cards (tablet grid) drop a size instead of wrapping "90d 12h 37m" out of the card. -->
+      <span
+        class="truncate text-base font-semibold whitespace-nowrap text-highlighted tabular-nums @[9rem]:text-lg @[10rem]:text-xl @[13rem]:text-2xl"
+        :title="String(value)">
         {{ value }}
       </span>
       <div
@@ -96,8 +99,8 @@ withDefaults(
     enableSortSelect: false,
     selectItems: () => [
       { value: "count", label: "Count" },
-      { value: "meanScore", label: "Mean Score" },
-      { value: "minutesWatched", label: "Watch Time" },
+      { value: "meanScore", label: "Mean score" },
+      { value: "minutesWatched", label: "Watch time" },
     ],
   }
 );

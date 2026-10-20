@@ -1,11 +1,10 @@
 import { defineStore } from "pinia"
 import type {
+	AniListAnimeCollectionResponse,
 	AniListAnimeListEntry,
-	AniListAnimeListResponse,
 	AniListSource
 } from "~~/shared/types/anilist"
 import {
-	collectAniListAnimeEntries,
 	groupAnimeEntries,
 	sortAnimeEntriesByScore,
 	type AnimeListGroup
@@ -20,6 +19,10 @@ function take<T>(items: T[], limit?: number): T[] {
 }
 
 export const useEntriesStore = defineStore("Entries", () => {
+	// Resolved once while the store is created: on the server, useRequestFetch() needs the
+	// Nuxt context, which is gone after the first await inside an action.
+	const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+
 	const user = useUserStore()
 	const entries = ref<AnimeListEntry[]>([])
 	const source = ref<AniListSource | null>(null)
@@ -56,18 +59,13 @@ export const useEntriesStore = defineStore("Entries", () => {
 			}
 
 			try {
-				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const fetcher = requestFetch
 				const username = user.authMode === "public" ? user.getUsername : undefined
-				const collected = await collectAniListAnimeEntries(page =>
-					fetcher<AniListAnimeListResponse>("/api/anilist/anime-list", {
-						query: {
-							...(username ? { username } : {}),
-							page,
-							perPage: 50,
-							sort: "score"
-						}
-					})
-				)
+				// The collection endpoint returns the whole list in one or two AniList requests,
+				// where paging 50 at a time cost one request per 50 entries.
+				const collected = await fetcher<AniListAnimeCollectionResponse>("/api/anilist/anime-collection", {
+					query: username ? { username } : undefined
+				})
 
 				source.value = collected.source
 				entries.value = collected.entries
@@ -79,9 +77,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 				source.value = null
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = false
-				error.value = caughtError instanceof Error
-					? caughtError.message
-					: "Unable to load the AniList anime list."
+				error.value = getApiErrorMessage(caughtError, "Unable to load the AniList anime list.")
 				throw caughtError
 			} finally {
 				loading.value = false

@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Activity Overview" v-bind="$attrs">
+  <MetricsCard title="Activity overview" v-bind="$attrs">
     <ActivityOverview
       :year="year"
       :show-days="showDays"

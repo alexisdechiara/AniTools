@@ -21,7 +21,7 @@ const EMPTY_PAGE_INFO: AniListPageInfo = {
 }
 
 function errorMessage(error: unknown, fallback: string) {
-	return error instanceof Error && error.message ? error.message : fallback
+	return getApiErrorMessage(error, fallback)
 }
 
 export function useExplore() {

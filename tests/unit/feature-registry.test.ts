@@ -59,6 +59,26 @@ describe("feature registry", () => {
 		expect(FEATURE_REGISTRY.create.navigation).toBe("primary")
 	})
 
+	it("keeps Settings and Support public in the secondary navigation", () => {
+		for (const featureId of ["settings", "support"] as const) {
+			const feature = FEATURE_REGISTRY[featureId]
+
+			expect(canAccessFeature(feature.access, "anonymous")).toBe(true)
+			expect(feature.navigation).toBe("secondary")
+		}
+
+		expect(FEATURE_REGISTRY.support.indexable).toBe(true)
+		expect(FEATURE_REGISTRY.settings.indexable).toBe(false)
+	})
+
+	it("serves Podium from OAuth or a public profile, without indexing it", () => {
+		const podium = FEATURE_REGISTRY.podium
+
+		expect(canAccessFeature(podium.access, "anonymous")).toBe(false)
+		expect(canAccessFeature(podium.access, "public-profile")).toBe(true)
+		expect(podium.indexable).toBe(false)
+	})
+
 	it("resolves dynamic navigation paths", () => {
 		expect(resolveFeaturePath("rewind", { year: 2026 })).toBe("/rewind/2026")
 		expect(() => resolveFeaturePath("rewind")).toThrowError(

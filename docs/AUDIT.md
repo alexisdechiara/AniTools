@@ -26,7 +26,9 @@ configurer. La checklist obligatoire est dans `docs/DEPLOYMENT.md`.
 | Tierlist | Bêta fonctionnelle | Import, franchise, classement, JSON, PNG/JPEG/WebP, clavier/tactile | Rendu image dépendant du navigateur |
 | Explore | Bêta fonctionnelle | Recommandations, studios, filtres, pile swipe et pagination | Graines et studios calculés sur 50 entrées ; sélection « Interested » locale |
 | Timeline | Bêta fonctionnelle | Flux mensuel des mises à jour anime, Gantt, pagination et cache client | Maximum 5 000 activités, cache non partagé |
-| Create | Bêta fonctionnelle | Story, carré, thumbnail 1200 × 630 et bannière en PNG/JPEG/WebP | Mono-image, projets non persistés |
+| Create | Bêta fonctionnelle | Cartes anime et statistiques ; story, carré, thumbnail 1200 × 630 et bannière en PNG/JPEG/WebP | Mono-image, projets non persistés |
+| Podium | Bêta fonctionnelle | Top 3 animes, genres, tags et studios | Agrégations limitées à la liste chargée |
+| Settings et Support | Disponible | Thème, format de score local, réinitialisations, état du compte et FAQ | Préférences propres au navigateur |
 | Login et shell public | Disponible | OAuth, profil public, états d'erreur, responsive, SEO et accessibilité | Assets de marque finaux à valider |
 
 Les anciennes surfaces et API de démonstration du template Nuxt UI ont été
@@ -72,7 +74,10 @@ livraison, car le registre évolue.
 Le navigateur appelle uniquement :
 
 - `/api/anilist/profile`
-- `/api/anilist/anime-list`
+- `/api/anilist/anime-collection` (liste complète, utilisée par les pages
+  personnelles)
+- `/api/anilist/anime-list` (pages de 50, utilisée par Explore)
+- `/api/anilist/anime-list-ids`
 - `/api/anilist/statistics`
 - `/api/anilist/activities`
 - `/api/anilist/recommendations`
@@ -86,6 +91,19 @@ Les opérations GraphQL sont des constantes côté serveur dans
 `server/utils/anilist-client.ts`. Les variables de requête et les réponses amont
 sont validées, les tailles de page et plages sont bornées, des délais sont
 appliqués et les réponses `429` sont propagées proprement.
+
+### Quota AniList
+
+Le budget amont est de 28 requêtes par minute et par bucket ; tous les visiteurs
+en profil public partagent le bucket `public`. Trois mesures le préservent :
+
+- la liste complète passe par `MediaListCollection` par blocs de 500 entrées :
+  une liste de 630 entrées coûte 2 requêtes au lieu de 13 pages de 50 ;
+- les lectures identiques sont servies depuis la mémoire (1 min pour les données
+  d'un utilisateur, 10 min pour le catalogue) et les requêtes simultanées
+  identiques sont mutualisées ; une mutation vide ce cache ;
+- en développement, les réponses sont enregistrées sur disque et rejouées
+  (`NUXT_ANILIST_DEV_CACHE`), sans aucun appel amont après le premier.
 
 Cette architecture évite :
 
@@ -113,6 +131,12 @@ Le flux livré :
 Les cookies d'authentification utilisent `no-store`. AniList fournit des jetons
 longue durée sans refresh token ; le produit doit accepter une reconnexion à
 l'expiration ou après révocation.
+
+Le mode profil public mémorise le pseudo AniList choisi dans le cookie
+`anitools-public-profile` (`SameSite=Lax`, un an), lisible par le client. Il ne
+contient qu'un pseudo déjà public, jamais de jeton : il sert uniquement à
+restaurer le profil au rendu serveur après un rechargement. « Forget this
+profile » et la connexion OAuth l'effacent.
 
 ## Sécurité
 

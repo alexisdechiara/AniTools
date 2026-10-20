@@ -1,5 +1,5 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
 	active?: boolean
 	confirmed?: boolean
 	visible?: boolean
@@ -8,31 +8,41 @@ withDefaults(defineProps<{
 	confirmed: false,
 	visible: false
 })
+
+const statusMessage = computed(() => {
+	if (props.confirmed) return "Card removed"
+	return props.active ? "Release to remove" : "Drop to remove"
+})
 </script>
 
 <template>
-	<Transition name="delete-target">
-		<div
-			v-if="visible"
-			class="pointer-events-none fixed bottom-6 left-1/2 z-100 flex -translate-x-1/2 flex-col items-center gap-2"
-			role="status"
-			aria-live="polite">
+	<div class="contents">
+		<!-- Stable live region: mounting it with the visual target would drop repeated announcements. -->
+		<span class="sr-only" role="status" aria-live="polite">
+			{{ visible ? statusMessage : "" }}
+		</span>
+		<Transition name="delete-target">
 			<div
-				data-dashboard-delete-target
-				:data-active="active || confirmed"
-				:data-confirmed="confirmed"
-				class="flex size-20 items-center justify-center rounded-full border-2 border-default bg-elevated/95 text-muted shadow-2xl backdrop-blur-xl">
-				<UIcon
-					:name="confirmed ? 'i-lucide-check' : 'i-lucide-trash-2'"
-					class="size-8"
-					aria-hidden="true" />
+				v-if="visible"
+				class="pointer-events-none fixed bottom-6 left-1/2 z-100 flex -translate-x-1/2 flex-col items-center gap-2"
+				aria-hidden="true">
+				<div
+					data-dashboard-delete-target
+					:data-active="active || confirmed"
+					:data-confirmed="confirmed"
+					class="flex size-20 items-center justify-center rounded-full border-2 border-default bg-elevated/95 text-muted shadow-2xl backdrop-blur-xl">
+					<UIcon
+						:name="confirmed ? 'i-lucide-check' : 'i-lucide-trash-2'"
+						class="size-8"
+						aria-hidden="true" />
+				</div>
+				<span
+					class="rounded-full bg-inverted px-3 py-1 text-xs font-semibold text-inverted shadow-lg">
+					{{ statusMessage }}
+				</span>
 			</div>
-			<span
-				class="rounded-full bg-inverted px-3 py-1 text-xs font-semibold text-inverted shadow-lg">
-				{{ confirmed ? "Card removed" : active ? "Release to remove" : "Drop to remove" }}
-			</span>
-		</div>
-	</Transition>
+		</Transition>
+	</div>
 </template>
 
 <style scoped>

@@ -10,7 +10,7 @@
             v-show="index >= currentIndex"
             :src="anime.src"
             fit="cover"
-            class="h-fit w-full scale-90 aspect-3/4 rounded-lg transition-all absolute"
+            class="h-fit w-full scale-90 aspect-3/4 rounded-lg transition-[scale,translate,opacity] absolute"
             :class="[
               indexToRotate(index),
               index === currentIndex && 'animate-pulsing-jiggle',
@@ -21,7 +21,7 @@
       <div class="col-span-7 flex flex-col gap-y-3 size-full relative">
         <span
           v-if="currentHighlightedAnime?.title"
-          class="text-xs capitalize text-toned font-medium text-pretty"
+          class="text-xs text-toned font-medium text-pretty"
         >
           {{ currentHighlightedAnime.title }}
         </span>
@@ -80,6 +80,7 @@ type Highlight = {
 };
 
 const currentIndex = ref(0);
+const { format: formatScore } = usePersonalScore();
 const highlightedAnimes = computed<Highlight[]>(() => {
   const highlights: Highlight[] = [];
   const bestScore = getBestScoreAnime.value;
@@ -98,7 +99,7 @@ const highlightedAnimes = computed<Highlight[]>(() => {
         bestScore.media.coverImage?.extraLarge ||
         bestScore.media.coverImage?.large ||
         bestScore.media.coverImage?.medium,
-      value: bestScore.score?.toString() ?? null,
+      value: bestScore.score ? formatScore(bestScore.score) : null,
     });
   }
 

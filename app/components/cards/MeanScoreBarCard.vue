@@ -1,5 +1,5 @@
 <template>
-	<MetricsCard title="Mean Score" :value="meanScore === undefined ? '-' : meanScore.toFixed(2) + ' %'" v-bind="$attrs">
+	<MetricsCard title="Mean score" :value="meanScore === undefined ? '-' : formatPercent(meanScore)" v-bind="$attrs">
 		<UTabs
 v-model="selectedTab"
 :items="items"
@@ -17,7 +17,7 @@ type="x"
 :domain-line="false"
 :tick-line="false"
 tick-text-align="center"
-				:tick-format="(d: ScoringData, i: number) => scoring[i]?.x"
+				:tick-format="(tick: number) => Number.isInteger(tick) ? scoring[tick]?.x ?? '' : ''"
 :num-ticks="10" />
 			<VisTooltip :triggers="triggers" />
 		</VisXYContainer>
@@ -45,6 +45,7 @@ const items = ref<TabsItem[]>([
 const selectedTab = ref("count");
 
 const { scores, meanScore } = storeToRefs(useStatisticsStore());
+const { formatPercent } = usePersonalScore();
 // Computed property pour gérer l'affichage en fonction de l'onglet sélectionné
 const scoring = computed(
 	() =>
@@ -67,7 +68,7 @@ const triggers = {
 	[StackedBar.selectors.bar]: (data: ScoringData) => {
 		return `
       <div class='flex flex-col'>
-        <span class='font-semibold'>${data.label ?? data.x} %</span>
+        <span class='font-semibold'>Scored ${formatPercent(data.x)}</span>
         <span>${formatValue(data.y)}</span>
       </div>
     `;
@@ -75,7 +76,7 @@ const triggers = {
 };
 
 const formatValue = (value: number) => {
-	return selectedTab.value === "count" ? `${value} animes` : formatWatchTime(value);
+	return selectedTab.value === "count" ? `${value} anime` : formatWatchTime(value);
 };
 </script>
 

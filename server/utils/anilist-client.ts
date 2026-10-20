@@ -6,6 +6,15 @@ import {
 } from "h3"
 import * as z from "zod"
 import {
+	ANILIST_CACHE_TTL,
+	ANILIST_DEV_CACHE_STORAGE,
+	aniListInFlightRequests,
+	aniListMemoryCache,
+	buildAniListCacheKey,
+	isAniListMutation,
+	resolveAniListDevCacheMode
+} from "./anilist-request-cache"
+import {
 	ANILIST_ACTIVITY_KINDS,
 	ANILIST_LIST_SORTS,
 	ANILIST_LIST_STATUSES,
@@ -16,6 +25,8 @@ import {
 	type AniListActivity,
 	type AniListActivityKind,
 	type AniListAiringSchedulesPage,
+	type AniListAnimeCollectionResponse,
+	type AniListAnimeListEntry,
 	type AniListAnimeListIdsResponse,
 	type AniListAnimeListResponse,
 	type AniListListSort,
@@ -39,6 +50,8 @@ const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_PAGE = 100
 const MAX_LIST_PAGE_SIZE = 50
 const MAX_LIST_ID_CHUNKS = 20
+const FULL_LIST_PER_CHUNK = 500
+const MAX_FULL_LIST_CHUNKS = 10
 const LIST_IDS_PER_CHUNK = 500
 const MAX_ACTIVITY_PAGE_SIZE = 50
 const MAX_EXPLORE_PAGE_SIZE = 20
@@ -200,6 +213,44 @@ const ANIME_LIST_QUERY = `
 				completedAt { year month day }
 				media {
 					${MEDIA_SUMMARY_FIELDS}
+				}
+			}
+		}
+	}
+`
+
+// One request returns up to FULL_LIST_PER_CHUNK entries, where Page caps at 50: loading a
+// 433-entry list drops from nine upstream requests to one.
+const ANIME_COLLECTION_QUERY = `
+	query AniToolsAnimeCollection(
+		$userId: Int
+		$username: String
+		$chunk: Int!
+		$perChunk: Int!
+	) {
+		MediaListCollection(
+			userId: $userId
+			userName: $username
+			type: ANIME
+			chunk: $chunk
+			perChunk: $perChunk
+			forceSingleCompletedList: true
+		) {
+			hasNextChunk
+			lists {
+				entries {
+					id
+					status
+					score
+					progress
+					repeat
+					priority
+					updatedAt
+					startedAt { year month day }
+					completedAt { year month day }
+					media {
+						${MEDIA_SUMMARY_FIELDS}
+					}
 				}
 			}
 		}
@@ -635,6 +686,8 @@ export type AniListSaveMediaListEntryBody = z.infer<typeof saveMediaListEntryBod
 export interface AniListRequestOptions {
 	fetch?: typeof globalThis.fetch
 	timeoutMs?: number
+	/** How long an identical read is served from memory; see ANILIST_CACHE_TTL. */
+	cacheTtlMs?: number
 }
 
 const graphQLErrorSchema = z.object({
@@ -1172,6 +1225,67 @@ async function requestAniList<T>(
 	options: AniListRequestOptions = {}
 ): Promise<T> {
 	const validatedAccess = access === null ? null : accessSchema.parse(access)
+
+	// Injected fetchers (unit tests) and mutations always reach AniList.
+	if (options.fetch) {
+		return requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
+	}
+	if (isAniListMutation(query)) {
+		const result = await requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
+		// Cached reads may now be stale; mutations are rare enough to simply start over.
+		aniListMemoryCache.clear()
+		return result
+	}
+
+	const viewer = validatedAccess?.mode === "oauth" ? `oauth:${validatedAccess.userId}` : "public"
+	const key = buildAniListCacheKey(query, variables, viewer)
+	const devCacheMode = resolveAniListDevCacheMode(
+		Boolean(import.meta.dev),
+		process.env.NUXT_ANILIST_DEV_CACHE
+	)
+
+	if (devCacheMode !== "off") {
+		const recorded = await useStorage(ANILIST_DEV_CACHE_STORAGE).getItem(key)
+		if (recorded !== null) return recorded as T
+		if (devCacheMode === "replay") {
+			throw upstreamError(
+				503,
+				"This AniList response is not in the development cache",
+				"ANILIST_DEV_CACHE_MISS"
+			)
+		}
+	}
+
+	const cached = aniListMemoryCache.get(key)
+	if (cached !== undefined) return cached as T
+
+	const pending = aniListInFlightRequests.get(key)
+	if (pending) return pending as Promise<T>
+
+	const request = requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
+		.then(async (data) => {
+			aniListMemoryCache.set(key, data, options.cacheTtlMs ?? ANILIST_CACHE_TTL.user)
+			if (devCacheMode === "record") {
+				// Stored as JSON text: unstorage parses it back into the same object on read.
+				await useStorage(ANILIST_DEV_CACHE_STORAGE).setItem(key, JSON.stringify(data))
+			}
+			return data
+		})
+		.finally(() => {
+			aniListInFlightRequests.delete(key)
+		})
+
+	aniListInFlightRequests.set(key, request)
+	return request
+}
+
+async function requestAniListUpstream<T>(
+	query: string,
+	variables: Record<string, unknown>,
+	dataSchema: z.ZodType<T>,
+	validatedAccess: AniListAccess | null,
+	options: AniListRequestOptions
+): Promise<T> {
 	enforceUpstreamBudget(validatedAccess)
 	const timeoutMs = z.number().int().min(1).max(30_000)
 		.parse(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -1246,7 +1360,11 @@ async function requestAniList<T>(
 		)
 	}
 
-	if (!response.ok) {
+	// AniList answers non-2xx codes (404 for unknown users, for one) with a valid
+	// GraphQL error envelope, so let those reach the mapping below.
+	const hasGraphQLErrors = envelope.success && (envelope.data.errors?.length ?? 0) > 0
+
+	if (!response.ok && !hasGraphQLErrors) {
 		throw upstreamError(
 			502,
 			"AniList request failed",
@@ -1326,7 +1444,7 @@ export async function getAniListSearchResponse(
 			}).nullable()
 		}),
 		null,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Page) {
@@ -1365,7 +1483,7 @@ export async function getAniListMediaResponse(
 			Media: mediaSchema.nullable()
 		}),
 		null,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Media || data.Media.type !== "ANIME" || data.Media.isAdult === true) {
@@ -1444,7 +1562,7 @@ export async function getAniListAiringSchedulesPage(
 			}).nullable()
 		}),
 		null,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Page) {
@@ -1497,7 +1615,7 @@ export async function getAniListMediaByIds(
 			}).nullable()
 		}),
 		null,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Page) {
@@ -1617,6 +1735,69 @@ export async function getAniListAnimeListResponse(
 				...entry,
 				media: entry.media ? normalizeMedia(entry.media) : null
 			}))
+	}
+}
+
+export async function getAniListAnimeCollectionResponse(
+	access: AniListAccess,
+	options: AniListRequestOptions = {}
+): Promise<AniListAnimeCollectionResponse> {
+	const validatedAccess = accessSchema.parse(access)
+	// Custom lists repeat entries that also sit in a status list: keep one per entry id.
+	const entries = new Map<number, AniListAnimeListEntry>()
+	const responseSchema = z.object({
+		MediaListCollection: z.object({
+			hasNextChunk: z.boolean().nullable(),
+			lists: z.array(z.object({
+				entries: z.array(animeListEntrySchema.nullable())
+					.max(FULL_LIST_PER_CHUNK)
+					.nullable()
+			}).nullable()).max(100).nullable()
+		}).nullable()
+	})
+	let chunk = 1
+	let hasNextChunk = true
+
+	while (hasNextChunk && chunk <= MAX_FULL_LIST_CHUNKS) {
+		const data = await requestAniList(
+			ANIME_COLLECTION_QUERY,
+			{
+				userId: validatedAccess.mode === "oauth" ? validatedAccess.userId : undefined,
+				username: validatedAccess.mode === "public" ? validatedAccess.username : undefined,
+				chunk,
+				perChunk: FULL_LIST_PER_CHUNK
+			},
+			responseSchema,
+			validatedAccess,
+			options
+		)
+
+		if (!data.MediaListCollection) {
+			throw upstreamError(
+				404,
+				"AniList user or anime list was not found",
+				"ANILIST_LIST_NOT_FOUND"
+			)
+		}
+
+		for (const list of data.MediaListCollection.lists ?? []) {
+			for (const entry of list?.entries ?? []) {
+				if (!entry || entries.has(entry.id)) continue
+				entries.set(entry.id, {
+					...entry,
+					media: entry.media ? normalizeMedia(entry.media) : null
+				})
+			}
+		}
+
+		hasNextChunk = data.MediaListCollection.hasNextChunk ?? false
+		chunk += 1
+	}
+
+	return {
+		source: sourceFromAccess(validatedAccess),
+		entries: [...entries.values()],
+		truncated: hasNextChunk
 	}
 }
 
@@ -1920,7 +2101,7 @@ export async function getAniListRecommendationsResponse(
 			}).nullable()
 		}),
 		validatedAccess,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Page) {
@@ -1977,7 +2158,7 @@ export async function getAniListStudioMediaResponse(
 			Studio: studioSchema.nullable()
 		}),
 		validatedAccess,
-		options
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
 	)
 
 	if (!data.Studio?.media) {

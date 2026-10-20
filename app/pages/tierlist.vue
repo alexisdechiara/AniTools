@@ -1,6 +1,7 @@
 <template>
 	<UDashboardPanel id="tierlist">
 		<UContainer class="max-w-none">
+			<PageHeader title="Anime tier list" visually-hidden />
 			<input
 				ref="jsonFileInput"
 				type="file"
@@ -11,7 +12,8 @@
 				v-if="showPageLoader"
 				label="Restoring your tier list"
 				description="Applying your saved tiers and preparing drag and drop." />
-			<div v-show="!showPageLoader">
+			<!-- v-if, not v-show: the board depends on the persisted store, which only exists on the client. -->
+			<div v-if="!showPageLoader">
 				<div data-tier-toolbar class="ml-8 sm:mx-4 lg:mx-12">
 					<UHeader
 						title=""
@@ -85,17 +87,32 @@
 					<SlideoverSettings v-model:open="openSlideover" />
 				</template>
 				<template #right>
-					<UButton
-						:icon="isInspectorEnabled ? 'i-lucide-scan-eye' : 'i-lucide-scan'"
-						class="cursor-pointer"
-						:variant="isInspectorEnabled ? 'solid' : 'ghost'"
-						color="neutral"
-						size="md"
-						aria-label="Toggle tier list inspector"
-						@click="toggleInspector" />
+					<UTooltip text="Click a tier, row or anime to restyle it">
+						<UButton
+							icon="i-lucide-paintbrush"
+							:label="isInspectorEnabled ? 'Done' : 'Customize'"
+							class="cursor-pointer"
+							:variant="isInspectorEnabled ? 'solid' : 'ghost'"
+							color="neutral"
+							size="md"
+							:aria-pressed="isInspectorEnabled"
+							:ui="{ label: 'hidden sm:inline' }"
+							@click="toggleInspector" />
+					</UTooltip>
 				</template>
 					</UHeader>
 				</div>
+
+			<UAlert
+				v-if="tierlistStore.entryCount === 0"
+				data-tierlist-onboarding
+				icon="i-lucide-sparkles"
+				title="Start your tier list"
+				description="Import your AniList collection to fill the tiers from your own scores, or search for anime to place by hand."
+				color="primary"
+				variant="soft"
+				class="mt-4 ml-8 w-auto sm:mx-4 lg:mx-12"
+				:actions="emptyActions" />
 
 			<div data-tier-board class="my-6 ml-8 flex flex-col sm:mx-4 sm:my-8 lg:mx-12" :class="gapSizeClass">
 				<VueDraggable
@@ -144,6 +161,20 @@
 			</div>
 		</UContainer>
 		<AnimesImportModal v-model:open="openImport" />
+		<UModal
+			v-model:open="importConfirmOpen"
+			title="Replace the current tier list?"
+			:description="`The ${tierlistStore.entryCount} anime you have placed are replaced by the contents of this file, and this can't be undone.`">
+			<template #footer>
+				<UButton
+					label="Keep my tier list"
+					color="neutral"
+					variant="outline"
+					class="ms-auto rounded-full"
+					@click="cancelImport" />
+				<UButton label="Replace tier list" color="error" class="rounded-full" @click="confirmImport" />
+			</template>
+		</UModal>
 		<InspectorOverlay />
 		<InspectorCursorTooltip />
 		<InspectorPopup />
@@ -155,6 +186,7 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 import { VueDraggable } from "vue-draggable-plus"
 import { FEATURE_REGISTRY } from "#shared/config/features"
 import type { AniListMediaSummary } from "~~/shared/types/anilist"
+import type { TierlistExportDocument } from "~/types/tierlist"
 import type { TierlistImageFormat } from "~/utils/tierlist-export"
 import {
 	buildTierlistFilename,
@@ -260,19 +292,19 @@ const tierlistMediaIds = computed(() => [
 
 const emptyActions = computed(() => [
 	{
-		icon: "i-lucide-search",
-		label: "Search",
-		color: "neutral" as const,
-		variant: "subtle" as const,
-		onClick: () => {
-			openSearch.value = true
-		}
-	},
-	{
 		icon: "i-lucide-cloud-download",
 		label: "Import from AniList",
 		onClick: () => {
 			openImport.value = true
+		}
+	},
+	{
+		icon: "i-lucide-search",
+		label: "Search anime",
+		color: "neutral" as const,
+		variant: "subtle" as const,
+		onClick: () => {
+			openSearch.value = true
 		}
 	}
 ])
@@ -351,6 +383,24 @@ async function exportTierlist(format: "json" | TierlistImageFormat): Promise<voi
 	}
 }
 
+const importConfirmOpen = ref(false)
+const pendingImport = ref<TierlistExportDocument | null>(null)
+
+function confirmImport(): void {
+	const snapshot = pendingImport.value
+	importConfirmOpen.value = false
+	pendingImport.value = null
+	if (!snapshot) return
+
+	tierlistStore.applySnapshot(snapshot)
+	toast.add({ title: "Tier list imported", color: "success" })
+}
+
+function cancelImport(): void {
+	importConfirmOpen.value = false
+	pendingImport.value = null
+}
+
 async function handleJsonFile(event: Event): Promise<void> {
 	const input = event.target
 	if (!(input instanceof HTMLInputElement)) return
@@ -373,10 +423,11 @@ async function handleJsonFile(event: Event): Promise<void> {
 			})
 			return
 		}
-		if (
-			tierlistStore.entryCount > 0
-			&& !window.confirm("Replace the current tier list with this JSON file?")
-		) return
+		if (tierlistStore.entryCount > 0) {
+			pendingImport.value = parsed.data
+			importConfirmOpen.value = true
+			return
+		}
 		tierlistStore.applySnapshot(parsed.data)
 		toast.add({ title: "Tier list imported", color: "success" })
 	} catch {

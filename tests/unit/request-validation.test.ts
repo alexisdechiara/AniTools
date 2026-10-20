@@ -19,6 +19,18 @@ describe("parseCalendarQuery", () => {
 		expect(result.airingAtLesser).toBe(1785283200 + (7 * day))
 	})
 
+	it("accepts a six-week month view that crosses a daylight-saving change", () => {
+		// October 2026 month view in Europe/Paris: 42 days plus the extra autumn hour.
+		const result = parseCalendarQuery({
+			airingAtGreater: "1790546400",
+			airingAtLesser: "1794178799",
+			rangeStart: "2026-09-27T22:00:00.000Z",
+			rangeEnd: "2026-11-08T22:59:59.999Z"
+		})
+
+		expect(result.airingAtLesser - result.airingAtGreater).toBeGreaterThan(42 * day)
+	})
+
 	it.each([
 		{
 			airingAtGreater: "100",

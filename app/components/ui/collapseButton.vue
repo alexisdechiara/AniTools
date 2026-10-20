@@ -2,7 +2,7 @@
 	<UCollapsible class="flex flex-col" v-bind="$attrs">
 		<UButton size="xl" class="group" :label="label" color="neutral" variant="link" trailing-icon="i-lucide-chevron-down"
 			:ui="{
-				base: `${first ? '' : 'border-t'} rounded-none border-neutral-200 text-muted`,
+				base: `${first ? '' : 'border-t'} rounded-none border-default text-muted`,
 				trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
 			}" block />
 
@@ -18,7 +18,6 @@
 
 defineProps<{
 	label: string,
-	first?: boolean,
-	last?: boolean
+	first?: boolean
 }>()
 </script>

@@ -21,9 +21,14 @@ secret OAuth et le jeton utilisateur restent côté serveur.
 - Explore : recommandations AniList en pile swipe, découverte par studio et
   exclusion exhaustive des titres déjà présents dans la liste.
 - Timeline : activité regroupée par semaines ou mois.
-- Create : cinq formats Canvas rendus localement, sans upload.
+- Create : cartes anime (score, note, genres) et cartes de statistiques AniList,
+  rendues localement via Canvas, sans upload.
+- Podium : top 3 des animes, genres, tags et studios de la liste.
+- Settings : thème, format d'affichage des scores et données locales.
+- Support : FAQ publique et lien vers le dépôt GitHub.
 
-`/calendar`, `/tierlist` et `/create` fonctionnent sans compte. Les autres
+`/calendar`, `/tierlist`, `/create`, `/settings` et `/support` fonctionnent sans
+compte. Les autres
 surfaces personnalisées utilisent soit une session OAuth, soit le nom d'un
 profil AniList public.
 
@@ -45,6 +50,11 @@ bun run dev
 
 Le serveur de développement écoute par défaut sur
 `http://localhost:3000`.
+
+En développement, chaque réponse de lecture AniList est enregistrée une fois dans
+`.data/anilist-dev-cache` puis rejouée : recharger les pages ne consomme plus le
+quota AniList, mais les données restent figées. Supprimer ce dossier pour les
+rafraîchir, ou régler `NUXT_ANILIST_DEV_CACHE` (`record`, `replay`, `off`).
 
 ## Authentification AniList
 

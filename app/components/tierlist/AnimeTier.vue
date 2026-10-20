@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="group relative z-20 aspect-3/4 h-fit w-full transition-all duration-100 ease-out focus-within:z-50 hover:z-50 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+		class="group relative z-20 aspect-3/4 h-fit w-full transition-[scale,box-shadow] duration-100 ease-out focus-within:z-50 hover:z-50 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
 		:class="[
 			!item.locked && !isInspectorEnabled ? 'hover:scale-102' : '',
 			hoveredTarget?.id === mediaId && hoveredTarget?.type === 'anime'
@@ -15,6 +15,8 @@
 		@click.stop="selectItem"
 		@mouseover.stop="setHovered(mediaId, 'anime', 'Anime')"
 		@mouseleave="clearHovered"
+		@focus="setHovered(mediaId, 'anime', 'Anime')"
+		@blur="clearHovered"
 		@keydown="handleKeydown">
 		<UContextMenu :items="actions" size="sm">
 			<NuxtImg
@@ -63,7 +65,7 @@
 		</UContextMenu>
 		<div
 			v-if="!isInspectorEnabled"
-			class="pointer-events-none absolute inset-0 z-40 rounded-lg bg-linear-to-t from-neutral-950/60 from-0% via-neutral-950/40 via-10% to-neutral-950/10 to-25% opacity-0 transition-all duration-100 ease-in-out group-focus-within:opacity-100 group-hover:opacity-100"
+			class="pointer-events-none absolute inset-0 z-40 rounded-lg bg-linear-to-t from-neutral-950/60 from-0% via-neutral-950/40 via-10% to-neutral-950/10 to-25% opacity-0 transition-opacity duration-100 ease-in-out group-focus-within:opacity-100 group-hover:opacity-100"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
 			class="pointer-events-none invisible absolute inset-x-2 bottom-2 z-50 text-[10px] font-medium text-white group-focus-within:visible group-hover:visible"
@@ -118,6 +120,12 @@ function removeAnime(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+	if (isInspectorEnabled.value && (event.key === "Enter" || event.key === " ")) {
+		setHovered(mediaId.value, "anime", "Anime")
+		selectItem(event)
+		return
+	}
+
 	switch (event.key) {
 		case "ArrowLeft":
 			if (!props.item.locked && props.canMoveEarlier) {

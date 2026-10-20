@@ -41,11 +41,23 @@
 	--ui-radius: 0.5rem;
 	--ui-container: var(--container-6xl);
 
-	--color-completed: oklch(from var(--ui-color-primary-400) l c h);
-	--color-planning: oklch(from var(--ui-color-warning-400) l c h );
-	--color-dropped: oklch(from var(--ui-color-error-400) l c h );
-	--color-watching: oklch(from var(--ui-color-success-400) l c h );
-	--color-paused: oklch(from var(--ui-color-neutral-200) l c h );
+	/* Sign-in surface: deliberately dark in both themes, so these sit outside the light/dark ramps. */
+	--color-hero-surface-from: oklch(0.225 0.046 285.89);
+	--color-hero-surface-to: oklch(0.168 0.027 286.63);
+	--color-hero-ink: oklch(0.168 0.027 286.63);
+	--color-brand-anilist: oklch(0.705 0.169 242.54);
+	--color-brand-anilist-hover: oklch(0.645 0.15 241.84);
+
+	/*
+	 * List status colours fill chart segments, so each needs 3:1 against the card behind it
+	 * (white here, black in dark mode, see .dark below). The 400 steps fall to 1.2–2.9:1 on
+	 * white; these steps measure 3.2–4.8:1.
+	 */
+	--color-completed: var(--ui-color-primary-500);
+	--color-planning: var(--ui-color-warning-700);
+	--color-dropped: var(--ui-color-error-500);
+	--color-watching: var(--ui-color-success-600);
+	--color-paused: var(--ui-color-neutral-500);
 
 	--vis-color-main: var(--ui-color-primary-400);
 	--vis-axis-tick-color: var(--ui-color-neutral-200);
@@ -80,12 +92,19 @@
   --ui-bg-muted: var(--ui-color-primary-900);
   --ui-bg-elevated: var(--ui-color-primary-800);
   --ui-bg-accented: var(--ui-color-primary-700);
-  --ui-bg-inverted: oklch(from var(--ui-color-primary-50) 0.01 c h);
+  --ui-bg-inverted: oklch(from var(--ui-color-primary-50) 0.99 c h);
 
 	--ui-border: var(--ui-color-primary-900);
   --ui-border-muted: var(--ui-color-primary-800);
   --ui-border-accented: var(--ui-color-primary-700);
-	--ui-border-inverted: oklch(from var(--ui-color-primary-50) 0.01 c h);
+	--ui-border-inverted: oklch(from var(--ui-color-primary-50) 0.99 c h);
+
+	/* On black cards the light steps all clear 3:1 by a wide margin. */
+	--color-completed: var(--ui-color-primary-300);
+	--color-planning: var(--ui-color-warning-400);
+	--color-dropped: var(--ui-color-error-400);
+	--color-watching: var(--ui-color-success-400);
+	--color-paused: var(--ui-color-neutral-400);
 }
 
 :where(
@@ -106,5 +125,57 @@
 		animation-duration: 0.01ms !important;
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
+	}
+}
+
+/*
+ * AniList cover colours are arbitrary and often pale, so using one raw as text can land
+ * at ~1.1:1 on our surfaces. Clamp lightness into a legible band per theme instead.
+ */
+.text-anime-theme {
+	color: oklch(from var(--anime-theme-color, var(--ui-color-primary-400)) clamp(0.3, l, 0.5) c h);
+}
+
+.dark .text-anime-theme {
+	color: oklch(from var(--anime-theme-color, var(--ui-color-primary-400)) clamp(0.68, l, 0.92) c h);
+}
+
+/*
+ * Tier colours are picked freely from the colour picker, so a fixed light ink can land on a
+ * pale background. Derive the ink from the chosen colour instead: below the 0.55 lightness
+ * threshold the clamp resolves to 1 (light ink), above it to 0 (dark ink).
+ */
+.tier-ink {
+	color: oklch(from var(--tier-color) clamp(0, (0.55 - l) * 100, 1) 0 h);
+}
+
+/* Shared podium reveal animations — used by AnimeRankingCard and CategoryPodiumCard */
+[data-podium-item] {
+	animation: podium-rise 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes podium-rise {
+	from {
+		opacity: 0;
+		transform: translateY(28px) scale(0.92);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+.animate-podium-glow {
+	animation: podium-glow 2.4s ease-in-out 600ms infinite;
+}
+
+@keyframes podium-glow {
+	0%, 100% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-color-warning-400) 45%, transparent);
+	}
+
+	50% {
+		box-shadow: 0 0 22px 6px color-mix(in srgb, var(--ui-color-warning-400) 35%, transparent);
 	}
 }

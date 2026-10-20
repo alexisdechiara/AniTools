@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest"
 import {
+	DASHBOARD_GRID_COLUMNS,
 	DEFAULT_DASHBOARD_CARD_IDS,
 	addDashboardCard,
 	getDashboardDeleteAttractionOffset,
 	isDashboardDeleteTargetHit,
 	moveDashboardCard,
 	normalizeDashboardCardIds,
-	removeDashboardCard
+	packDashboardLayout,
+	removeDashboardCard,
+	scaleDashboardCardWidth
 } from "../../app/utils/dashboard-layout"
 
 describe("dashboard layout preferences", () => {
@@ -65,5 +68,94 @@ describe("dashboard layout preferences", () => {
 			{ top: 700, right: 580, bottom: 780, left: 500 }
 		)).toEqual({ x: 340, y: 540 })
 		expect(getDashboardDeleteAttractionOffset(null, null)).toBeNull()
+	})
+})
+
+describe("dashboard grid packing", () => {
+	const metric = { w: 3, h: 1 }
+	const wide = { w: 9, h: 3 }
+	const tall = { w: 3, h: 4 }
+
+	it("packs the default 12-column layout without gaps", () => {
+		const layout = packDashboardLayout([
+			{ id: "watch-time", size: metric },
+			{ id: "anime-count", size: metric },
+			{ id: "episode-count", size: metric },
+			{ id: "status", size: tall },
+			{ id: "mean-score", size: wide }
+		])
+
+		expect(layout.map(({ i, x, y }) => [i, x, y])).toEqual([
+			["watch-time", 0, 0],
+			["anime-count", 3, 0],
+			["episode-count", 6, 0],
+			["status", 9, 0],
+			["mean-score", 0, 1]
+		])
+	})
+
+	it("narrows cards proportionally on the 8-column tablet grid", () => {
+		const layout = packDashboardLayout([
+			{ id: "watch-time", size: metric },
+			{ id: "anime-count", size: metric },
+			{ id: "episode-count", size: metric },
+			{ id: "status", size: metric }
+		], 8)
+
+		expect(layout.map(({ x, y, w }) => [x, y, w])).toEqual([
+			[0, 0, 2],
+			[2, 0, 2],
+			[4, 0, 2],
+			[6, 0, 2]
+		])
+	})
+
+	it("turns third-width cards into halves and lets the last one fill its row", () => {
+		const third = { w: 4, h: 3 }
+		const layout = packDashboardLayout([
+			{ id: "next-episodes", size: third },
+			{ id: "current-anime", size: third },
+			{ id: "recent-updates", size: third }
+		], 8)
+
+		expect(layout.map(({ x, y, w }) => [x, y, w])).toEqual([
+			[0, 0, 4],
+			[4, 0, 4],
+			[0, 3, 8]
+		])
+	})
+
+	it("keeps authored widths on the full 12-column grid", () => {
+		const layout = packDashboardLayout([{ id: "watch-time", size: metric }])
+
+		expect(layout[0]?.w).toBe(3)
+	})
+
+	it("snaps to half or full width on narrow grids", () => {
+		expect(scaleDashboardCardWidth(3, DASHBOARD_GRID_COLUMNS.sm)).toBe(2)
+		expect(scaleDashboardCardWidth(9, DASHBOARD_GRID_COLUMNS.sm)).toBe(4)
+		expect(scaleDashboardCardWidth(3, DASHBOARD_GRID_COLUMNS.xs)).toBe(1)
+		expect(scaleDashboardCardWidth(6, DASHBOARD_GRID_COLUMNS.xs)).toBe(2)
+		expect(scaleDashboardCardWidth(9, DASHBOARD_GRID_COLUMNS.xxs)).toBe(1)
+	})
+
+	it("gives lists and charts the full width on phone grids", () => {
+		expect(scaleDashboardCardWidth(4, DASHBOARD_GRID_COLUMNS.xs, 3)).toBe(2)
+		expect(scaleDashboardCardWidth(3, DASHBOARD_GRID_COLUMNS.xs, 4)).toBe(2)
+		expect(scaleDashboardCardWidth(3, DASHBOARD_GRID_COLUMNS.xs, 1)).toBe(1)
+	})
+
+	it("never places a card outside the grid", () => {
+		for (const columns of Object.values(DASHBOARD_GRID_COLUMNS)) {
+			const layout = packDashboardLayout([
+				{ id: "watch-time", size: metric },
+				{ id: "mean-score", size: wide },
+				{ id: "status", size: tall }
+			], columns)
+
+			for (const item of layout) {
+				expect(item.x + item.w).toBeLessThanOrEqual(columns)
+			}
+		}
 	})
 })

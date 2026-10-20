@@ -34,9 +34,16 @@ export function useAppNavigation(options: UseAppNavigationOptions = {}) {
 		}
 	}
 
-	const items = FEATURE_IDS
+	const primaryItems = FEATURE_IDS
 		.filter(featureId => FEATURE_REGISTRY[featureId].navigation === "primary")
 		.map(featureId => toNavigationItem(featureId))
+	const secondaryItems = FEATURE_IDS
+		.filter(featureId => FEATURE_REGISTRY[featureId].navigation === "secondary")
+		.map(featureId => toNavigationItem(featureId))
+
+	const items = secondaryItems.length > 0
+		? [primaryItems, secondaryItems]
+		: primaryItems
 
 	return {
 		items

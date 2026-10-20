@@ -60,7 +60,7 @@ function relationBadge(media: AniListMediaSummary) {
 				<UButton
 					icon="i-lucide-undo-2"
 					label="Undo"
-					color="error"
+					color="neutral"
 					variant="soft"
 					size="sm"
 					class="rounded-full"

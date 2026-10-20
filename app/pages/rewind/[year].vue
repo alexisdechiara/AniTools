@@ -133,12 +133,14 @@ useSeoMeta({
 							v-model="selectedYear"
 							:items="yearItems"
 							value-key="value"
-							variant="ghost"
+							variant="soft"
+							color="primary"
 							size="sm"
-							class="w-28"
+							icon="i-lucide-calendar"
+							class="w-32"
 							:ui="{
-								base: 'cursor-pointer rounded-none border-b border-dashed border-primary/50 font-semibold text-primary hover:border-primary hover:bg-primary/10',
-								trailingIcon: 'hidden'
+								base: 'cursor-pointer rounded-full font-semibold text-primary',
+								trailingIcon: 'text-primary'
 							}"
 							aria-label="Rewind year" />
 					</template>

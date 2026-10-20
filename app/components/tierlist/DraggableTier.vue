@@ -41,6 +41,21 @@
 				@reorder="reorderAnime(entry, $event)" />
 			<slot v-if="filteredEntries.length === 0" name="empty" />
 		</VueDraggable>
+
+		<UModal
+			v-model:open="clearTierOpen"
+			title="Clear this tier?"
+			description="Every anime in this tier goes back to nowhere — they are not moved to Unranked, and this can't be undone.">
+			<template #footer>
+				<UButton
+					label="Keep them"
+					color="neutral"
+					variant="outline"
+					class="ms-auto rounded-full"
+					@click="clearTierOpen = false" />
+				<UButton label="Clear tier" color="error" class="rounded-full" @click="clearTier" />
+			</template>
+		</UModal>
 	</UContextMenu>
 </template>
 
@@ -89,7 +104,10 @@ function getDropPoint(event: Event | undefined): { x: number, y: number } | null
 	return null
 }
 
-function handleDragEnd(event: SortableEvent): void {
+// Sortable sets `originalEvent` at runtime, but @types/sortablejs omits it.
+type SortableDragEndEvent = SortableEvent & { originalEvent?: Event }
+
+function handleDragEnd(event: SortableDragEndEvent): void {
 	const point = getDropPoint(event.originalEvent)
 	const mediaId = Number(event.item.dataset.mediaId)
 	if (!point || !Number.isInteger(mediaId) || mediaId <= 0) return
@@ -218,13 +236,19 @@ const actions = [
 			color: "error" as const,
 			icon: "i-lucide-brush-cleaning",
 			onClick: () => {
-				if (window.confirm("Clear every anime from this tier? This cannot be undone.")) {
-					modelValue.value = []
-				}
+				clearTierOpen.value = true
 			}
 		}
 	]
 ]
+
+const clearTierOpen = ref(false)
+
+function clearTier() {
+	modelValue.value = []
+	clearTierOpen.value = false
+	toast.add({ title: "Tier cleared", color: "success" })
+}
 </script>
 
 <style scoped>

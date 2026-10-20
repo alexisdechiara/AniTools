@@ -1,7 +1,7 @@
 export type FeatureAccessMode = "public" | "optional" | "oauth"
 export type FeatureIdentity = "anonymous" | "public-profile" | "oauth"
 export type FeatureStatus = "available" | "beta" | "planned"
-export type FeatureNavigationPlacement = "primary" | "child" | "hidden"
+export type FeatureNavigationPlacement = "primary" | "secondary" | "child" | "hidden"
 
 export interface FeatureAccessPolicy {
 	readonly mode: FeatureAccessMode
@@ -38,7 +38,10 @@ export const FEATURE_IDS = [
 	"calendar",
 	"create",
 	"explore",
+	"podium",
 	"timeline",
+	"settings",
+	"support",
 	"login"
 ] as const
 
@@ -53,6 +56,14 @@ export interface FeatureDefinition {
 	readonly status: FeatureStatus
 	readonly navigation: FeatureNavigationPlacement
 	readonly parent?: FeatureId
+}
+
+/** Document title for a feature page: child pages carry their parent, e.g. "Genres · Statistics". */
+export function getFeaturePageTitle(featureId: FeatureId): string {
+	const feature = FEATURE_REGISTRY[featureId]
+	return feature.parent
+		? `${feature.label} · ${FEATURE_REGISTRY[feature.parent].label}`
+		: feature.label
 }
 
 export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = {
@@ -179,6 +190,15 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		status: "beta",
 		navigation: "primary"
 	},
+	podium: {
+		label: "Podium",
+		icon: "i-lucide-trophy",
+		path: "/podium",
+		access: FEATURE_ACCESS.oauthWithPublicProfile,
+		indexable: false,
+		status: "beta",
+		navigation: "primary"
+	},
 	timeline: {
 		label: "Timeline",
 		icon: "i-lucide-chart-no-axes-gantt",
@@ -187,6 +207,24 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		indexable: false,
 		status: "beta",
 		navigation: "primary"
+	},
+	settings: {
+		label: "Settings",
+		icon: "i-lucide-settings",
+		path: "/settings",
+		access: FEATURE_ACCESS.public,
+		indexable: false,
+		status: "available",
+		navigation: "secondary"
+	},
+	support: {
+		label: "Support",
+		icon: "i-lucide-circle-help",
+		path: "/support",
+		access: FEATURE_ACCESS.public,
+		indexable: true,
+		status: "available",
+		navigation: "secondary"
 	},
 	login: {
 		label: "Sign in",

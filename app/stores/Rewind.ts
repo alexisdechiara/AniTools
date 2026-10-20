@@ -16,6 +16,10 @@ interface RewindCacheEntry {
 }
 
 export const useRewindStore = defineStore("Rewind", () => {
+	// Resolved once while the store is created: on the server, useRequestFetch() needs the
+	// Nuxt context, which is gone after the first await inside an action.
+	const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+
 	const user = useUserStore()
 	const activities = ref<AniListAnimeActivity[]>([])
 	const source = ref<AniListSource | null>(null)
@@ -75,7 +79,7 @@ export const useRewindStore = defineStore("Rewind", () => {
 			error.value = null
 
 			try {
-				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const fetcher = requestFetch
 				const username = user.authMode === "public" ? user.getUsername : undefined
 				const result = await collectRewindActivities(page =>
 					fetcher<AniListActivitiesResponse>("/api/anilist/activities", {
@@ -103,9 +107,7 @@ export const useRewindStore = defineStore("Rewind", () => {
 				truncated.value = false
 				year.value = normalizedYear
 				loadedKey.value = null
-				error.value = caughtError instanceof Error
-					? caughtError.message
-					: "Unable to load this AniList Rewind."
+				error.value = getApiErrorMessage(caughtError, "Unable to load this AniList Rewind.")
 				return false
 			} finally {
 				loading.value = false

@@ -134,7 +134,7 @@ const visibleItems = computed(() =>
 										class="rounded-lg px-2.5 py-2"
 										:class="selectedMetric === 'count' ? 'bg-primary/10' : 'bg-muted/40'">
 										<dt class="text-xs text-muted">Count</dt>
-										<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ item.count.toLocaleString() }}</dd>
+										<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ formatNumber(item.count) }}</dd>
 									</div>
 									<div
 										class="rounded-lg px-2.5 py-2"

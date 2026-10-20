@@ -6,9 +6,10 @@ Ce fichier est la référence pour les agents IA qui interviennent dans ce dép�
 
 AniTools transforme les données AniList d'un utilisateur en outils pratiques et
 visuels : calendrier de diffusion, tableau de bord, statistiques, rétrospective
-annuelle, découverte, timeline, tier list et studio de création.
+annuelle, découverte, timeline, podium, tier list et studio de création.
 
-`/calendar`, `/tierlist` et `/create` doivent rester utiles sans compte. Les
+`/calendar`, `/tierlist`, `/create`, `/settings` et `/support` doivent rester
+utiles sans compte. Les
 surfaces personnalisées acceptent soit une session OAuth, soit un profil AniList
 public. Les données privées et toute future mutation AniList doivent toujours
 passer par le serveur.
@@ -196,10 +197,29 @@ doit rester couverte par un contrôle visuel lors d'une évolution du rendu.
 - [x] Création de thumbnails AniList (1200 × 630)
 - [x] Création de bannières (1500 × 500)
 - [x] Gabarits, formats PNG/JPEG/WebP, règles d'import et confidentialité définis
+- [x] Carte anime avec badge de score personnel, note et genres
+- [x] Carte de statistiques AniList avec états vide, chargement et erreur
 
 Limites : studio mono-image sans sauvegarde de projet ; rendu exclusivement
 local via Canvas. L'utilisateur reste responsable des licences des images
 importées. Voir `docs/CREATE.md`.
+
+### Podium
+
+- [x] Top 3 des animes les mieux notés
+- [x] Top 3 genres, tags et studios selon le nombre, la note ou le temps
+
+Limite : réutilise les agrégations Statistics sur la liste chargée.
+
+### Settings et Support
+
+- [x] Thème, format d'affichage des scores et réinitialisations locales
+- [x] État du compte : OAuth, profil public ou invité
+- [x] FAQ publique indexable
+
+Le format de score est une préférence d'affichage locale (`Preferences`) ; il ne
+modifie jamais le format configuré sur le compte AniList. Les conversions sont
+testées dans `tests/unit/score-format.test.ts`.
 
 ## Priorités restantes
 

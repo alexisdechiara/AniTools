@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RewindAnimeMetric } from "~/utils/rewind"
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
 	title: string
 	items: readonly RewindAnimeMetric[]
 	emptyLabel?: string
@@ -30,18 +30,31 @@ function podiumOrder(rank: number): number {
 	if (rank === 2) return 1
 	return 3
 }
+
+function riseDelay(rank: number): string {
+	if (rank === 2) return "0ms"
+	if (rank === 1) return "90ms"
+	return "180ms"
+}
+
+const { format: formatScore } = usePersonalScore()
+
+const scores = computed(() => props.items.map(item => item.entry.score ?? 0))
+const ranks = computed(() => competitionRanks(scores.value))
 </script>
 
 <template>
 	<MetricsCard :title="title" v-bind="$attrs">
 		<ol
 			v-if="items.length"
+			:key="items.map(item => item.entry.id).join('-')"
 			class="mt-3 flex min-h-80 items-end justify-center gap-2 sm:gap-4">
 			<li
 				v-for="(item, index) in items"
 				:key="item.entry.id"
 				class="flex max-w-40 min-w-0 flex-1 flex-col items-center justify-end"
-				:style="{ order: podiumOrder(index + 1) }">
+				:style="{ order: podiumOrder(index + 1), animationDelay: riseDelay(index + 1) }"
+				data-podium-item>
 				<AnimeDetailsPopover
 					v-if="item.entry.media?.title && item.entry.media.coverImage"
 					:data="item.entry"
@@ -53,8 +66,12 @@ function podiumOrder(rank: number): number {
 					<button
 						type="button"
 						class="group/poster relative mb-3 cursor-pointer overflow-hidden rounded-lg shadow-lg ring-1 ring-default transition duration-200 hover:-translate-y-1 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-						:class="index === 0 ? 'w-24 sm:w-28' : 'w-20 sm:w-24'"
-						:aria-label="`Show details for ${getTitle(item)}`">
+						:class="[
+							index === 0 ? 'w-24 sm:w-28' : 'w-20 sm:w-24',
+							index === 0 && variant === 'top' ? 'animate-podium-glow' : ''
+						]"
+						:aria-label="`Show details for ${getTitle(item)}`"
+						:title="getTitle(item)">
 						<NuxtImg
 							:src="getCover(item)"
 							:alt="getTitle(item)"
@@ -81,10 +98,11 @@ function podiumOrder(rank: number): number {
 						variant === 'flop' ? 'saturate-75' : ''
 					]">
 					<span class="text-3xl leading-none font-black text-highlighted">
-						{{ index + 1 }}
+						{{ ranks[index] }}
 					</span>
 					<span class="mt-1 text-xs font-semibold text-muted">
-						{{ item.entry.score || "—" }}/100
+						{{ formatScore(item.entry.score) }}
+						<template v-if="isTiedRank(scores, index)">· Tied</template>
 					</span>
 				</div>
 			</li>

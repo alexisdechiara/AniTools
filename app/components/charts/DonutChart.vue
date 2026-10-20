@@ -1,16 +1,15 @@
 <template>
   <div
     class="flex gap-6"
-    :class="orientation === 'horizontal' ? 'flex-col sm:flex-row' : 'flex-col'"
-    role="img"
-    :aria-label="chartAriaLabel">
+    :class="orientation === 'horizontal' ? 'flex-col sm:flex-row' : 'flex-col'">
     <VisSingleContainer
       v-if="chartDataForDonut.length"
       :data="chartDataForDonut"
       :width="width"
       :height="height"
       :style="{ '--chart-width': width, '--chart-height': height }"
-      aria-hidden="true">
+      role="img"
+      :aria-label="chartAriaLabel">
       <VisDonut
         :value="sliceValue"
         :pad-angle="0.05"
@@ -221,7 +220,7 @@ function legendRawValue(item: DonutDataItem): string {
     return formatDuration(getMinutes(item));
   }
 
-  return getCount(item).toLocaleString();
+  return formatNumber(getCount(item));
 }
 
 function escapeHtml(value: string): string {
