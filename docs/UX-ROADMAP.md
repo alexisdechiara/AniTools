@@ -94,7 +94,6 @@ inaccessible ; **MEDIUM** dégrade nettement la compréhension ou la cohérence 
   « inspecteur » ressemble à un bouton plein écran ; pas de `<h1>`.
 - Explore : la sélection « Interested » est perdue au rechargement.
 - Barre latérale (sombre) : l'état survol est identique à l'état actif.
-- Dossiers vides `app/components/home` et `app/components/inbox`.
 - Logo provisoire « A » (login, chargeurs) et `UHeader` détourné comme titre de
   barre latérale (`default.vue:25`).
 
