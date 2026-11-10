@@ -89,6 +89,8 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		} else {
 			currentStatus.value.push(format)
 		}
+		// The list is only needed for this filter: load it on first use (no-op once loaded).
+		if (currentStatus.value.length > 0) void entriesStore.fetchAllAnimes().catch(() => undefined)
 	}
 
 	const toggleDubbing = (lang: string) => {
@@ -162,7 +164,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		]
 
 		let statusItems: DropdownMenuItem[] = []
-		if (userStore.isAuthenticated && entriesStore.isInitialized) {
+		if (userStore.isAuthenticated) {
 			statusItems = [
 				{
 					label: "Status", children: [
