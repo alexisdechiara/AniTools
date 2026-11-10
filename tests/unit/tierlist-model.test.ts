@@ -18,7 +18,8 @@ import {
 	parseTierlistDragPayload,
 	parseTierlistExportText,
 	sanitizeTierlistEntry,
-	serializeTierlistState
+	serializeTierlistState,
+	toTierlistEntryFromListEntry
 } from "../../app/utils/tierlist-model"
 
 function entry(id: number, overrides: Partial<TierlistEntry> = {}): TierlistEntry {
@@ -143,6 +144,36 @@ describe("tierlist entry model", () => {
 			entry: { media: { id: 9 } }
 		})
 		expect(parseTierlistDragPayload(JSON.stringify(entry(9)))).toBeNull()
+	})
+})
+
+describe("list entry to tier list entry conversion", () => {
+	const media = entry(1).media
+
+	it("converts a 10-point list score to the 100-point scale", () => {
+		expect(toTierlistEntryFromListEntry({ score: 9, media }, "POINT_10")?.score).toBe(90)
+	})
+
+	it("converts a 5-star list score to the 100-point scale", () => {
+		expect(toTierlistEntryFromListEntry({ score: 4, media }, "POINT_5")?.score).toBe(80)
+	})
+
+	it("keeps a 100-point list score unchanged", () => {
+		expect(toTierlistEntryFromListEntry({ score: 85, media }, "POINT_100")?.score).toBe(85)
+	})
+
+	it("keeps unscored entries at zero for every format", () => {
+		const formats = ["POINT_100", "POINT_10_DECIMAL", "POINT_10", "POINT_5", "POINT_3"] as const
+		for (const format of formats) {
+			expect(toTierlistEntryFromListEntry({ score: 0, media }, format)?.score).toBe(0)
+			expect(toTierlistEntryFromListEntry({ score: null, media }, format)?.score).toBe(0)
+		}
+	})
+
+	it("rejects inputs without a valid media", () => {
+		expect(toTierlistEntryFromListEntry({ score: 9 }, "POINT_10")).toBeNull()
+		expect(toTierlistEntryFromListEntry({ score: 9, media: null }, "POINT_10")).toBeNull()
+		expect(toTierlistEntryFromListEntry(null, "POINT_10")).toBeNull()
 	})
 })
 

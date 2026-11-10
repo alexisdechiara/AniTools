@@ -192,11 +192,13 @@ useSeoMeta({
 						<ListCard
 							v-model:sort="genresSort"
 							title="Top genres"
+							score-scale="raw"
 							:list="genreItems"
 							class="xl:col-span-4" />
 						<ListCard
 							v-model:sort="tagsSort"
 							title="Top tags"
+							score-scale="raw"
 							:list="tagItems"
 							class="xl:col-span-4" />
 						<RewindBreakdownCard
