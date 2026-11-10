@@ -5,6 +5,7 @@ import type {
 	AniListSearchResponse
 } from "~~/shared/types/anilist"
 import { getCreateMediaTitle } from "~/utils/create-artwork"
+import { hasMediaDetails } from "~/utils/media-details"
 
 interface PickerItem {
 	id: number
@@ -127,6 +128,10 @@ watch(visibleItems, (items) => {
 async function resolveMedia(item: PickerItem): Promise<AniListMediaSummary | null> {
 	const cached = mediaCache.get(item.id)
 	if (cached) return cached
+	if (item.media && hasMediaDetails(item.media)) {
+		mediaCache.set(item.id, item.media)
+		return item.media
+	}
 
 	loadingMediaId.value = item.id
 	error.value = null
