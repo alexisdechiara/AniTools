@@ -702,6 +702,8 @@ export interface AniListRequestOptions {
 	timeoutMs?: number
 	/** How long an identical read is served from memory; see ANILIST_CACHE_TTL. */
 	cacheTtlMs?: number
+	/** Always reach AniList: no memory, in-flight or development disk cache, read or write. */
+	skipCache?: boolean
 }
 
 const graphQLErrorSchema = z.object({
@@ -1261,8 +1263,11 @@ async function requestAniList<T>(
 ): Promise<T> {
 	const validatedAccess = access === null ? null : accessSchema.parse(access)
 
-	// Injected fetchers (unit tests) and mutations always reach AniList.
+	// Injected fetchers (unit tests), uncached safety checks and mutations always reach AniList.
 	if (options.fetch) {
+		return requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
+	}
+	if (options.skipCache) {
 		return requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
 	}
 	const viewer = validatedAccess?.mode === "oauth" ? `oauth:${validatedAccess.userId}` : "public"
@@ -1583,7 +1588,8 @@ export async function saveAniListMediaListEntry(
 			{ userId: validatedAccess.userId, mediaId: validatedBody.mediaId },
 			entryLookupSchema,
 			validatedAccess,
-			options
+			// A safety check must see AniList's current answer, never a cached one.
+			{ ...options, skipCache: true }
 		)
 		existingEntry = lookup.MediaList
 	} catch (error) {
