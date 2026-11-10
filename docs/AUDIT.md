@@ -1,11 +1,11 @@
 # Audit de livraison AniTools
 
-Date de référence : 29 juillet 2026.
+Date de référence : 10 novembre 2026 (première version le 29 juillet 2026).
 
 ## Conclusion
 
 La roadmap fonctionnelle initiale est désormais implémentée. Le projet repose
-sur Nuxt 4.5.1 et Bun 1.3.5, n'embarque plus le client GraphQL historique,
+sur Nuxt 4.6.4 et Bun 1.3.5, n'embarque plus le client GraphQL historique,
 dispose d'un OAuth AniList serveur, d'une API interne à opérations fixes, de
 tests Vitest/Playwright et d'une CI.
 
@@ -24,7 +24,7 @@ configurer. La checklist obligatoire est dans `docs/DEPLOYMENT.md`.
 | Statistics | Bêta fonctionnelle | Overview, Genres, Tags, Studios, Voice Actors et Staff | People borné au top 100 toutes périodes fourni par AniList |
 | Rewind | Bêta fonctionnelle | Sélection annuelle, genres, saisons, top/flop, sélection et temps estimé | Dépend de l'historique AniList, maximum 20 pages |
 | Tierlist | Bêta fonctionnelle | Import, franchise, classement, JSON, PNG/JPEG/WebP, clavier/tactile | Rendu image dépendant du navigateur |
-| Explore | Bêta fonctionnelle | Recommandations, studios, filtres, pile swipe et pagination | Graines et studios calculés sur 50 entrées ; sélection « Interested » locale |
+| Explore | Bêta fonctionnelle | Recommandations, studios, filtres, pile swipe, pagination et ajout à « Planning » (OAuth) | Graines, studios et exclusions calculés sur la liste complète chargée ; sélection « Interested » locale |
 | Timeline | Bêta fonctionnelle | Flux mensuel des mises à jour anime, Gantt, pagination et cache client | Maximum 5 000 activités, cache non partagé |
 | Create | Bêta fonctionnelle | Cartes anime et statistiques ; story, carré, thumbnail 1200 × 630 et bannière en PNG/JPEG/WebP | Mono-image, projets non persistés |
 | Podium | Bêta fonctionnelle | Top 3 animes, genres, tags et studios | Agrégations limitées à la liste chargée |
@@ -38,29 +38,32 @@ supprimées.
 
 ### État actuel
 
-- Nuxt `4.5.1` et Nuxt UI `4.10.0`.
-- Pinia `4.0.2`, Directus SDK `23.0.0`, Zod `4.4.3`.
-- ESLint `10.8.0`, TypeScript `6.0.3`, vue-tsc `3.3.8`.
-- Vitest `4.1.10` et Playwright `1.62.0`.
+Versions minimales déclarées dans `package.json` (qui fait foi) :
+
+- Nuxt `4.6.4` et Nuxt UI `4.12.0`.
+- Pinia `4.1.0`, Directus SDK `27.1.0`, Zod `4.6.7`.
+- `@nuxtjs/robots` `7.0.2`, `@nuxtjs/sitemap` `9.1.0`, `nuxt-site-config`
+  `5.0.3`, `@vueuse/nuxt` `15.0.0`.
+- ESLint `10.14.0`, TypeScript `6.0.3`, vue-tsc `3.3.14`.
+- Vitest `5.1.0`, `@nuxt/test-utils` `4.4.0`, `@vue/test-utils` `2.5.1`,
+  `happy-dom` `21.0.4` et Playwright `1.65.0`.
 - Bun `1.3.5` déclaré comme gestionnaire de paquets.
 - `bun.lock` est le seul lockfile.
-- `nuxt-graphql-client`, GraphQL Codegen et les fichiers `app/queries` ont été
-  retirés.
-- Des overrides bornent plusieurs dépendances transitives ; ils doivent être
-  réévalués lors des montées de version.
+- `nuxt-graphql-client`, GraphQL Codegen, les fichiers `app/queries` et
+  `date-fns` ont été retirés.
+- `overrides` ne contient plus que deux entrées, chacune corrigeant une alerte
+  connue : `node-forge` `1.4.1` (plusieurs alertes hautes, via l'outil de
+  certificat du serveur de développement) et `vite` `8.3.4`
+  (GHSA-587h-7wmj-h5pm). Les retirer dès que les dépendances amont embarquent
+  ces versions.
 
-Au 20 octobre 2026, après `bun update` et la mise à jour des overrides, `bun audit`
-signale encore deux alertes hautes **sans version corrigée publiée** :
-
-- `braces` ≤ 3.0.3 (déni de service sur motifs imbriqués), via
-  `nitropack › globby › fast-glob › micromatch` et l'outillage stylelint. Les
-  motifs sont ceux de la configuration de build, jamais une saisie visiteur.
-- `node-forge` ≤ 1.4.0 (vérification de signature RSA), via `listhen`, qui ne
-  sert qu'à générer le certificat HTTPS du serveur de développement.
-
-Aucune des deux n'est atteignable depuis le serveur de production. Retirer les
-overrides correspondants dès qu'une version corrigée paraît. `bun audit` doit
-être rejoué dans la CI et avant chaque livraison, car le registre évolue.
+Au 10 novembre 2026, `bun audit` ne signale aucune alerte haute ou critique ;
+restent deux alertes modérées (`glob`, `minimatch`) et trois faibles
+(`deepmerge`, `esbuild`, `serialize-javascript`), toutes transitives de
+l'outillage de build, de test ou de développement. La CI exécute
+`bun run audit:gate` (`scripts/audit-gate.mjs`), qui échoue sur toute alerte
+haute ou critique absente de `scripts/audit-allowlist.json` ; cette liste est
+vide. Rejouer la commande avant chaque livraison, car le registre évolue.
 
 ### Réserves techniques
 
@@ -75,7 +78,9 @@ overrides correspondants dès qu'une version corrigée paraît. `bun audit` doit
 - `vue-cal` reste une release candidate ; les tests Calendar et une recette
   visuelle sont requis avant chaque mise à jour.
 - Le lint passe sans erreur bloquante mais conserve plusieurs centaines
-  d'avertissements historiques. Ils doivent être réduits par lots relus, sans
+  d'avertissements historiques, tous issus de règles de formatage
+  (`@typescript-eslint/no-explicit-any` et `@typescript-eslint/no-unused-vars`
+  sont des erreurs). Ils doivent être réduits par lots relus, sans
   `eslint --fix` global aveugle.
 
 ## Architecture AniList
@@ -84,17 +89,23 @@ Le navigateur appelle uniquement :
 
 - `/api/anilist/profile`
 - `/api/anilist/anime-collection` (liste complète, utilisée par les pages
-  personnelles)
-- `/api/anilist/anime-list` (pages de 50, utilisée par Explore)
-- `/api/anilist/anime-list-ids`
+  personnelles, dont Explore)
 - `/api/anilist/statistics`
 - `/api/anilist/activities`
 - `/api/anilist/recommendations`
 - `/api/anilist/studio-media`
 - `/api/anilist/media`
+- `POST /api/anilist/media-list`, l'unique écriture : ajout d'un anime à
+  « Planning » depuis Explore. Elle exige une session OAuth et une requête de même
+  origine, est limitée à 20 requêtes par minute et par client, refuse un corps de
+  plus de 1 Ko et répond `409` si l'anime est déjà dans la liste (vérifié par une
+  lecture fixe non mise en cache) ; chaque ajout coûte donc deux requêtes AniList.
 - `/api/search`
 - `/api/calendar`
 - les routes de session et d'authentification
+
+`/api/anilist/anime-list` et `/api/anilist/anime-list-ids` existent toujours côté
+serveur mais n'ont plus d'appelant dans le client.
 
 Les opérations GraphQL sont des constantes côté serveur dans
 `server/utils/anilist-client.ts`. Les variables de requête et les réponses amont
@@ -103,14 +114,17 @@ appliqués et les réponses `429` sont propagées proprement.
 
 ### Quota AniList
 
-Le budget amont est de 28 requêtes par minute et par bucket ; tous les visiteurs
-en profil public partagent le bucket `public`. Trois mesures le préservent :
+Le budget amont est de 28 requêtes par minute et par bucket : un bucket par
+utilisateur connecté, et un bucket `public` partagé par tous les visiteurs non
+connectés. Ces budgets sont stockés à part des buckets de rate limiting par
+visiteur, qui ne peuvent donc pas les évincer. Trois mesures le préservent :
 
 - la liste complète passe par `MediaListCollection` par blocs de 500 entrées :
   une liste de 630 entrées coûte 2 requêtes au lieu de 13 pages de 50 ;
 - les lectures identiques sont servies depuis la mémoire (1 min pour les données
   d'un utilisateur, 10 min pour le catalogue) et les requêtes simultanées
-  identiques sont mutualisées ; une mutation vide ce cache ;
+  identiques sont mutualisées ; les clés étant préfixées par l'identité, une
+  écriture n'invalide que les lectures en cache de l'utilisateur qui écrit ;
 - en développement, les réponses sont enregistrées sur disque et rejouées
   (`NUXT_ANILIST_DEV_CACHE`), sans aucun appel amont après le premier.
 
@@ -152,8 +166,17 @@ profile » et la connexion OAuth l'effacent.
 ### Mesures présentes
 
 - Validation Zod des entrées et réponses AniList sensibles.
-- Rate limits applicatifs sur Calendar, Search et chaque endpoint AniList.
-- Plage Calendar limitée à 42 jours, caches bornés, délais et tentatives bornées.
+- Rate limits applicatifs sur Calendar, Search, chaque endpoint AniList,
+  `/auth/anilist` (20/min) et `/auth/anilist/callback` (10/min), par client.
+- Plage Calendar limitée à 42 jours, caches bornés du handler (sans couche de
+  cache Nitro `swr`), nouvelles tentatives réservées aux erreurs amont
+  transitoires et abandon après 25 secondes.
+- Schémas de requête stricts sur `/api/calendar` et `/api/search` (paramètres
+  inconnus refusés) ; `Cache-Control` public sur les seuls succès, et toute
+  réponse d'erreur d'une route AniList en `private, no-store`.
+- Chemin de retour après connexion validé après normalisation (même site
+  uniquement).
+- Un `401` AniList pour un utilisateur connecté efface le cookie de session.
 - En-têtes CSP, HSTS en production, anti-framing, `nosniff`, politique de
   référent et Permissions Policy.
 - URLs externes validées et liens avec `noopener noreferrer`.
@@ -190,9 +213,23 @@ La suite versionnée couvre notamment :
 - formats et contraintes Create ;
 - navigation, registre de fonctionnalités et SEO.
 
-Playwright vérifie le shell public, le login, Calendar, Tierlist et l'absence
-d'appel GraphQL AniList direct depuis le navigateur. La CI GitHub exécute
-installation figée, lint, typecheck, couverture unitaire, audit, build et E2E.
+Vitest est découpé en deux projets : `unit` (Node, `tests/unit/`, fonctions
+pures et utilitaires serveur) et `nuxt` (`tests/nuxt/`, stores Pinia et
+composables dans un runtime Nuxt via `@nuxt/test-utils`, dont Entries,
+Statistics, Rewind, Calendar, Preferences, Explore et Timeline).
+
+Playwright (Chromium) vérifie le shell public et le login sur mobile, Tierlist
+sans compte (dont le glisser-déposer et l'absence d'appel GraphQL AniList
+direct depuis le navigateur), l'absence de jeton dans la session non
+authentifiée, Create sans import de fichier, le Gantt de la Timeline, les pages
+Dashboard, Statistics, Rewind, Podium et Explore en mode profil public avec
+toutes les réponses d'API simulées dans le navigateur
+(`tests/e2e/fixtures/anilist.ts`), la non-régression du passage d'un profil
+public à un autre sans donnée résiduelle, et les en-têtes de sécurité (CSP de
+production sans `'unsafe-eval'` en mode build). Calendar n'est atteint que par
+un lien depuis le login : son contenu n'a pas de test navigateur. La CI GitHub exécute installation figée, lint, typecheck, couverture
+unitaire, `bun run audit:gate`, build, puis les tests Playwright contre le
+build de production (`bun run test:e2e:build`).
 
 La couverture ne remplace pas une recette avec un vrai compte AniList, un profil
 public conséquent, Directus en panne et plusieurs tailles d'écran.
@@ -213,11 +250,14 @@ public conséquent, Directus en panne et plusieurs tailles d'écran.
 - [x] Titres bien notés par studio
 - [x] Page, navigation, pagination et états complets
 - [x] Pile swipe tactile/souris/clavier et exclusion exhaustive de la liste
+- [x] Ajout à « Planning » avec une session OAuth
 
-Réserve : AniList fournit des recommandations communautaires. Les graines et
-studios reposent sur les 50 entrées de liste détaillées, tandis que les exclusions
-parcourent toute la collection AniList. La sélection « Interested » reste locale
-à la session Explore et ne modifie pas la liste AniList.
+Réserve : AniList fournit des recommandations communautaires. Graines, studios
+et exclusions sont calculés sur la collection complète chargée. La sélection
+« Interested » reste locale à la session Explore ; seul l'ajout explicite à
+« Planning » écrit dans la liste AniList via `POST /api/anilist/media-list`,
+refuse un anime déjà présent, puis marque la liste et les statistiques comme
+périmées pour qu'elles soient rechargées à la visite suivante.
 
 ### Timeline
 
@@ -273,7 +313,8 @@ signale la troncature.
 
 - [x] Story, carré, thumbnail AniList 1200 × 630 et bannière
 - [x] Dimensions et formats d'export
-- [x] Contraintes d'import, confidentialité et responsabilité de licence
+- [x] Images issues d'AniList uniquement (aucun import local), confidentialité
+  et responsabilité de licence
 
 Réserve : outil mono-image, sans calques avancés ni persistance de projet.
 
@@ -311,11 +352,11 @@ Actions encore manuelles :
 - [ ] Remplacer rate limits et caches en mémoire par Redis/KV ou équivalent.
 - [ ] Définir redaction, métriques, alertes et budget de requêtes AniList.
 - [ ] Choisir et valider le runtime Nitro cible.
-- [ ] Réduire les avertissements ESLint par lots.
+- [ ] Réduire les avertissements ESLint par lots (règles de formatage
+  uniquement).
 
 ### P2 — améliorations produit
 
-- [ ] Rendre les graines et studios Explore exhaustifs si l'API et le quota le permettent.
 - [ ] Proposer des périodes People si une source fiable est définie.
 - [ ] Ajouter éventuellement une carte Timeline au Dashboard.
 - [ ] Ajouter sauvegarde de projets et calques à Create si le besoin est validé.
