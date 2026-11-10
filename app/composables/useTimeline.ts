@@ -92,9 +92,13 @@ export function useTimeline() {
 	}
 
 	let activeRequest = 0
+	let activeLoadMoreRequest = 0
 
 	async function load(force = false) {
 		const requestId = ++activeRequest
+		// A reload supersedes any pending "load more" and releases its flag.
+		activeLoadMoreRequest++
+		loadingMore.value = false
 		loading.value = true
 		error.value = null
 
@@ -125,22 +129,22 @@ export function useTimeline() {
 			|| safetyLimitReached.value
 		) return
 
-		const requestId = ++activeRequest
+		const requestId = ++activeLoadMoreRequest
 		loadingMore.value = true
 		error.value = null
 
 		try {
 			const response = await fetchPage(pageInfo.value.currentPage + 1)
-			if (requestId !== activeRequest) return
+			if (requestId !== activeLoadMoreRequest) return
 			mergeActivities(response.activities.filter(
 				(activity): activity is AniListAnimeActivity => activity.kind === "anime"
 			))
 			pageInfo.value = response.pageInfo
 		} catch (caughtError) {
-			if (requestId !== activeRequest) return
+			if (requestId !== activeLoadMoreRequest) return
 			error.value = errorMessage(caughtError)
 		} finally {
-			if (requestId === activeRequest) {
+			if (requestId === activeLoadMoreRequest) {
 				loadingMore.value = false
 			}
 		}
