@@ -241,8 +241,8 @@ testées dans `tests/unit/score-format.test.ts`.
 
 1. Exécuter la checklist manuelle de `docs/DEPLOYMENT.md`.
 2. Remplacer caches et rate limits en mémoire avant le multi-instance.
-3. Réduire progressivement les avertissements ESLint hérités, qui ne portent
-   plus que sur des règles de formatage, sans `--fix` global non relu.
+3. Réduire progressivement les avertissements ESLint hérités, qui portent
+   presque tous sur des règles de formatage ou de style, sans `--fix` global non relu.
 4. Valider l'identité de marque, les cartes sociales et la stratégie i18n.
 5. Surveiller les limites et conditions AniList, puis adapter les échantillons si
    le produit a besoin de statistiques exhaustives.

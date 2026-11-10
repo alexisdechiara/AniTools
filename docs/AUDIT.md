@@ -78,7 +78,8 @@ vide. Rejouer la commande avant chaque livraison, car le registre évolue.
 - `vue-cal` reste une release candidate ; les tests Calendar et une recette
   visuelle sont requis avant chaque mise à jour.
 - Le lint passe sans erreur bloquante mais conserve plusieurs centaines
-  d'avertissements historiques, tous issus de règles de formatage
+  d'avertissements historiques, presque tous issus de règles de formatage ou de
+  style (ordre des classes Tailwind, attributs Vue)
   (`@typescript-eslint/no-explicit-any` et `@typescript-eslint/no-unused-vars`
   sont des erreurs). Ils doivent être réduits par lots relus, sans
   `eslint --fix` global aveugle.
@@ -352,8 +353,8 @@ Actions encore manuelles :
 - [ ] Remplacer rate limits et caches en mémoire par Redis/KV ou équivalent.
 - [ ] Définir redaction, métriques, alertes et budget de requêtes AniList.
 - [ ] Choisir et valider le runtime Nitro cible.
-- [ ] Réduire les avertissements ESLint par lots (règles de formatage
-  uniquement).
+- [ ] Réduire les avertissements ESLint par lots (essentiellement des règles de
+  formatage).
 
 ### P2 — améliorations produit
 
