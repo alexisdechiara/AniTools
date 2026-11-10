@@ -1,5 +1,5 @@
 import { registerEndpoint } from "@nuxt/test-utils/runtime"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useEntriesStore } from "~/stores/Entries"
 import { useUserStore } from "~/stores/User"
 import type {
@@ -60,6 +60,49 @@ function usePublicProfile() {
 	user.id = 1
 	user.username = "alice"
 	user.authMode = "public"
+}
+
+interface Deferred<T> {
+	promise: Promise<T>
+	resolve: (value: T) => void
+}
+
+function deferred<T>(): Deferred<T> {
+	let resolve: (value: T) => void = () => undefined
+	const promise = new Promise<T>((done) => {
+		resolve = done
+	})
+	return { promise, resolve }
+}
+
+function collectionFor(username: string, ids: number[]): AniListAnimeCollectionResponse {
+	return {
+		source: { mode: "public", username },
+		entries: ids.map(entry),
+		truncated: false
+	}
+}
+
+function serveDeferred(pending: Deferred<AniListAnimeCollectionResponse>) {
+	unregister?.()
+	unregister = registerEndpoint(COLLECTION_ENDPOINT, {
+		method: "GET",
+		handler: () => {
+			calls += 1
+			return pending.promise
+		}
+	})
+}
+
+function serveImmediately(response: AniListAnimeCollectionResponse) {
+	unregister?.()
+	unregister = registerEndpoint(COLLECTION_ENDPOINT, {
+		method: "GET",
+		handler: () => {
+			calls += 1
+			return response
+		}
+	})
 }
 
 describe("Entries store", () => {
@@ -133,5 +176,82 @@ describe("Entries store", () => {
 
 		expect(entries.entries).toEqual([])
 		expect(entries.isInitialized).toBe(false)
+	})
+
+	it("drops the previous profile's list as soon as the identity changes", async () => {
+		usePublicProfile()
+		const entries = useEntriesStore()
+		await entries.fetchAllAnimes()
+		expect(entries.entries).toHaveLength(2)
+
+		useUserStore().username = "bob"
+		await nextTick()
+
+		expect(entries.entries).toEqual([])
+		expect(entries.isInitialized).toBe(false)
+	})
+
+	it("drops the list when the profile is forgotten", async () => {
+		usePublicProfile()
+		const entries = useEntriesStore()
+		await entries.fetchAllAnimes()
+
+		useUserStore().$reset()
+		await nextTick()
+
+		expect(entries.entries).toEqual([])
+		expect(entries.isInitialized).toBe(false)
+	})
+
+	it("discards a late response for the previous identity", async () => {
+		const aliceResponse = deferred<AniListAnimeCollectionResponse>()
+		serveDeferred(aliceResponse)
+		usePublicProfile()
+		const entries = useEntriesStore()
+		const aliceLoad = entries.fetchAllAnimes()
+		await vi.waitFor(() => expect(calls).toBe(1))
+
+		useUserStore().username = "bob"
+		serveImmediately(collectionFor("bob", [7, 8, 9]))
+		await entries.fetchAllAnimes()
+		expect(entries.entries.map(item => item.id)).toEqual([7, 8, 9])
+
+		aliceResponse.resolve(collectionFor("alice", [1, 2]))
+		await aliceLoad
+
+		expect(entries.entries.map(item => item.id)).toEqual([7, 8, 9])
+		expect(entries.isInitialized).toBe(true)
+		expect(entries.loading).toBe(false)
+	})
+
+	it("keeps the store empty when it is reset during a request", async () => {
+		const pending = deferred<AniListAnimeCollectionResponse>()
+		serveDeferred(pending)
+		usePublicProfile()
+		const entries = useEntriesStore()
+		const load = entries.fetchAllAnimes()
+		await vi.waitFor(() => expect(calls).toBe(1))
+
+		entries.$reset()
+		pending.resolve(collection)
+		await load
+
+		expect(entries.entries).toEqual([])
+		expect(entries.isInitialized).toBe(false)
+		expect(entries.loading).toBe(false)
+	})
+
+	it("refetches once after invalidate()", async () => {
+		usePublicProfile()
+		const entries = useEntriesStore()
+		await entries.fetchAllAnimes()
+		expect(calls).toBe(1)
+
+		entries.invalidate()
+		await entries.fetchAllAnimes()
+		expect(calls).toBe(2)
+
+		await entries.fetchAllAnimes()
+		expect(calls).toBe(2)
 	})
 })

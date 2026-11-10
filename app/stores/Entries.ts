@@ -30,12 +30,25 @@ export const useEntriesStore = defineStore("Entries", () => {
 	const loading = ref(false)
 	const error = ref<string | null>(null)
 	const loadedIdentity = ref<string | null>(null)
+	const stale = ref(false)
 	let pendingRequest: Promise<AnimeListEntry[]> | null = null
+	let pendingIdentity: string | null = null
+	// Bumped by $reset() and by a request for another identity: a request only writes
+	// the state while the generation it started with is still the current one.
+	let generation = 0
 
 	const identity = computed(() => {
 		if (!user.isAuthenticated || !user.getUsername) return null
 		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
 	})
+
+	// A different identity must never see the previous one's list, even before a refetch.
+	// Synchronous so the reset always lands before a caller can start the next identity's request.
+	watch(identity, (nextIdentity) => {
+		if (loadedIdentity.value !== null && loadedIdentity.value !== nextIdentity) {
+			$reset()
+		}
+	}, { flush: "sync" })
 
 	const lists = computed<AnimeListGroup[]>(() => groupAnimeEntries(entries.value))
 
@@ -45,11 +58,17 @@ export const useEntriesStore = defineStore("Entries", () => {
 			$reset()
 			return []
 		}
-		if (!force && isInitialized.value && loadedIdentity.value === currentIdentity) {
+		if (!force && !stale.value && isInitialized.value && loadedIdentity.value === currentIdentity) {
 			return entries.value
 		}
-		if (pendingRequest) return pendingRequest
+		if (pendingRequest && pendingIdentity === currentIdentity) return pendingRequest
+		if (pendingRequest) {
+			// The running request belongs to another identity: it may no longer write.
+			generation += 1
+		}
 
+		const requestGeneration = generation
+		pendingIdentity = currentIdentity
 		pendingRequest = (async () => {
 			loading.value = true
 			error.value = null
@@ -67,12 +86,17 @@ export const useEntriesStore = defineStore("Entries", () => {
 					query: username ? { username } : undefined
 				})
 
+				if (requestGeneration !== generation) return entries.value
+
 				source.value = collected.source
 				entries.value = collected.entries
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = true
+				stale.value = false
 				return entries.value
 			} catch (caughtError) {
+				if (requestGeneration !== generation) throw caughtError
+
 				entries.value = []
 				source.value = null
 				loadedIdentity.value = currentIdentity
@@ -80,12 +104,19 @@ export const useEntriesStore = defineStore("Entries", () => {
 				error.value = getApiErrorMessage(caughtError, "Unable to load the AniList anime list.")
 				throw caughtError
 			} finally {
-				loading.value = false
-				pendingRequest = null
+				if (requestGeneration === generation) {
+					loading.value = false
+					pendingRequest = null
+					pendingIdentity = null
+				}
 			}
 		})()
 
 		return pendingRequest
+	}
+
+	function invalidate() {
+		stale.value = true
 	}
 
 	const getNextAiringAnimesEpisodes = computed(() =>
@@ -139,7 +170,10 @@ export const useEntriesStore = defineStore("Entries", () => {
 		loading.value = false
 		error.value = null
 		loadedIdentity.value = null
+		stale.value = false
 		pendingRequest = null
+		pendingIdentity = null
+		generation += 1
 	}
 
 	return {
@@ -150,6 +184,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 		loading,
 		error,
 		fetchAllAnimes,
+		invalidate,
 		getAllAnimes,
 		getNextAiringAnimesEpisodes,
 		getAnimesByStatus,
