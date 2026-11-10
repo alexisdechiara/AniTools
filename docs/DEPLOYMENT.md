@@ -146,17 +146,21 @@ exclusivement Bun :
 
 ```bash
 bun install --frozen-lockfile
-bun run lint
-bun run typecheck
-bun run test:unit
-bun run test:e2e
-bun audit
-bun run build
+bun run check          # lint, typecheck, tests unitaires puis build
+bun run test:e2e:build # build puis Playwright contre le serveur de production
+bun run audit:gate
 ```
 
-Le preset Nitro actuel produit cependant `.output/server/index.mjs` pour
+Node.js `>=22.19.0` reste néanmoins requis partout, développement et tests
+navigateur compris : la CLI Nuxt s'exécute sur Node même lancée via Bun, et
+`bun run dev` échoue au démarrage sous Node 22.13 (`nuxt-site-config` 5). Le
+preset Nitro actuel produit en outre `.output/server/index.mjs` pour
 `node-server`. La cible de production doit donc fournir Node.js `>=22.19.0` pour
 exécuter cet artefact, même si Bun reste le gestionnaire du projet.
+
+La CI n'installe pas Node explicitement : les tests navigateur en mode build
+démarrent `node .output/server/index.mjs` avec le Node du runner GitHub, dont la
+version (`>=22.19.0`) est à vérifier lors de la première exécution.
 
 - [ ] Épingler Node.js `>=22.19.0` sur l'hébergeur.
 - [ ] Conserver Bun `>=1.3.5` pour installation et build.
@@ -170,10 +174,12 @@ le garantit pas.
 
 ## 7. Préparer le multi-instance ou le serverless
 
-Aujourd'hui, les caches Calendar, le cache des lectures AniList
-(`server/utils/anilist-request-cache.ts` : 1 min pour les données d'un
-utilisateur, 10 min pour le catalogue, requêtes identiques mutualisées) et les
-buckets de rate limiting vivent dans la mémoire du processus. Ils conviennent à une recette ou à une instance unique,
+Aujourd'hui, les caches Calendar du handler, le cache des lectures AniList
+(`server/utils/anilist-request-cache.ts` : clés préfixées par l'identité, 1 min
+pour les données d'un utilisateur, 10 min pour le catalogue, requêtes identiques
+mutualisées), les buckets de rate limiting par visiteur et le stockage séparé
+des budgets amont AniList vivent dans la mémoire du processus. Aucune couche de
+cache Nitro (`swr`) n'est utilisée. Ils conviennent à une recette ou à une instance unique,
 mais chaque instance possède ses propres compteurs et son propre cache.
 
 Avant plusieurs réplicas, autoscaling ou fonctions serverless :
@@ -210,8 +216,10 @@ juste avant la mise en ligne ; elles peuvent évoluer.
   l'accord AniList avant de dépasser ce cadre.
 - [ ] Prévoir un contact et une procédure de retrait si AniList demande une
   modification d'usage.
-- [ ] Ne lancer une future mutation qu'après confirmation utilisateur explicite
-  et via une opération serveur autorisée.
+- [ ] N'écrire dans AniList qu'après une action utilisateur explicite et via une
+  opération serveur fixe et autorisée. L'unique mutation actuelle (ajout à
+  « Planning » depuis Explore) refuse d'écraser une entrée déjà présente ;
+  toute mutation future doit suivre les mêmes règles.
 
 ## 9. Finaliser marque, contenu et i18n
 
@@ -231,9 +239,10 @@ juste avant la mise en ligne ; elles peuvent évoluer.
 ## 10. Recette avant ouverture
 
 - [ ] `bun install --frozen-lockfile` réussit sur un environnement vierge.
-- [ ] Lint, typecheck, tests unitaires, E2E, audit et build sont verts.
+- [ ] `bun run check` et `bun run test:e2e:build` sont verts.
 - [ ] Aucun lockfile autre que `bun.lock` n'est présent.
-- [ ] `bun audit` ne signale aucune vulnérabilité connue non acceptée.
+- [ ] `bun run audit:gate` passe : aucune alerte haute ou critique hors de
+  `scripts/audit-allowlist.json`.
 - [ ] OAuth fonctionne avec un vrai compte, puis logout invalide la session.
 - [ ] Le mode profil public fonctionne sans autorisation OAuth.
 - [ ] `/calendar`, `/tierlist`, `/create`, `/settings` et `/support` fonctionnent
