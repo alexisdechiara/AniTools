@@ -1,5 +1,4 @@
 import { defineStore } from "pinia"
-import { getTime } from "date-fns"
 import type { DropdownMenuItem } from "@nuxt/ui"
 import {
 	getCalendarViewRange,
@@ -33,8 +32,8 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	const calendarRange = getCalendarRange()
 
 	const dateRange = reactive<{ start: Date, end: Date }>({ start: new Date(calendarRange.start), end: new Date(calendarRange.end) })
-	const airingAtGreater = computed(() => Math.floor(getTime(dateRange.start) / 1000))
-	const airingAtLesser = computed(() => Math.floor(getTime(dateRange.end) / 1000))
+	const airingAtGreater = computed(() => Math.floor(dateRange.start.getTime() / 1000))
+	const airingAtLesser = computed(() => Math.floor(dateRange.end.getTime() / 1000))
 
 	// ========== Filtres ==========
 	const currentFormat = ref<string[]>(["TV", "ONA", "MOVIE"])

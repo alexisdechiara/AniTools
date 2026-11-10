@@ -53,7 +53,6 @@ export default defineNuxtConfig({
 				"@vue/devtools-core",
 				"@unovis/ts",
 				"@unovis/vue",
-				"date-fns",
 				"grid-layout-plus",
 				"vue-cal",
 				"vue-draggable-plus",
