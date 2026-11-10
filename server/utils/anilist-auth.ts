@@ -173,11 +173,14 @@ function requireAuthConfig(event: H3Event): AniListAuthConfig {
 				&& "NUXT_SESSION_PREVIOUS_PASSWORD (32+ characters when set)"
 		].filter(Boolean)
 
-		throw createError({
-			statusCode: 503,
-			statusMessage: `AniList authentication is not configured correctly: ${
+		console.error(
+			`[auth] AniList authentication is not configured correctly: ${
 				missing.length ? missing.join(", ") : "invalid OAuth configuration"
 			}`
+		)
+		throw createError({
+			statusCode: 503,
+			statusMessage: "AniList authentication is not available"
 		})
 	}
 

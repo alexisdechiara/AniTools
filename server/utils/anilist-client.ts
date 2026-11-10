@@ -45,7 +45,7 @@ import {
 	type AniListStatistics,
 	type AniListStatisticsResponse
 } from "~~/shared/types/anilist"
-import { checkRateLimit } from "~~/server/utils/rate-limit"
+import { checkUpstreamBudget } from "~~/server/utils/rate-limit"
 
 const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co"
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -1238,7 +1238,7 @@ function enforceUpstreamBudget(access: AniListAccess | null) {
 	const key = access?.mode === "oauth"
 		? `oauth-user:${access.userId}`
 		: "public"
-	const result = checkRateLimit(key, {
+	const result = checkUpstreamBudget(key, {
 		namespace: "anilist-upstream",
 		limit: UPSTREAM_REQUEST_LIMIT,
 		windowMs: UPSTREAM_REQUEST_WINDOW_MS
