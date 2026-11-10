@@ -55,13 +55,13 @@
 		"@nuxt/eslint": "^1.17.0",
 		"@nuxt/test-utils": "^4.4.0",
 		"@playwright/test": "^1.65.0",
-		"@vitest/coverage-istanbul": "^4.1.12",
+		"@vitest/coverage-istanbul": "^5.1.0",
 		"@vue/test-utils": "^2.5.1",
 		"eslint": "^10.14.0",
 		"eslint-plugin-tailwindcss": "^4.4.0",
 		"happy-dom": "^21.0.4",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.12",
+		"vitest": "^5.1.0",
 		"vue-tsc": "^3.3.14"
 	},
 	"overrides": {
