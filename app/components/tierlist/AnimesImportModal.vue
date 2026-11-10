@@ -160,7 +160,7 @@
 				variant="solid"
 				color="primary"
 				icon="i-lucide-log-in"
-				:to="{ path: '/login', query: { redirect: router.currentRoute.value.fullPath } }" />
+				:to="loginTarget" />
 		</template>
 	</UModal>
 
@@ -206,7 +206,8 @@ const modalCloseFunction = ref<(() => void) | null>(null)
 const tierlistStore = useTierlistStore()
 const entriesStore = useEntriesStore()
 const userStore = useUserStore()
-const router = useRouter()
+const route = useRoute()
+const loginTarget = computed(() => ({ path: "/login", query: { redirect: route.fullPath } }))
 const toast = useToast()
 const {
 	isInitialized,
