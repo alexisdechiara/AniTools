@@ -211,13 +211,14 @@ doit rester couverte par un contrôle visuel lors d'une évolution du rendu.
 - [x] Création d'images carrées (1080 × 1080)
 - [x] Création de thumbnails AniList (1200 × 630)
 - [x] Création de bannières (1500 × 500)
-- [x] Gabarits, formats PNG/JPEG/WebP, règles d'import et confidentialité définis
+- [x] Gabarits, formats PNG/JPEG/WebP et confidentialité définis (images AniList
+  uniquement, aucun import local)
 - [x] Carte anime avec badge de score personnel, note et genres
 - [x] Carte de statistiques AniList avec états vide, chargement et erreur
 
 Limites : studio mono-image sans sauvegarde de projet ; rendu exclusivement
 local via Canvas. L'utilisateur reste responsable des licences des images
-importées. Voir `docs/CREATE.md`.
+qu'il exporte. Voir `docs/CREATE.md`.
 
 ### Podium
 
