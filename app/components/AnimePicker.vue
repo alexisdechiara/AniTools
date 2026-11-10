@@ -83,26 +83,34 @@ const animeUrl = computed(() => activeMedia.value?.siteUrl
 	?? (activeMedia.value ? `https://anilist.co/anime/${activeMedia.value.id}` : null)
 )
 
+let searchRequest = 0
+
 const runSearch = useDebounceFn(async () => {
 	const query = searchTerm.value.trim()
 	if (query.length < 2) {
+		// Supersede any pending request so it cannot repopulate the cleared field.
+		searchRequest++
 		searchResults.value = []
 		error.value = null
+		loadingSearch.value = false
 		return
 	}
 
+	const requestId = ++searchRequest
 	loadingSearch.value = true
 	error.value = null
 	try {
 		const response = await $fetch<AniListSearchResponse>("/api/search", {
 			query: { q: query }
 		})
+		if (requestId !== searchRequest) return
 		searchResults.value = response.result.predictions
 	} catch {
+		if (requestId !== searchRequest) return
 		searchResults.value = []
 		error.value = "AniList search is unavailable. Try again in a moment."
 	} finally {
-		loadingSearch.value = false
+		if (requestId === searchRequest) loadingSearch.value = false
 	}
 }, 400)
 
