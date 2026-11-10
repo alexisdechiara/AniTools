@@ -101,7 +101,7 @@ export function useExplore() {
 			recommendationPageInfo.value = response.pageInfo
 		} catch (error) {
 			if (requestId !== recommendationRequest) return
-			recommendations.value = []
+			if (page === 1) recommendations.value = []
 			recommendationError.value = errorMessage(
 				error,
 				"Unable to load AniList recommendations."
@@ -145,7 +145,7 @@ export function useExplore() {
 			studioPageInfo.value = response.pageInfo
 		} catch (error) {
 			if (requestId !== studioRequest) return
-			studioMedia.value = []
+			if (page === 1) studioMedia.value = []
 			studioError.value = errorMessage(
 				error,
 				"Unable to load this studio catalogue."
