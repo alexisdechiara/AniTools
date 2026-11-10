@@ -31,6 +31,16 @@ describe("parseCalendarQuery", () => {
 		expect(result.airingAtLesser - result.airingAtGreater).toBeGreaterThan(42 * day)
 	})
 
+	it("rejects a valid query with an unknown key", () => {
+		expect(() => parseCalendarQuery({
+			airingAtGreater: "1785283200",
+			airingAtLesser: String(1785283200 + (7 * day)),
+			rangeStart: "2026-07-29T00:00:00.000Z",
+			rangeEnd: "2026-08-05T00:00:00.000Z",
+			cacheBust: "1"
+		})).toThrow()
+	})
+
 	it.each([
 		{
 			airingAtGreater: "100",
@@ -78,5 +88,9 @@ describe("parseSearchQuery", () => {
 
 	it("rejects unbounded input", () => {
 		expect(() => parseSearchQuery({ q: "a".repeat(101) })).toThrow()
+	})
+
+	it("rejects an unknown key", () => {
+		expect(() => parseSearchQuery({ q: "frieren", extra: "1" })).toThrow()
 	})
 })

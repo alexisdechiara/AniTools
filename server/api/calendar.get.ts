@@ -13,6 +13,7 @@ import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseCalendarQuery } from "~~/server/utils/request-validation"
 import { withTimeout } from "~~/server/utils/with-timeout"
 import {
+	isRetryableAniListError,
 	parseSimuldubItems,
 	type ValidatedSimuldubItem
 } from "~~/server/utils/calendar-data"
@@ -24,6 +25,7 @@ const MAX_ANILIST_PAGES = 24
 const MAX_MISSING_MEDIA_IDS = 100
 const MEDIA_BATCH_SIZE = 50
 const MAX_RETRIES = 3
+const AIRING_DEADLINE_MS = 25_000
 const DEFAULT_DIRECTUS_URL = "https://api.anitools.geekly.blog"
 
 const airingCache = new Map<string, { data: AniListAiringSchedule[], expiresAt: number }>()
@@ -75,8 +77,16 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 	let hasNextPage = true
 	let page = 1
 	let retryCount = 0
+	const startedAt = Date.now()
 
 	while (hasNextPage && page <= MAX_ANILIST_PAGES && retryCount < MAX_RETRIES) {
+		if (Date.now() - startedAt > AIRING_DEADLINE_MS) {
+			throw createError({
+				statusCode: 504,
+				statusMessage: "AniList calendar took too long"
+			})
+		}
+
 		try {
 			const response = await getAniListAiringSchedulesPage(
 				{
@@ -93,7 +103,7 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 			page++
 			retryCount = 0
 		} catch (error) {
-			if (isError(error) && error.statusCode === 429) {
+			if (!isRetryableAniListError(error)) {
 				throw error
 			}
 
@@ -226,6 +236,7 @@ export default defineEventHandler(async (event) => {
 	])
 
 	if (airingResult.status === "rejected") {
+		setResponseHeader(event, "Cache-Control", "private, no-store")
 		forwardAniListRateLimit(event, airingResult.reason)
 		if (isError(airingResult.reason) && airingResult.reason.statusCode === 504) {
 			throw airingResult.reason
@@ -245,9 +256,6 @@ export default defineEventHandler(async (event) => {
 		airingResult.value,
 		simuldubs
 	)
-	for (const error of missingMediaResult.errors) {
-		forwardAniListRateLimit(event, error)
-	}
 
 	const warnings = [
 		...(simuldubResult.status === "rejected"
@@ -261,6 +269,7 @@ export default defineEventHandler(async (event) => {
 			: [])
 	]
 
+	setResponseHeader(event, "Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300")
 	return {
 		airingSchedules: airingResult.value,
 		simuldubs,

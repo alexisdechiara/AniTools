@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
 	InvalidCalendarUpstreamResponse,
+	isRetryableAniListError,
 	parseSimuldubItems
 } from "../../server/utils/calendar-data"
 
@@ -43,5 +44,25 @@ describe("parseSimuldubItems", () => {
 			...validRecord,
 			end_date: "2026-07-29T17:00:00.000Z"
 		}])).toThrow(InvalidCalendarUpstreamResponse)
+	})
+})
+
+describe("isRetryableAniListError", () => {
+	it.each([
+		"ANILIST_TIMEOUT",
+		"ANILIST_UNAVAILABLE",
+		"ANILIST_UPSTREAM_ERROR"
+	])("retries a transient upstream failure (%s)", (code) => {
+		expect(isRetryableAniListError({ data: { code } })).toBe(true)
+	})
+
+	it.each([
+		{ data: { code: "ANILIST_INVALID_DATA" } },
+		{ data: { code: "ANILIST_RATE_LIMITED" } },
+		new Error("boom"),
+		null,
+		"ANILIST_TIMEOUT"
+	])("does not retry %o", (error) => {
+		expect(isRetryableAniListError(error)).toBe(false)
 	})
 })

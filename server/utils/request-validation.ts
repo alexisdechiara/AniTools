@@ -11,7 +11,7 @@ const calendarQuerySchema = z.object({
 	airingAtLesser: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
 	rangeStart: z.string().datetime({ offset: true }),
 	rangeEnd: z.string().datetime({ offset: true })
-}).superRefine((query, context) => {
+}).strict().superRefine((query, context) => {
 	if (query.airingAtLesser <= query.airingAtGreater) {
 		context.addIssue({
 			code: "custom",
@@ -86,7 +86,7 @@ const calendarQuerySchema = z.object({
 
 const searchQuerySchema = z.object({
 	q: z.string().trim().max(MAX_SEARCH_LENGTH).optional().default("")
-})
+}).strict()
 
 function invalidQuery(message: string) {
 	return createError({

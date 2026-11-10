@@ -5,6 +5,8 @@ import {
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseSearchQuery } from "~~/server/utils/request-validation"
 
+const SUCCESS_CACHE_CONTROL = "public, max-age=60, s-maxage=300, stale-while-revalidate=600"
+
 export default defineEventHandler(async (event) => {
 	enforceRateLimit(event, {
 		namespace: "search",
@@ -15,6 +17,7 @@ export default defineEventHandler(async (event) => {
 	const { q: rawSearch } = parseSearchQuery(getQuery(event))
 
 	if (!rawSearch) {
+		setResponseHeader(event, "Cache-Control", SUCCESS_CACHE_CONTROL)
 		return {
 			result: {
 				predictions: []
@@ -23,9 +26,11 @@ export default defineEventHandler(async (event) => {
 	}
 
 	try {
-		return await getAniListSearchResponse(rawSearch, {
+		const response = await getAniListSearchResponse(rawSearch, {
 			timeoutMs: 8_000
 		})
+		setResponseHeader(event, "Cache-Control", SUCCESS_CACHE_CONTROL)
+		return response
 	} catch (error) {
 		await handleAniListRouteError(event, error)
 		throw error

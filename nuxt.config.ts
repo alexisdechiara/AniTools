@@ -114,18 +114,6 @@ export default defineNuxtConfig({
 		"/**": {
 			headers: securityHeaders
 		},
-		"/api/calendar": {
-			swr: 60,
-			headers: {
-				"Cache-Control": "public, s-maxage=60, stale-while-revalidate=300"
-			}
-		},
-		"/api/search": {
-			swr: 300,
-			headers: {
-				"Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
-			}
-		},
 		"/api/auth/**": {
 			headers: {
 				"Cache-Control": "private, no-store"
