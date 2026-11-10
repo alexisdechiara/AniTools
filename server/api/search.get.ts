@@ -1,7 +1,7 @@
 import {
-	forwardAniListRateLimit,
-	getAniListSearchResponse
-} from "~~/server/utils/anilist-client"
+	getAniListSearchResponse,
+	handleAniListRouteError
+}from "~~/server/utils/anilist-client"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseSearchQuery } from "~~/server/utils/request-validation"
 
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
 			timeoutMs: 8_000
 		})
 	} catch (error) {
-		forwardAniListRateLimit(event, error)
+		await handleAniListRouteError(event, error)
 		throw error
 	}
 })

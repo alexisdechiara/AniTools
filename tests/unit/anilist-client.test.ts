@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest"
+import { IncomingMessage, ServerResponse } from "node:http"
+import { Socket } from "node:net"
+import { createError, createEvent } from "h3"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
 	ANILIST_ALLOWED_OPERATIONS,
 	fetchAniListProfile,
@@ -11,13 +14,15 @@ import {
 	getAniListMediaResponse,
 	getAniListSearchResponse,
 	getAniListStatisticsResponse,
+	handleAniListRouteError,
 	parseAniListActivitiesQuery,
 	parseAniListAnimeListQuery,
 	parseAniListMediaQuery,
 	parseAniListProfileQuery,
 	parseAniListSaveMediaListEntryBody,
 	resolveAniListAccess,
-	saveAniListMediaListEntry
+	saveAniListMediaListEntry,
+	setAniListResponseCache
 } from "../../server/utils/anilist-client"
 
 const publicAccess = {
@@ -382,7 +387,8 @@ describe("AniList allowlisted client", () => {
 		expect(body.variables).toEqual({
 			page: 2,
 			perPage: 50,
-			airingAtGreater: 1_799_000_000,
+			// AniList's bound is exclusive, so the inclusive range start is sent one second earlier.
+			airingAtGreater: 1_798_999_999,
 			airingAtLesser: 1_801_000_000
 		})
 		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
@@ -912,5 +918,138 @@ describe("AniList allowlisted client", () => {
 				code: "ANILIST_INVALID_DATA"
 			}
 		})
+	})
+})
+
+function createTestEvent() {
+	const request = new IncomingMessage(new Socket())
+	const response = new ServerResponse(request)
+	return { event: createEvent(request, response), response }
+}
+
+describe("AniList upstream error paths", () => {
+	afterEach(() => {
+		vi.useRealTimers()
+		vi.unstubAllGlobals()
+	})
+
+	it("keeps the meaning of a non-JSON 429 from AniList's edge", async () => {
+		const requester = fetchMock(async () => new Response("<html>slow down</html>", {
+			status: 429,
+			headers: { "retry-after": "17" }
+		}))
+
+		await expect(fetchAniListProfile(publicAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 429,
+			data: {
+				code: "ANILIST_RATE_LIMITED",
+				retryAfter: 17
+			}
+		})
+	})
+
+	it("maps an empty 401 to an unauthorized error", async () => {
+		const requester = fetchMock(async () => new Response("", { status: 401 }))
+
+		await expect(fetchAniListProfile(oauthAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 401,
+			data: {
+				code: "ANILIST_UNAUTHORIZED"
+			}
+		})
+	})
+
+	it("keeps the timeout armed while a stalled body is read", async () => {
+		const requester = fetchMock(async (_url, request) => ({
+			status: 200,
+			ok: true,
+			headers: new Headers(),
+			json: () => new Promise((_resolve, reject) => {
+				request?.signal?.addEventListener("abort", () => {
+					reject(new DOMException("Aborted", "AbortError"))
+				})
+			})
+		}) as unknown as Response)
+
+		await expect(fetchAniListProfile(oauthAccess, {
+			fetch: requester,
+			timeoutMs: 20
+		})).rejects.toMatchObject({
+			statusCode: 504,
+			data: {
+				code: "ANILIST_TIMEOUT"
+			}
+		})
+	})
+
+	it("reads the clock when the activities year bound is checked", () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date("2027-01-02T00:00:00Z"))
+
+		expect(parseAniListActivitiesQuery({ year: "2027" })).toMatchObject({ year: 2027 })
+		expect(() => parseAniListActivitiesQuery({ year: "2028" })).toThrow()
+	})
+
+	it("sends an inclusive airing range start to AniList", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Page: {
+					pageInfo: { hasNextPage: false },
+					airingSchedules: []
+				}
+			}
+		}))
+
+		await getAniListAiringSchedulesPage({
+			page: 1,
+			perPage: 50,
+			airingAtGreater: 1000,
+			airingAtLesser: 2000
+		}, { fetch: requester })
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			variables: Record<string, unknown>
+		}
+		expect(body.variables.airingAtGreater).toBe(999)
+		expect(body.variables.airingAtLesser).toBe(2000)
+	})
+
+	it("drops the public cache header and forwards Retry-After on a route error", async () => {
+		const { event, response } = createTestEvent()
+		setAniListResponseCache(event, "public", 300)
+		const error429 = createError({
+			statusCode: 429,
+			statusMessage: "AniList rate limit reached",
+			data: { code: "ANILIST_RATE_LIMITED", retryAfter: 17 }
+		})
+
+		await handleAniListRouteError(event, error429)
+
+		expect(response.getHeader("cache-control")).toBe("private, no-store")
+		expect(response.getHeader("retry-after")).toBe(17)
+	})
+
+	it("clears the session only when AniList rejects an OAuth token", async () => {
+		const deleteCookieMock = vi.fn()
+		vi.stubGlobal("deleteCookie", deleteCookieMock)
+		vi.stubGlobal("getRequestURL", vi.fn(() => new URL("https://anitools.example/api/anilist/profile")))
+		const unauthorized = createError({
+			statusCode: 401,
+			statusMessage: "AniList authorization is no longer valid",
+			data: { code: "ANILIST_UNAUTHORIZED" }
+		})
+
+		await handleAniListRouteError(createTestEvent().event, unauthorized, publicAccess)
+		expect(deleteCookieMock).not.toHaveBeenCalled()
+
+		const { event, response } = createTestEvent()
+		await handleAniListRouteError(event, unauthorized, oauthAccess)
+		expect(deleteCookieMock).toHaveBeenCalled()
+		expect(response.getHeader("cache-control")).toBe("private, no-store")
 	})
 })

@@ -572,7 +572,9 @@ const activitiesQuerySchema = z.object({
 	page: pageSchema,
 	perPage: activityPageSizeSchema,
 	kind: z.enum(ANILIST_ACTIVITY_KINDS).default("anime"),
-	year: z.coerce.number().int().min(2000).max(new Date().getUTCFullYear()).optional(),
+	year: z.coerce.number().int().min(2000)
+		.refine(year => year <= new Date().getUTCFullYear(), "year cannot be in the future")
+		.optional(),
 	from: activityTimestampSchema.optional(),
 	to: activityTimestampSchema.optional()
 }).strict().superRefine((query, context) => {
@@ -1117,6 +1119,27 @@ export function forwardAniListRateLimit(event: H3Event, error: unknown) {
 	}
 }
 
+/**
+ * Error path shared by every AniList route. A failure must never keep the public cache
+ * header set for the success path, and a rejected token means the session is dead.
+ */
+export async function handleAniListRouteError(
+	event: H3Event,
+	error: unknown,
+	access?: AniListAccess | null
+) {
+	setResponseHeader(event, "Cache-Control", "private, no-store")
+	forwardAniListRateLimit(event, error)
+
+	const code = isError(error) && typeof error.data === "object" && error.data !== null
+		? (error.data as Record<string, unknown>).code
+		: undefined
+	if (code === "ANILIST_UNAUTHORIZED" && access?.mode === "oauth") {
+		const { clearAniListSession } = await import("~~/server/utils/anilist-auth")
+		clearAniListSession(event)
+	}
+}
+
 function sourceFromAccess(access: AniListAccess): AniListSource {
 	return {
 		mode: access.mode,
@@ -1293,72 +1316,84 @@ async function requestAniListUpstream<T>(
 	const controller = new AbortController()
 	const timeout = setTimeout(() => controller.abort(), timeoutMs)
 	let response: Response
+	let payload: unknown
 
+	// One timeout covers both the headers and the body: a stalled body must not hang the request.
 	try {
-		response = await fetcher(ANILIST_GRAPHQL_URL, {
-			method: "POST",
-			headers: {
-				Accept: "application/json",
-				"Content-Type": "application/json",
-				...(validatedAccess?.mode === "oauth"
-					? { Authorization: `Bearer ${validatedAccess.accessToken}` }
-					: {})
-			},
-			body: JSON.stringify({
-				query,
-				variables
-			}),
-			signal: controller.signal
-		})
-	} catch (error) {
-		if (controller.signal.aborted) {
+		try {
+			response = await fetcher(ANILIST_GRAPHQL_URL, {
+				method: "POST",
+				headers: {
+					Accept: "application/json",
+					"Content-Type": "application/json",
+					...(validatedAccess?.mode === "oauth"
+						? { Authorization: `Bearer ${validatedAccess.accessToken}` }
+						: {})
+				},
+				body: JSON.stringify({
+					query,
+					variables
+				}),
+				signal: controller.signal
+			})
+		} catch (error) {
+			if (controller.signal.aborted) {
+				throw upstreamError(
+					504,
+					"AniList request timed out",
+					"ANILIST_TIMEOUT"
+				)
+			}
+
+			throw createError({
+				statusCode: 502,
+				statusMessage: "Unable to reach AniList",
+				data: { code: "ANILIST_UNAVAILABLE" },
+				cause: error
+			})
+		}
+
+		// Checked before the body is parsed: AniList's edge can answer these with HTML or nothing.
+		if (response.status === 429) {
 			throw upstreamError(
-				504,
-				"AniList request timed out",
-				"ANILIST_TIMEOUT"
+				429,
+				"AniList rate limit reached",
+				"ANILIST_RATE_LIMITED",
+				{ retryAfter: getRetryAfter(response) }
 			)
 		}
 
-		throw createError({
-			statusCode: 502,
-			statusMessage: "Unable to reach AniList",
-			data: { code: "ANILIST_UNAVAILABLE" },
-			cause: error
-		})
+		if (response.status === 401 || response.status === 403) {
+			throw upstreamError(
+				401,
+				"AniList authorization is no longer valid",
+				"ANILIST_UNAUTHORIZED"
+			)
+		}
+
+		try {
+			payload = await response.json()
+		} catch (error) {
+			if (controller.signal.aborted) {
+				throw upstreamError(
+					504,
+					"AniList request timed out",
+					"ANILIST_TIMEOUT"
+				)
+			}
+
+			throw createError({
+				statusCode: 502,
+				statusMessage: "AniList returned an invalid response",
+				data: { code: "ANILIST_INVALID_RESPONSE" },
+				cause: error
+			})
+		}
 	} finally {
 		clearTimeout(timeout)
 	}
 
-	let payload: unknown
-	try {
-		payload = await response.json()
-	} catch (error) {
-		throw createError({
-			statusCode: 502,
-			statusMessage: "AniList returned an invalid response",
-			data: { code: "ANILIST_INVALID_RESPONSE" },
-			cause: error
-		})
-	}
-
 	const envelope = graphQLResponseSchema.safeParse(payload)
-
-	if (response.status === 429) {
-		throw upstreamError(
-			429,
-			"AniList rate limit reached",
-			"ANILIST_RATE_LIMITED",
-			{ retryAfter: getRetryAfter(response) }
-		)
-	}
-
-	if (response.status === 401 || response.status === 403) {
-		throw upstreamError(
-			401,
-			"AniList authorization is no longer valid",
-			"ANILIST_UNAUTHORIZED"
-		)
-	}
 
 	// AniList answers non-2xx codes (404 for unknown users, for one) with a valid
 	// GraphQL error envelope, so let those reach the mapping below.
@@ -1550,7 +1585,11 @@ export async function getAniListAiringSchedulesPage(
 	const validatedQuery = airingSchedulesQuerySchema.parse(query)
 	const data = await requestAniList(
 		AIRING_SCHEDULES_QUERY,
-		validatedQuery,
+		{
+			...validatedQuery,
+			// AniList's airingAt_greater is exclusive; the calendar range start is inclusive.
+			airingAtGreater: Math.max(0, validatedQuery.airingAtGreater - 1)
+		},
 		z.object({
 			Page: z.object({
 				pageInfo: z.object({

@@ -1,7 +1,7 @@
 import { assertSameOriginRequest } from "~~/server/utils/anilist-auth"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
-	forwardAniListRateLimit,
+	handleAniListRouteError,
 	parseAniListSaveMediaListEntryBody,
 	resolveAniListAccess,
 	saveAniListMediaListEntry,
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
 	try {
 		return await saveAniListMediaListEntry(access, body)
 	} catch (error) {
-		forwardAniListRateLimit(event, error)
+		await handleAniListRouteError(event, error, access)
 		throw error
 	}
 })
