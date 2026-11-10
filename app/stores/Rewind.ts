@@ -31,11 +31,20 @@ export const useRewindStore = defineStore("Rewind", () => {
 	const cache = new Map<string, RewindCacheEntry>()
 	let pendingRequest: Promise<boolean> | null = null
 	let pendingKey: string | null = null
+	// Bumped by $reset() and by every new request: only the newest request may write the
+	// state, so a slow older year can never overwrite the year selected after it.
+	let generation = 0
 
 	const identity = computed(() => {
 		if (!user.isAuthenticated || !user.getUsername) return null
 		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
 	})
+
+	// A different identity must never see the previous one's Rewind, even before a refetch.
+	// Synchronous so the reset always lands before a caller can start the next identity's request.
+	watch(identity, () => {
+		$reset()
+	}, { flush: "sync" })
 
 	function applyResult(
 		cacheKey: string,
@@ -66,6 +75,7 @@ export const useRewindStore = defineStore("Rewind", () => {
 		if (!force) {
 			const cached = cache.get(cacheKey)
 			if (cached) {
+				supersedePendingRequest()
 				applyResult(cacheKey, normalizedYear, cached)
 				return true
 			}
@@ -73,6 +83,8 @@ export const useRewindStore = defineStore("Rewind", () => {
 			if (pendingRequest && pendingKey === cacheKey) return pendingRequest
 		}
 
+		generation += 1
+		const requestGeneration = generation
 		pendingKey = cacheKey
 		pendingRequest = (async () => {
 			loading.value = true
@@ -98,10 +110,15 @@ export const useRewindStore = defineStore("Rewind", () => {
 					truncated: result.truncated
 				}
 
+				// The cache is keyed by identity and year, so a superseded result is still safe to keep.
 				cache.set(cacheKey, cachedResult)
+				if (requestGeneration !== generation) return true
+
 				applyResult(cacheKey, normalizedYear, cachedResult)
 				return true
 			} catch (caughtError) {
+				if (requestGeneration !== generation) return false
+
 				activities.value = []
 				source.value = null
 				truncated.value = false
@@ -110,13 +127,25 @@ export const useRewindStore = defineStore("Rewind", () => {
 				error.value = getApiErrorMessage(caughtError, "Unable to load this AniList Rewind.")
 				return false
 			} finally {
-				loading.value = false
-				pendingRequest = null
-				pendingKey = null
+				if (requestGeneration === generation) {
+					loading.value = false
+					pendingRequest = null
+					pendingKey = null
+				}
 			}
 		})()
 
 		return pendingRequest
+	}
+
+	// A year answered from the cache is newer than any request still running: that request
+	// may no longer write, and the store is no longer loading.
+	function supersedePendingRequest() {
+		if (!pendingRequest) return
+		generation += 1
+		loading.value = false
+		pendingRequest = null
+		pendingKey = null
 	}
 
 	function $reset() {
@@ -130,6 +159,7 @@ export const useRewindStore = defineStore("Rewind", () => {
 		cache.clear()
 		pendingRequest = null
 		pendingKey = null
+		generation += 1
 	}
 
 	return {
