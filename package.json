@@ -39,7 +39,7 @@
 		"@pinia/nuxt": "^1.0.3",
 		"@unovis/ts": "^1.8.0",
 		"@unovis/vue": "^1.8.0",
-		"@vueuse/nuxt": "^14.4.0",
+		"@vueuse/nuxt": "^15.0.0",
 		"grid-layout-plus": "^1.1.1",
 		"nuxt": "^4.6.4",
 		"nuxt-site-config": "^5.0.3",
