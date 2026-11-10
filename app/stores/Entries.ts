@@ -12,8 +12,6 @@ import {
 
 export type AnimeListEntry = AniListAnimeListEntry
 
-export type AnimesType = AnimeListGroup[]
-
 function take<T>(items: T[], limit?: number): T[] {
 	return limit === undefined ? items : items.slice(0, Math.max(0, limit))
 }
