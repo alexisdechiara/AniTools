@@ -42,8 +42,9 @@ describe("hasMediaDetails", () => {
 	})
 
 	it.each(DETAIL_FIELDS)("rejects a media object missing %s", (field) => {
-		const media = completeMedia()
-		delete media[field]
+		const media = Object.fromEntries(
+			Object.entries(completeMedia()).filter(([key]) => key !== field)
+		)
 		expect(hasMediaDetails(media)).toBe(false)
 	})
 })
