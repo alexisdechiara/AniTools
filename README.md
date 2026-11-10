@@ -18,8 +18,9 @@ secret OAuth et le jeton utilisateur restent côté serveur.
 - Rewind annuel : genres, saisons, top/flop, sélection et temps regardé estimé.
 - Tierlist publique : import AniList, mode franchise, classement, persistance,
   JSON et exports PNG/JPEG/WebP.
-- Explore : recommandations AniList en pile swipe, découverte par studio et
-  exclusion exhaustive des titres déjà présents dans la liste.
+- Explore : recommandations AniList en pile swipe, découverte par studio,
+  exclusion des titres déjà présents dans la liste complète et ajout à
+  « Planning » avec une session AniList.
 - Timeline : activité regroupée par semaines ou mois.
 - Create : cartes anime (score, note, genres) et cartes de statistiques AniList,
   rendues localement via Canvas, sans upload.
@@ -35,8 +36,9 @@ profil AniList public.
 ## Prérequis
 
 - Bun `>=1.3.5`
-- Node.js `>=22.19.0` uniquement sur une cible qui exécute l'artefact Nitro
-  `node-server` actuel
+- Node.js `>=22.19.0`, y compris pour `bun run dev` et les tests navigateur :
+  la CLI Nuxt s'exécute sur Node même lancée via Bun, et l'artefact Nitro
+  `node-server` actuel l'exige aussi en production
 
 Le dépôt utilise exclusivement Bun et le seul lockfile autorisé est `bun.lock`.
 
@@ -93,16 +95,16 @@ avant ouverture sont détaillés dans
 ## Vérifications
 
 ```bash
-bun run lint
-bun run typecheck
-bun run test:unit
-bun run test:e2e
-bun run build
-bun audit
+bun run check          # lint, typecheck, tests unitaires puis build
+bun run test:nuxt      # seul le projet Vitest des stores et composables
+bun run test:e2e       # Playwright contre le serveur de développement
+bun run test:e2e:build # build puis Playwright contre le serveur de production
+bun run audit:gate     # échoue sur une alerte haute ou critique non listée
 ```
 
 La CI GitHub exécute l'installation figée, le lint, le typecheck, les tests
-unitaires avec couverture, l'audit, le build et les tests Playwright.
+unitaires avec couverture, `bun run audit:gate`, le build et les tests
+Playwright contre le build de production.
 
 ## Documentation
 
