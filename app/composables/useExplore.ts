@@ -1,7 +1,5 @@
 import type {
 	AniListAnimeListEntry,
-	AniListAnimeListIdsResponse,
-	AniListAnimeListResponse,
 	AniListMediaSummary,
 	AniListPageInfo,
 	AniListRecommendationsResponse,
@@ -166,25 +164,16 @@ export function useExplore() {
 		listError.value = null
 
 		try {
-			const [response, idsResponse] = await Promise.all([
-				$fetch<AniListAnimeListResponse>(
-					"/api/anilist/anime-list",
-					{
-						query: {
-							...accessQuery(),
-							page: 1,
-							perPage: 50,
-							sort: "score"
-						}
-					}
-				),
-				$fetch<AniListAnimeListIdsResponse>(
-					"/api/anilist/anime-list-ids",
-					{ query: accessQuery() }
-				)
-			])
-			entries.value = response.entries
-			listedMediaIds.value = new Set(idsResponse.mediaIds)
+			const entriesStore = useEntriesStore()
+			// The whole list is already loaded (or cached) for the other pages: reuse it instead of
+			// paying for a second copy of the same data.
+			const allEntries = await entriesStore.fetchAllAnimes()
+			if (entriesStore.truncated) {
+				// An incomplete list cannot guarantee that a suggestion is not already in it.
+				throw new Error("AniList list too large for discovery")
+			}
+			entries.value = allEntries
+			listedMediaIds.value = new Set(allEntries.flatMap(entry => entry.media ? [entry.media.id] : []))
 			selectedSeedId.value = seeds.value[0]?.media.id ?? null
 			selectedStudioId.value = studios.value[0]?.id ?? null
 			listInitialized.value = true

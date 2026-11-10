@@ -31,6 +31,8 @@ export const useEntriesStore = defineStore("Entries", () => {
 	const error = ref<string | null>(null)
 	const loadedIdentity = ref<string | null>(null)
 	const stale = ref(false)
+	// True when the server could not return the whole list (it exceeds the chunk ceiling).
+	const truncated = ref(false)
 	let pendingRequest: Promise<AnimeListEntry[]> | null = null
 	let pendingIdentity: string | null = null
 	// Bumped by $reset() and by a request for another identity: a request only writes
@@ -90,6 +92,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 
 				source.value = collected.source
 				entries.value = collected.entries
+				truncated.value = collected.truncated
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = true
 				stale.value = false
@@ -99,6 +102,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 
 				entries.value = []
 				source.value = null
+				truncated.value = false
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = false
 				error.value = getApiErrorMessage(caughtError, "Unable to load the AniList anime list.")
@@ -171,6 +175,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 		error.value = null
 		loadedIdentity.value = null
 		stale.value = false
+		truncated.value = false
 		pendingRequest = null
 		pendingIdentity = null
 		generation += 1
@@ -183,6 +188,7 @@ export const useEntriesStore = defineStore("Entries", () => {
 		isInitialized,
 		loading,
 		error,
+		truncated,
 		fetchAllAnimes,
 		invalidate,
 		getAllAnimes,
