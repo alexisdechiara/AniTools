@@ -11,7 +11,11 @@
     />
     <ol class="flex flex-col group mt-2">
       <template v-for="(item, index) in list" :key="item.name">
-        <GenresAndTagsPopover v-if="Number(index) < 5" v-bind="item">
+        <GenresAndTagsPopover
+          v-if="Number(index) < 5"
+          v-bind="item"
+          :mean-score-label="formatMeanScore(item.meanScore)"
+        >
           <li
             class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
             @mouseover="handleMouseOver(item.name)"
@@ -85,10 +89,14 @@ const selectedSort = defineModel<MetricSort>("sort", {
   required: true,
 });
 
-const { formatPercent } = usePersonalScore();
+const { format, formatPercent } = usePersonalScore();
+
+function formatMeanScore(value: number | undefined): string {
+  return props.scoreScale === "raw" ? format(value) : formatPercent(value);
+}
 
 function formatMetric(item: listType): string {
-  if (selectedSort.value === "meanScore") return formatPercent(item.meanScore);
+  if (selectedSort.value === "meanScore") return formatMeanScore(item.meanScore);
   if (selectedSort.value === "minutesWatched") return formatWatchTime(item.minutesWatched ?? 0);
   return formatNumber(item.count ?? 0);
 }
@@ -110,7 +118,7 @@ export type listType = {
   icon?: string;
 };
 
-const props = defineProps<{ title: string; list: listType[] }>();
+const props = defineProps<{ title: string; list: listType[]; scoreScale?: "percent" | "raw" }>();
 
 const maxValue = computed(() => {
   if (!props.list.length) return 0;

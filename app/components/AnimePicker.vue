@@ -5,6 +5,7 @@ import type {
 	AniListSearchResponse
 } from "~~/shared/types/anilist"
 import { getCreateMediaTitle } from "~/utils/create-artwork"
+import { hasMediaDetails } from "~/utils/media-details"
 
 interface PickerItem {
 	id: number
@@ -83,26 +84,34 @@ const animeUrl = computed(() => activeMedia.value?.siteUrl
 	?? (activeMedia.value ? `https://anilist.co/anime/${activeMedia.value.id}` : null)
 )
 
+let searchRequest = 0
+
 const runSearch = useDebounceFn(async () => {
 	const query = searchTerm.value.trim()
 	if (query.length < 2) {
+		// Supersede any pending request so it cannot repopulate the cleared field.
+		searchRequest++
 		searchResults.value = []
 		error.value = null
+		loadingSearch.value = false
 		return
 	}
 
+	const requestId = ++searchRequest
 	loadingSearch.value = true
 	error.value = null
 	try {
 		const response = await $fetch<AniListSearchResponse>("/api/search", {
 			query: { q: query }
 		})
+		if (requestId !== searchRequest) return
 		searchResults.value = response.result.predictions
 	} catch {
+		if (requestId !== searchRequest) return
 		searchResults.value = []
 		error.value = "AniList search is unavailable. Try again in a moment."
 	} finally {
-		loadingSearch.value = false
+		if (requestId === searchRequest) loadingSearch.value = false
 	}
 }, 400)
 
@@ -119,6 +128,10 @@ watch(visibleItems, (items) => {
 async function resolveMedia(item: PickerItem): Promise<AniListMediaSummary | null> {
 	const cached = mediaCache.get(item.id)
 	if (cached) return cached
+	if (item.media && hasMediaDetails(item.media)) {
+		mediaCache.set(item.id, item.media)
+		return item.media
+	}
 
 	loadingMediaId.value = item.id
 	error.value = null

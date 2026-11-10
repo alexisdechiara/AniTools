@@ -70,10 +70,3 @@ export interface CalendarEvent {
 	timeUntilAiring?: number
 	title: string
 }
-
-export interface CalendarViewRange {
-	extendedEnd?: Date
-	extendedStart?: Date
-	fullRangeEnd?: Date
-	fullRangeStart?: Date
-}

@@ -1,4 +1,4 @@
-import { useEventListener, useThrottleFn, useRafFn } from "@vueuse/core"
+import { useEventListener, useThrottleFn } from "@vueuse/core"
 
 export type InspectorType = "row" | "header" | "content" | "anime" | null
 
@@ -24,20 +24,14 @@ export const useInspector = () => {
 	const cursorPosition = useState<{ x: number, y: number }>("inspector-cursor", () => ({ x: 0, y: 0 }))
 	const inspectorActivatedAt = useState<number>("inspector-activated-at", () => 0)
 
-	const { pause: pauseCursor, resume: resumeCursor } = useRafFn(() => {
-		if (!isInspectorEnabled.value) return
-	}, { immediate: false })
-
 	const toggleInspector = () => {
 		const enabled = !isInspectorEnabled.value
 		isInspectorEnabled.value = enabled
 
 		if (!enabled) {
 			hoveredTarget.value = null
-			pauseCursor()
 		} else {
 			inspectorActivatedAt.value = Date.now()
-			resumeCursor()
 		}
 	}
 
@@ -83,7 +77,6 @@ export const useInspector = () => {
 
 		isInspectorEnabled.value = false
 		hoveredTarget.value = null
-		pauseCursor()
 	}
 
 	const closeInspector = () => {

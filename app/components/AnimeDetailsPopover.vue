@@ -186,6 +186,7 @@
 import { useDraggable, useEventListener } from '@vueuse/core'
 import type { PopoverProps, TabsItem } from '@nuxt/ui'
 import type { AniListMediaResponse, AniListMediaSummary } from '~~/shared/types/anilist'
+import { hasMediaDetails } from '~/utils/media-details'
 import TextHover from './TextHover.vue';
 
 interface AnimeDetailsPopoverTitle {
@@ -359,6 +360,7 @@ const sanitizedDescription = computed(() => decodeHtmlEntities((media.value?.des
 watch(open, async (isOpen) => {
 	const mediaId = Number(props.data?.media?.id)
 	if (!isOpen || remoteMedia.value || !Number.isInteger(mediaId) || mediaId <= 0) return
+	if (hasMediaDetails(props.data?.media)) return
 
 	detailsLoading.value = true
 	detailsError.value = null

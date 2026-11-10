@@ -2,7 +2,8 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import { defineStore } from "pinia"
 import type {
 	AniListMediaResponse,
-	AniListMediaSummary
+	AniListMediaSummary,
+	AniListScoreFormat
 } from "~~/shared/types/anilist"
 import type {
 	TierlistEntry,
@@ -22,7 +23,8 @@ import {
 	deserializeTierlistState,
 	formatMediaResultToTierlistEntry,
 	sanitizeTierlistEntry,
-	serializeTierlistState
+	serializeTierlistState,
+	toTierlistEntryFromListEntry
 } from "~/utils/tierlist-model"
 import {
 	findMatchingTierIds,
@@ -230,13 +232,20 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		currentTemplate.value = -1
 	}
 
+	function listScoreFormat(): AniListScoreFormat {
+		return useUserStore().mediaListOptions.scoreFormat ?? "POINT_100"
+	}
+
 	async function addAnime(item: CommandPaletteItem): Promise<boolean> {
 		const mediaId = typeof item.id === "number" ? item.id : Number(item.id)
 		if (!Number.isInteger(mediaId) || mediaId <= 0) return false
 
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
 		const existingEntry = getAllAnimes.value.find(entry => entry?.media?.id === mediaId)
-		if (existingEntry) return addEntryToUnrankedTier(existingEntry)
+		if (existingEntry) {
+			const converted = toTierlistEntryFromListEntry(existingEntry, listScoreFormat())
+			return converted ? addEntryToUnrankedTier(converted) : false
+		}
 
 		const response = await $fetch<AniListMediaResponse>("/api/anilist/media", {
 			query: { id: mediaId }
@@ -248,7 +257,10 @@ export const useTierlistStore = defineStore("tierlist", () => {
 	function addAnimeMedia(media: AniListMediaSummary): boolean {
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
 		const existingEntry = getAllAnimes.value.find(entry => entry.media?.id === media.id)
-		if (existingEntry) return addEntryToUnrankedTier(existingEntry)
+		if (existingEntry) {
+			const converted = toTierlistEntryFromListEntry(existingEntry, listScoreFormat())
+			return converted ? addEntryToUnrankedTier(converted) : false
+		}
 
 		const entry = formatMediaResultToTierlistEntry(media)
 		return entry ? addEntryToUnrankedTier(entry) : false
@@ -278,8 +290,9 @@ export const useTierlistStore = defineStore("tierlist", () => {
 			return { added: 0, skipped: 0, truncated: false }
 		}
 
+		const sourceFormat = listScoreFormat()
 		const allEntries = getAllAnimes.value
-			.map(sanitizeTierlistEntry)
+			.map(entry => toTierlistEntryFromListEntry(entry, sourceFormat))
 			.filter((entry): entry is TierlistEntry => entry !== null)
 		const existingIds = getExistingMediaIds()
 		const effectiveYears = isFranchise ? [] : years

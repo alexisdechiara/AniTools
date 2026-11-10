@@ -1,4 +1,6 @@
 import * as z from "zod"
+import type { AniListScoreFormat } from "~~/shared/types/anilist"
+import { scoreToPercent } from "~/utils/score-format"
 import type {
 	TierlistEntry,
 	TierlistExportDocument,
@@ -244,6 +246,23 @@ export function getTierlistEntryTitle(entry: TierlistEntry): string {
 export function sanitizeTierlistEntry(input: unknown): TierlistEntry | null {
 	const result = tierlistEntrySchema.safeParse(input)
 	return result.success ? result.data : null
+}
+
+/**
+ * AniList returns list scores in the owner's own format (10 points, 5 stars, …) while tier
+ * ranges and filters work on the 100-point scale. Convert once, where a list entry becomes a
+ * tier-list entry, so everything downstream compares like with like.
+ */
+export function toTierlistEntryFromListEntry(
+	input: unknown,
+	sourceFormat: AniListScoreFormat
+): TierlistEntry | null {
+	if (!isRecord(input)) return null
+	const rawScore = typeof input.score === "number" ? input.score : null
+	return sanitizeTierlistEntry({
+		...input,
+		score: scoreToPercent(rawScore, sourceFormat) ?? 0
+	})
 }
 
 export function formatMediaResultToTierlistEntry(input: unknown): TierlistEntry | null {

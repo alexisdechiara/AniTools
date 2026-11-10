@@ -328,6 +328,12 @@ watch(availableLanguages, (languages) => {
 
 const items = computed(() => store.getFilterMenuItems(availableLanguages.value))
 
+const statusByMediaId = computed(() => new Map(
+	animeEntries.value.flatMap(entry =>
+		entry.media && entry.status ? [[entry.media.id, entry.status] as const] : []
+	)
+))
+
 const filteredCalendarEvents = computed(() => {
 	const search = searchQuery.value.trim().toLocaleLowerCase()
 
@@ -336,8 +342,8 @@ const filteredCalendarEvents = computed(() => {
 		const formatMatch = !format || store.currentFormat.includes(format)
 		let statusMatch = true
 		if (store.currentStatus.length > 0 && entriesInitialized.value) {
-			const listEntry = animeEntries.value.find(entry => entry.media?.id === event.media.id)
-			statusMatch = Boolean(listEntry?.status && store.currentStatus.includes(listEntry.status))
+			const status = statusByMediaId.value.get(event.media.id)
+			statusMatch = Boolean(status && store.currentStatus.includes(status))
 		}
 		const languageMatch = event.languages.length === 0
 			|| event.languages.some(language => store.dubbing.includes(language))
@@ -427,9 +433,8 @@ onMounted(() => {
 		store.currentView = "day"
 	}
 
-	if (userStore.isAuthenticated && !entriesInitialized.value) {
-		void entriesStore.fetchAllAnimes().catch(() => undefined)
-	}
+	// The list only serves the Status filter: load it when that filter is already active.
+	if (userStore.isAuthenticated && store.currentStatus.length > 0) void entriesStore.fetchAllAnimes().catch(() => undefined)
 
 	scheduleScrollToCurrentTime()
 })

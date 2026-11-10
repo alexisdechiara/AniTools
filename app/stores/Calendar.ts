@@ -39,6 +39,8 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	const currentFormat = ref<string[]>(["TV", "ONA", "MOVIE"])
 	const currentStatus = ref<string[]>([])
 	const dubbing = ref<string[]>(["jp", "cn", "en", "fr"])
+	// Languages the user explicitly unticked; they stay unticked across date ranges.
+	const excludedDubbing = ref<string[]>([])
 
 	// ========== Getters ==========
 	const isMonthView = computed(() => currentView.value === "month")
@@ -87,25 +89,26 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		} else {
 			currentStatus.value.push(format)
 		}
+		// The list is only needed for this filter: load it on first use (no-op once loaded).
+		if (currentStatus.value.length > 0) void entriesStore.fetchAllAnimes().catch(() => undefined)
 	}
 
 	const toggleDubbing = (lang: string) => {
 		const index = dubbing.value.indexOf(lang)
 		if (index > -1) {
 			dubbing.value.splice(index, 1)
+			if (!excludedDubbing.value.includes(lang)) {
+				excludedDubbing.value.push(lang)
+			}
 		} else {
 			dubbing.value.push(lang)
+			excludedDubbing.value = excludedDubbing.value.filter(excluded => excluded !== lang)
 		}
 	}
 
 	const setAvailableDubbingOptions = (availableLanguages: string[]) => {
 		const normalizedLanguages = [...new Set(availableLanguages)]
-		dubbing.value = dubbing.value.filter(lang => normalizedLanguages.includes(lang))
-		normalizedLanguages.forEach((lang) => {
-			if (!dubbing.value.includes(lang)) {
-				dubbing.value.push(lang)
-			}
-		})
+		dubbing.value = normalizedLanguages.filter(lang => !excludedDubbing.value.includes(lang))
 	}
 
 	// ========== Dropdown Menu Items ==========
@@ -161,7 +164,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		]
 
 		let statusItems: DropdownMenuItem[] = []
-		if (userStore.isAuthenticated && entriesStore.isInitialized) {
+		if (userStore.isAuthenticated) {
 			statusItems = [
 				{
 					label: "Status", children: [
@@ -221,6 +224,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentFormat.value = ["TV", "ONA", "MOVIE"]
 		currentStatus.value = []
 		dubbing.value = ["jp", "cn", "en", "fr"]
+		excludedDubbing.value = []
 	}
 
 	return {

@@ -270,6 +270,7 @@ onMounted(async () => {
 })
 
 watch(isAuthenticated, async (authenticated) => {
+	if (import.meta.server) return
 	if (!authenticated || entriesStore.isInitialized) return
 	try {
 		await entriesStore.fetchAllAnimes()

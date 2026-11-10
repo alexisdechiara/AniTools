@@ -23,7 +23,7 @@
           <div class="flex flex-col">
             <span class="text-xs text-toned font-medium">Mean score</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis"
-              >{{ meanScore }} %</span
+              >{{ meanScoreLabel ?? "—" }}</span
             >
           </div>
           <div class="flex flex-col">
@@ -64,7 +64,7 @@
 <script lang="ts" setup>
 import type { listType } from "./cards/ListCard.vue";
 
-const props = defineProps<listType>();
+const props = defineProps<listType & { meanScoreLabel?: string }>();
 
 const items = computed(() => {
   return props.entries

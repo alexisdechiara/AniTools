@@ -251,12 +251,7 @@ export const useUserStore = defineStore("User", () => {
 		// Getters
 		isAuthenticated,
 		isOAuthAuthenticated,
-		getId: computed(() => id.value),
 		getUsername: computed(() => username.value),
-		getAvatar: computed(() => avatar.value),
-		getUpdatedAt: computed(() => updatedAt.value),
-		getOptions: computed(() => options.value),
-		getMediaListOptions: computed(() => mediaListOptions.value),
 
 		// Actions
 		fetchUserData,
