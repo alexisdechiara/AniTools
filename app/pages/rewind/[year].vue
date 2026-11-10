@@ -75,7 +75,8 @@ const { showPageLoader } = useProgressiveLoading(
 )
 
 async function load(force = false) {
-	await Promise.all([
+	// The stores record failures in `error`, which this page renders.
+	await Promise.allSettled([
 		entriesStore.fetchAllAnimes(force),
 		rewindStore.fetchYear(selectedYear.value, force)
 	])

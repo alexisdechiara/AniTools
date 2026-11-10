@@ -74,7 +74,8 @@ const categoryPodium = computed(() => {
 })
 
 async function load(force = false) {
-	await entriesStore.fetchAllAnimes(force)
+	// The store records the failure in `error`, which this page renders.
+	await entriesStore.fetchAllAnimes(force).catch(() => undefined)
 }
 
 onMounted(() => {
