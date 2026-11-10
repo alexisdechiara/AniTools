@@ -23,6 +23,7 @@
 		"test:unit": "vitest run",
 		"test:unit:watch": "vitest",
 		"test:unit:coverage": "vitest run --coverage",
+		"test:nuxt": "vitest run --project nuxt",
 		"test:e2e": "playwright test",
 		"test:e2e:ui": "playwright test --ui"
 	},
@@ -52,10 +53,13 @@
 	},
 	"devDependencies": {
 		"@nuxt/eslint": "^1.17.0",
+		"@nuxt/test-utils": "^4.4.0",
 		"@playwright/test": "^1.65.0",
 		"@vitest/coverage-istanbul": "^4.1.12",
+		"@vue/test-utils": "^2.5.1",
 		"eslint": "^10.14.0",
 		"eslint-plugin-tailwindcss": "^4.4.0",
+		"happy-dom": "^21.0.4",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.12",
 		"vue-tsc": "^3.3.14"
