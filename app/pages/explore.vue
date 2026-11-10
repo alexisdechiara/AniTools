@@ -193,6 +193,9 @@ async function saveToPlanning(
 		})
 		addedMediaIds.value = new Set([...addedMediaIds.value, media.id])
 		interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+		// The list changed on AniList: other pages must refetch instead of trusting their copy.
+		useEntriesStore().invalidate()
+		useStatisticsStore().invalidate()
 		if (notify) {
 			toast.add({
 				title: "Added to Plan to Watch",
