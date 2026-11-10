@@ -379,6 +379,9 @@ export function sanitizeReturnTo(value: unknown) {
 		if (parsed.origin !== "https://anitools.local") return "/"
 
 		const sanitized = `${parsed.pathname}${parsed.search}${parsed.hash}`
+		if (!sanitized.startsWith("/") || sanitized.startsWith("//") || sanitized.includes("\\")) {
+			return "/"
+		}
 		return sanitized.length <= 2048 ? sanitized : "/"
 	} catch {
 		return "/"

@@ -5,11 +5,15 @@ describe("getSafeInternalPath", () => {
 	it("keeps local paths and their query strings", () => {
 		expect(getSafeInternalPath("/calendar?view=week")).toBe("/calendar?view=week")
 		expect(getSafeInternalPath(["/tierlist", "/calendar"])).toBe("/tierlist")
+		expect(getSafeInternalPath("/settings/../calendar?view=week")).toBe("/calendar?view=week")
 	})
 
 	it.each([
 		"https://example.com",
 		"//example.com/path",
+		"/a/..//example.com/path",
+		"/.//example.com/path",
+		"/%2e//example.com/path",
 		"/\\example.com",
 		"/calendar\nSet-Cookie: bad",
 		null

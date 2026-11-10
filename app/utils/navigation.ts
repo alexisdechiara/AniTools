@@ -15,5 +15,15 @@ export function getSafeInternalPath(value: unknown, fallback = "/") {
 		return fallback
 	}
 
-	return candidate
+	try {
+		const parsed = new URL(candidate, "https://anitools.local")
+		if (parsed.origin !== "https://anitools.local") return fallback
+		const normalized = `${parsed.pathname}${parsed.search}${parsed.hash}`
+		if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.includes("\\")) {
+			return fallback
+		}
+		return normalized
+	} catch {
+		return fallback
+	}
 }
