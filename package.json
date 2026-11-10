@@ -41,8 +41,8 @@
 		"nuxt-site-config": "^4.2.3",
 		"pinia": "^4.1.0",
 		"pinia-plugin-persistedstate": "^4.7.1",
-		"reka-ui": "2.10.1",
-		"vue-cal": "^5.0.1-rc.46",
+		"reka-ui": "^2.11.0",
+		"vue-cal": "5.0.1-rc.46",
 		"vue-draggable-plus": "^0.6.1",
 		"vue-timeline-chart": "^5.2.0",
 		"zod": "^4.6.7"
