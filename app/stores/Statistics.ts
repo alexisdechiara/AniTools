@@ -33,12 +33,25 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 	const loading = ref(false)
 	const error = ref<string | null>(null)
 	const loadedIdentity = ref<string | null>(null)
+	const stale = ref(false)
 	let pendingRequest: Promise<boolean> | null = null
+	let pendingIdentity: string | null = null
+	// Bumped by $reset() and by a request for another identity: a request only writes
+	// the state while the generation it started with is still the current one.
+	let generation = 0
 
 	const identity = computed(() => {
 		if (!user.isAuthenticated || !user.getUsername) return null
 		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
 	})
+
+	// A different identity must never see the previous one's statistics, even before a refetch.
+	// Synchronous so the reset always lands before a caller can start the next identity's request.
+	watch(identity, (nextIdentity) => {
+		if (loadedIdentity.value !== null && loadedIdentity.value !== nextIdentity) {
+			$reset()
+		}
+	}, { flush: "sync" })
 
 	const meanScore = computed(() => statistics.value?.meanScore)
 	const minutesWatched = computed(() => statistics.value?.minutesWatched)
@@ -63,11 +76,17 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 			$reset()
 			return false
 		}
-		if (!force && isInitialized.value && loadedIdentity.value === currentIdentity) {
+		if (!force && !stale.value && isInitialized.value && loadedIdentity.value === currentIdentity) {
 			return true
 		}
-		if (pendingRequest) return pendingRequest
+		if (pendingRequest && pendingIdentity === currentIdentity) return pendingRequest
+		if (pendingRequest) {
+			// The running request belongs to another identity: it may no longer write.
+			generation += 1
+		}
 
+		const requestGeneration = generation
+		pendingIdentity = currentIdentity
 		pendingRequest = (async () => {
 			loading.value = true
 			error.value = null
@@ -83,12 +102,18 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 					query: username ? { username } : undefined
 				})
 
+				// A superseded or reset request reports success without writing anything.
+				if (requestGeneration !== generation) return true
+
 				statistics.value = response.statistics
 				source.value = response.source
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = true
+				stale.value = false
 				return true
 			} catch (caughtError) {
+				if (requestGeneration !== generation) return false
+
 				statistics.value = null
 				source.value = null
 				loadedIdentity.value = currentIdentity
@@ -96,12 +121,19 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 				error.value = getApiErrorMessage(caughtError, "Unable to load AniList statistics.")
 				return false
 			} finally {
-				loading.value = false
-				pendingRequest = null
+				if (requestGeneration === generation) {
+					loading.value = false
+					pendingRequest = null
+					pendingIdentity = null
+				}
 			}
 		})()
 
 		return pendingRequest
+	}
+
+	function invalidate() {
+		stale.value = true
 	}
 
 	function getSortedGenres(sort: MetricSort = genresSort.value, limit = 5) {
@@ -145,7 +177,10 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		loading.value = false
 		error.value = null
 		loadedIdentity.value = null
+		stale.value = false
 		pendingRequest = null
+		pendingIdentity = null
+		generation += 1
 	}
 
 	return {
@@ -174,6 +209,7 @@ export const useStatisticsStore = defineStore("Statistics", () => {
 		statusSort,
 		studiosSort,
 		fetchStatistics,
+		invalidate,
 		getSortedGenres,
 		getSortedTags,
 		getSortedFormats,
