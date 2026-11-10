@@ -51,16 +51,19 @@ function stableStringify(value: unknown): string {
 
 /**
  * `viewer` scopes OAuth reads to their user (`oauth:<id>`); public reads share `public`.
- * The access token itself never enters the key, so it never reaches the cache or the disk.
+ * The key is `<viewer>:<sha256>`: the prefix lets one viewer's entries be dropped without
+ * touching anyone else's. The access token itself never enters the key, so it never reaches
+ * the cache or the disk.
  */
 export function buildAniListCacheKey(
 	query: string,
 	variables: Record<string, unknown>,
 	viewer: string
 ): string {
-	return createHash("sha256")
+	const hash = createHash("sha256")
 		.update(stableStringify({ query: query.replace(/\s+/g, " ").trim(), variables, viewer }))
 		.digest("hex")
+	return `${viewer}:${hash}`
 }
 
 interface MemoryEntry {
@@ -93,6 +96,17 @@ export function createAniListMemoryCache(maxEntries = MAX_MEMORY_ENTRIES) {
 				entries.delete(oldest)
 			}
 		},
+		/** Deletes every entry whose key starts with `prefix` and returns how many were deleted. */
+		deleteByPrefix(prefix: string): number {
+			let deleted = 0
+			for (const key of [...entries.keys()]) {
+				if (key.startsWith(prefix)) {
+					entries.delete(key)
+					deleted += 1
+				}
+			}
+			return deleted
+		},
 		clear(): void {
 			entries.clear()
 		},
@@ -106,3 +120,20 @@ export const aniListMemoryCache = createAniListMemoryCache()
 
 /** Shares one upstream promise between identical reads that overlap in time. */
 export const aniListInFlightRequests = new Map<string, Promise<unknown>>()
+
+let aniListWriteEpoch = 0
+
+/** Bumped by every mutation; a read that started under an older epoch must not be cached. */
+export function getAniListWriteEpoch(): number {
+	return aniListWriteEpoch
+}
+
+/** Drops one viewer's cached reads and in-flight promises after that viewer changed their list. */
+export function invalidateAniListViewer(viewer: string): void {
+	aniListWriteEpoch += 1
+	const prefix = `${viewer}:`
+	aniListMemoryCache.deleteByPrefix(prefix)
+	for (const key of [...aniListInFlightRequests.keys()]) {
+		if (key.startsWith(prefix)) aniListInFlightRequests.delete(key)
+	}
+}

@@ -147,6 +147,7 @@ describe("AniList endpoint query validation", () => {
 			"media",
 			"airing-schedules",
 			"media-by-ids",
+			"media-list-entry",
 			"save-media-list-entry"
 		])
 	})
@@ -311,15 +312,23 @@ describe("AniList allowlisted client", () => {
 	})
 
 	it("adds an anime to planning through the fixed authenticated mutation", async () => {
-		const requester = fetchMock(async () => jsonResponse({
-			data: {
-				SaveMediaListEntry: {
-					id: 99,
-					mediaId: 7,
-					status: "PLANNING"
+		const requester = fetchMock(vi.fn()
+			.mockResolvedValueOnce(jsonResponse(
+				{
+					data: { MediaList: null },
+					errors: [{ message: "Not Found", status: 404 }]
+				},
+				404
+			))
+			.mockResolvedValueOnce(jsonResponse({
+				data: {
+					SaveMediaListEntry: {
+						id: 99,
+						mediaId: 7,
+						status: "PLANNING"
+					}
 				}
-			}
-		}))
+			})))
 
 		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
 			fetch: requester
@@ -327,17 +336,67 @@ describe("AniList allowlisted client", () => {
 			entry: { id: 99, mediaId: 7, status: "PLANNING" }
 		})
 
-		const [, request] = requester.mock.calls[0]!
-		const body = JSON.parse(String(request?.body)) as {
-			query: string
-			variables: Record<string, unknown>
-		}
-		expect(body.query).toContain("mutation AniToolsSaveMediaListEntry")
-		expect(body.query).toContain("status: PLANNING")
-		expect(body.variables).toEqual({ mediaId: 7 })
-		expect(new Headers(request?.headers).get("Authorization")).toBe(
-			"Bearer secret-access-token"
-		)
+		expect(requester).toHaveBeenCalledTimes(2)
+		const [lookupBody, mutationBody] = requester.mock.calls.map(([, request]) => {
+			expect(new Headers(request?.headers).get("Authorization")).toBe(
+				"Bearer secret-access-token"
+			)
+			return JSON.parse(String(request?.body)) as {
+				query: string
+				variables: Record<string, unknown>
+			}
+		})
+		expect(lookupBody?.query).toContain("query AniToolsMediaListEntry")
+		expect(lookupBody?.variables).toEqual({ userId: 42, mediaId: 7 })
+		expect(mutationBody?.query).toContain("mutation AniToolsSaveMediaListEntry")
+		expect(mutationBody?.query).toContain("status: PLANNING")
+		expect(mutationBody?.variables).toEqual({ mediaId: 7 })
+	})
+
+	it("also adds an anime when AniList answers the lookup with a null entry", async () => {
+		const requester = fetchMock(vi.fn()
+			.mockResolvedValueOnce(jsonResponse({ data: { MediaList: null } }))
+			.mockResolvedValueOnce(jsonResponse({
+				data: {
+					SaveMediaListEntry: { id: 99, mediaId: 7, status: "PLANNING" }
+				}
+			})))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).resolves.toEqual({
+			entry: { id: 99, mediaId: 7, status: "PLANNING" }
+		})
+		expect(requester).toHaveBeenCalledTimes(2)
+	})
+
+	it("refuses to overwrite an anime that is already in the list", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: { MediaList: { id: 5, status: "COMPLETED" } }
+		}))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 409,
+			data: { code: "ANILIST_ENTRY_EXISTS", status: "COMPLETED" }
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
+	})
+
+	it("does not treat a failed lookup as a missing entry", async () => {
+		const requester = fetchMock(async () => new Response("", {
+			status: 429,
+			headers: { "retry-after": "17" }
+		}))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 429,
+			data: { code: "ANILIST_RATE_LIMITED" }
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
 	})
 
 	it("rejects media-list mutations for public profiles", async () => {

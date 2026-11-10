@@ -11,6 +11,8 @@ import {
 	aniListInFlightRequests,
 	aniListMemoryCache,
 	buildAniListCacheKey,
+	getAniListWriteEpoch,
+	invalidateAniListViewer,
 	isAniListMutation,
 	resolveAniListDevCacheMode
 } from "./anilist-request-cache"
@@ -82,6 +84,7 @@ export const ANILIST_ALLOWED_OPERATIONS = [
 	"media",
 	"airing-schedules",
 	"media-by-ids",
+	"media-list-entry",
 	"save-media-list-entry"
 ] as const
 
@@ -519,6 +522,15 @@ const MEDIA_BY_IDS_QUERY = `
 			media(id_in: $mediaIds, type: ANIME, isAdult: false) {
 				${MEDIA_SUMMARY_FIELDS}
 			}
+		}
+	}
+`
+
+const MEDIA_LIST_ENTRY_QUERY = `
+	query AniToolsMediaListEntry($userId: Int!, $mediaId: Int!) {
+		MediaList(userId: $userId, mediaId: $mediaId, type: ANIME) {
+			id
+			status
 		}
 	}
 `
@@ -1253,14 +1265,16 @@ async function requestAniList<T>(
 	if (options.fetch) {
 		return requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
 	}
+	const viewer = validatedAccess?.mode === "oauth" ? `oauth:${validatedAccess.userId}` : "public"
+
 	if (isAniListMutation(query)) {
 		const result = await requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
-		// Cached reads may now be stale; mutations are rare enough to simply start over.
-		aniListMemoryCache.clear()
+		// Only the writer's own list changed: drop their cached reads and keep everyone else's,
+		// so one write does not send every visitor back to the shared upstream budget.
+		invalidateAniListViewer(viewer)
 		return result
 	}
 
-	const viewer = validatedAccess?.mode === "oauth" ? `oauth:${validatedAccess.userId}` : "public"
 	const key = buildAniListCacheKey(query, variables, viewer)
 	const devCacheMode = resolveAniListDevCacheMode(
 		Boolean(import.meta.dev),
@@ -1285,9 +1299,13 @@ async function requestAniList<T>(
 	const pending = aniListInFlightRequests.get(key)
 	if (pending) return pending as Promise<T>
 
+	// A write that lands while this read is in flight makes its answer possibly stale.
+	const epoch = getAniListWriteEpoch()
 	const request = requestAniListUpstream(query, variables, dataSchema, validatedAccess, options)
 		.then(async (data) => {
-			aniListMemoryCache.set(key, data, options.cacheTtlMs ?? ANILIST_CACHE_TTL.user)
+			if (getAniListWriteEpoch() === epoch) {
+				aniListMemoryCache.set(key, data, options.cacheTtlMs ?? ANILIST_CACHE_TTL.user)
+			}
 			if (devCacheMode === "record") {
 				// Stored as JSON text: unstorage parses it back into the same object on read.
 				await useStorage(ANILIST_DEV_CACHE_STORAGE).setItem(key, JSON.stringify(data))
@@ -1295,7 +1313,8 @@ async function requestAniList<T>(
 			return data
 		})
 		.finally(() => {
-			aniListInFlightRequests.delete(key)
+			// A write may have dropped this promise and a newer read may own the key by now.
+			if (aniListInFlightRequests.get(key) === request) aniListInFlightRequests.delete(key)
 		})
 
 	aniListInFlightRequests.set(key, request)
@@ -1548,6 +1567,40 @@ export async function saveAniListMediaListEntry(
 	}
 
 	const validatedBody = saveMediaListEntryBodySchema.parse(body)
+
+	// SaveMediaListEntry updates an existing entry, so it would move a Completed or Watching
+	// anime back to Planning. Look the entry up first and refuse to overwrite it.
+	const entryLookupSchema = z.object({
+		MediaList: z.object({
+			id: z.number().int().positive(),
+			status: z.enum(ANILIST_LIST_STATUSES).nullable()
+		}).nullable()
+	})
+	let existingEntry: z.infer<typeof entryLookupSchema>["MediaList"] = null
+	try {
+		const lookup = await requestAniList(
+			MEDIA_LIST_ENTRY_QUERY,
+			{ userId: validatedAccess.userId, mediaId: validatedBody.mediaId },
+			entryLookupSchema,
+			validatedAccess,
+			options
+		)
+		existingEntry = lookup.MediaList
+	} catch (error) {
+		// AniList answers a lookup for an entry that does not exist with a 404 GraphQL error.
+		// Only that miss means "safe to add"; every other failure must stop the write.
+		if (!isError(error) || error.statusCode !== 404) throw error
+	}
+
+	if (existingEntry) {
+		throw upstreamError(
+			409,
+			"This anime is already in your AniList list",
+			"ANILIST_ENTRY_EXISTS",
+			{ status: existingEntry.status }
+		)
+	}
+
 	const data = await requestAniList(
 		SAVE_MEDIA_LIST_ENTRY_MUTATION,
 		{ mediaId: validatedBody.mediaId },
