@@ -13,7 +13,7 @@ const storedItems: StoredItem[] = [
 	{
 		icon: "i-lucide-sliders-horizontal",
 		label: "Display preferences",
-		detail: "Your theme and score format."
+		detail: "Your score display format."
 	},
 	{
 		icon: "i-lucide-user-round",
@@ -97,7 +97,7 @@ function resetLayout() {
 		<UModal
 			v-model:open="preferencesResetOpen"
 			title="Reset display preferences?"
-			description="Your theme and score format go back to the AniTools defaults, and this can't be undone.">
+			description="Your score display format goes back to the AniTools default, and this can't be undone.">
 			<template #footer>
 				<UButton
 					label="Keep my preferences"
