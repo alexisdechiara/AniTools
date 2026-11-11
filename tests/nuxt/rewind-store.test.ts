@@ -1,6 +1,6 @@
 import { registerEndpoint } from "@nuxt/test-utils/runtime"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { useRewindStore } from "~/stores/Rewind"
+import { buildRewindActivityRequest, useRewindStore } from "~/stores/Rewind"
 import { useUserStore } from "~/stores/User"
 import type {
 	AniListActivitiesResponse,
@@ -45,7 +45,18 @@ function deferred<T>(): Deferred<T> {
 	return { promise, resolve }
 }
 
+// One page of a year that spans several activity pages; activity ids are unique per page.
+function pageOf(year: number, page: number, lastPage: number): AniListActivitiesResponse {
+	return {
+		source: { mode: "public", username: "alice" },
+		pageInfo: { currentPage: page, hasNextPage: page < lastPage, lastPage, perPage: 50, total: lastPage },
+		activities: [activity(year * 100 + page)]
+	}
+}
+
 const requestedYears: number[] = []
+const requestedPages: number[] = []
+const pagedYears = new Map<number, number>()
 const pendingYears = new Map<number, Deferred<AniListActivitiesResponse>>()
 let unregister: (() => void) | null = null
 
@@ -55,8 +66,13 @@ function serveActivities() {
 	unregister = registerEndpoint(ACTIVITIES_ENDPOINT, {
 		method: "GET",
 		handler: (event) => {
-			const year = Number(new URL(event.path, "http://localhost").searchParams.get("year"))
+			const params = new URL(event.path, "http://localhost").searchParams
+			const year = Number(params.get("year"))
+			const page = Number(params.get("page"))
 			requestedYears.push(year)
+			requestedPages.push(page)
+			const lastPage = pagedYears.get(year)
+			if (lastPage) return pageOf(year, page, lastPage)
 			return pendingYears.get(year)?.promise ?? pageFor(year)
 		}
 	})
@@ -80,13 +96,62 @@ describe("Rewind store", () => {
 		useUserStore().$reset()
 		useRewindStore().$reset()
 		requestedYears.length = 0
+		requestedPages.length = 0
 		pendingYears.clear()
+		pagedYears.clear()
 		serveActivities()
 	})
 
 	afterEach(() => {
 		unregister?.()
 		unregister = null
+	})
+
+	it("requests each activity page once when the page mount and the route watcher both ask", async () => {
+		pagedYears.set(2025, 7)
+		usePublicProfile()
+		const rewind = useRewindStore()
+
+		// `/rewind/[year]` calls fetchYear from onMounted and again from its route watcher.
+		const fromMount = rewind.fetchYear(2025)
+		const fromWatcher = rewind.fetchYear(2025)
+		await Promise.all([fromMount, fromWatcher])
+
+		expect(requestedPages).toEqual([1, 2, 3, 4, 5, 6, 7])
+		expect(rewind.activities).toHaveLength(7)
+		expect(rewind.truncated).toBe(false)
+	})
+
+	it("does not request a loaded year again", async () => {
+		pagedYears.set(2025, 3)
+		usePublicProfile()
+		const rewind = useRewindStore()
+
+		await rewind.fetchYear(2025)
+		await rewind.fetchYear(2025)
+		await rewind.fetchYear(2024)
+		await rewind.fetchYear(2025)
+
+		expect(requestedPages).toEqual([1, 2, 3, 1])
+		expect(requestedYears).toEqual([2025, 2025, 2025, 2024])
+	})
+
+	it("asks for each page once, past the browser HTTP cache", async () => {
+		// The duplicate requests seen on /rewind were not a second store call: public reads are
+		// served with stale-while-revalidate, so the browser answered a reopened year from its
+		// HTTP cache and refreshed every page in the background. `no-store` leaves one request.
+		expect(buildRewindActivityRequest(2025, 3, "alice")).toEqual({
+			query: { username: "alice", kind: "anime", year: 2025, page: 3, perPage: 50 },
+			cache: "no-store"
+		})
+		expect(buildRewindActivityRequest(2025, 1).query).not.toHaveProperty("username")
+
+		pagedYears.set(2025, 4)
+		usePublicProfile()
+		const rewind = useRewindStore()
+		await Promise.all([rewind.fetchYear(2025), rewind.fetchYear(2025)])
+
+		expect(requestedPages).toEqual([1, 2, 3, 4])
 	})
 
 	it("keeps the newest year when an older request finishes last", async () => {

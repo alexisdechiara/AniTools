@@ -15,6 +15,31 @@ interface RewindCacheEntry {
 	truncated: boolean
 }
 
+/**
+ * A Rewind reads every activity page of a year in one go and keeps the result in this store,
+ * so the browser's HTTP cache has nothing to add. Public AniList reads are served with
+ * `max-age=30, stale-while-revalidate=150`: left to the default cache mode, reopening a year
+ * 30 to 180 seconds later answered each page from the HTTP cache and then requested it again
+ * in the background, two requests per page against the endpoint's rate limit, for a copy
+ * nobody reads. `no-store` keeps it to one request per page; the server keeps its own cache.
+ */
+export function buildRewindActivityRequest(
+	year: number,
+	page: number,
+	username?: string
+) {
+	return {
+		query: {
+			...(username ? { username } : {}),
+			kind: "anime",
+			year,
+			page,
+			perPage: 50
+		},
+		cache: "no-store"
+	} as const
+}
+
 export const useRewindStore = defineStore("Rewind", () => {
 	// Resolved once while the store is created: on the server, useRequestFetch() needs the
 	// Nuxt context, which is gone after the first await inside an action.
@@ -94,15 +119,10 @@ export const useRewindStore = defineStore("Rewind", () => {
 				const fetcher = requestFetch
 				const username = user.authMode === "public" ? user.getUsername : undefined
 				const result = await collectRewindActivities(page =>
-					fetcher<AniListActivitiesResponse>("/api/anilist/activities", {
-						query: {
-							...(username ? { username } : {}),
-							kind: "anime",
-							year: normalizedYear,
-							page,
-							perPage: 50
-						}
-					})
+					fetcher<AniListActivitiesResponse>(
+						"/api/anilist/activities",
+						buildRewindActivityRequest(normalizedYear, page, username)
+					)
 				)
 				const cachedResult: RewindCacheEntry = {
 					activities: result.activities,
