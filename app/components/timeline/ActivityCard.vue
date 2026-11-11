@@ -27,6 +27,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { title: getAnimeTitle } = useMediaTitle()
+const { activeDisplay, formatDateTime: formatLocalDateTime } = useTimeDisplay()
 
 const mediaTitle = computed(() => {
 	if (props.activity.kind !== "anime") return null
@@ -64,7 +65,10 @@ const runStartedAt = computed(() =>
 	mergedRun.value ? new Date(mergedRun.value.startedAt * 1_000) : null
 )
 const runSpan = computed(() => mergedRun.value
-	? formatRunSpan(mergedRun.value.startedAt, mergedRun.value.endedAt, { compact: props.compact })
+	? formatRunSpan(mergedRun.value.startedAt, mergedRun.value.endedAt, {
+		compact: props.compact,
+		display: activeDisplay.value
+	})
 	: ""
 )
 const runStatus = computed(() =>
@@ -74,14 +78,15 @@ const runUpdates = computed(() => {
 	const run = mergedRun.value
 	if (!run) return []
 
-	const severalDays = runSpansSeveralDays(run.startedAt, run.endedAt)
+	const display = activeDisplay.value
+	const severalDays = runSpansSeveralDays(run.startedAt, run.endedAt, undefined, display)
 	return run.activities.map(update => ({
 		id: update.id,
 		label: update.progress
 			? `${update.status || "updated"} · ${update.progress}`
 			: update.status || "updated",
 		datetime: new Date(update.createdAt * 1_000).toISOString(),
-		time: formatRunUpdateTime(update.createdAt, severalDays)
+		time: formatRunUpdateTime(update.createdAt, severalDays, undefined, display)
 	}))
 })
 const expanded = ref(false)
@@ -143,7 +148,7 @@ const imageOrderClass = computed(() =>
 					:datetime="timestamp.toISOString()"
 					class="shrink-0 text-xs text-dimmed"
 					:class="compact ? 'ml-auto' : ''">
-					{{ formatDateTime(timestamp, compact ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }) }}
+					{{ formatLocalDateTime(timestamp, compact ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }) }}
 				</time>
 			</div>
 

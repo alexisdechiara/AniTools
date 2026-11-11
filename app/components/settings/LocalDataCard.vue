@@ -15,7 +15,7 @@ const storedItems: StoredItem[] = [
 	{
 		icon: "i-lucide-sliders-horizontal",
 		label: "Display preferences",
-		detail: "Your score display format."
+		detail: "Your score display format, time zone and 12 or 24-hour clock."
 	},
 	{
 		icon: "i-lucide-user-round",
@@ -60,7 +60,7 @@ function resetPreferences() {
 	preferencesResetOpen.value = false
 	toast.add({
 		title: "Preferences reset",
-		description: "Score display is back to Percentage, and the calendar opens unfiltered.",
+		description: "Score display is back to Percentage, time display is automatic again, and the calendar opens unfiltered.",
 		icon: "i-lucide-rotate-ccw"
 	})
 }
@@ -151,7 +151,7 @@ function resetExplorePicks() {
 		<UModal
 			v-model:open="preferencesResetOpen"
 			title="Reset display preferences?"
-			description="Your score display format and the Calendar: My list choice go back to the AniTools default, and this can't be undone.">
+			description="Your score display format, your time display and the Calendar: My list choice go back to the AniTools default, and this can't be undone.">
 			<template #footer>
 				<UButton
 					label="Keep my preferences"

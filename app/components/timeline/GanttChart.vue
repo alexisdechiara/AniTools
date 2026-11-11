@@ -79,19 +79,22 @@ const chartItems = computed(() => chartData.value.items.map((item) => {
 		}
 	}
 }))
-const timestampFormatters: Partial<Record<TimelineBaseUnits, Intl.DateTimeFormat>> = {
-	years: createDateFormatter({ year: "numeric" }),
-	months: createDateFormatter({ month: "short", year: "numeric" }),
-	weeks: createDateFormatter({ day: "numeric", month: "short" }),
-	days: createDateFormatter({ day: "numeric", month: "short" }),
-	hours: createDateFormatter({ hour: "2-digit", minute: "2-digit" })
-}
+const { activeDisplay, createFormatter } = useTimeDisplay()
+// Computed, not built once: the axis follows the time zone and clock chosen in Settings.
+const timestampFormatters = computed<Partial<Record<TimelineBaseUnits, Intl.DateTimeFormat>>>(() => ({
+	years: createFormatter({ year: "numeric" }),
+	months: createFormatter({ month: "short", year: "numeric" }),
+	weeks: createFormatter({ day: "numeric", month: "short" }),
+	days: createFormatter({ day: "numeric", month: "short" }),
+	hours: createFormatter(clockTimeOptions(activeDisplay.value))
+}))
 function renderTimestampLabel(
 	timestamp: number,
 	scale: { unit: string, step: number }
 ): string {
-	const formatter = timestampFormatters[scale.unit as TimelineBaseUnits]
-	return (formatter ?? timestampFormatters.days)!.format(new Date(-timestamp))
+	const formatters = timestampFormatters.value
+	const formatter = formatters[scale.unit as TimelineBaseUnits]
+	return (formatter ?? formatters.days)!.format(new Date(-timestamp))
 }
 
 function handleViewportChange(nextViewport: { start: number, end: number }): void {

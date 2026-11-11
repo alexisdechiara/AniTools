@@ -5,7 +5,7 @@
 		</div>
 
 		<vue-cal ref="vueCalRef" v-model:view="store.currentView" :time-step="store.timeStep" time-at-cursor week-numbers
-			aria-label="Anime release calendar"
+			aria-label="Anime release calendar" :twelve-hour="twelveHourClock"
 			:views="['day', 'week', 'month']" :events="filteredCalendarEvents" @wheel="store.handleWheel"
 			:time-cell-height="store.currentView === 'day' ? 96 : store.currentView === 'week' ? 64 : 48"
 			@ready="onCalendarReady" @view-change="onViewChange">
@@ -119,11 +119,10 @@
 							class="text-muted font-light"
 							:class="[isCancelled(event) && 'opacity-25', getPeriodTextClass(event, store.timeStep)]">{{
 								shouldShowEpisodeWithPeriod(event, store.timeStep)
-		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${event.start.format('HH:mm')} -
-							${event.end.format('HH:mm')}`
+		? `${getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))} | ${formatEventPeriod(event.start, event.end)}`
 		: shouldShowEpisodeOnly(event, store.timeStep)
 			? getEpisodeLabel(event.episode, shouldUseLongEpisodeLabel(event))
-			: `${event.start.format('HH:mm')} - ${event.end.format('HH:mm')}`
+			: formatEventPeriod(event.start, event.end)
 							}}</span>
 						<div v-if="shouldShowBadges(event, store.timeStep)" class="flex items-center gap-2"
 							:class="isCancelled(event) && 'opacity-25'">
@@ -317,6 +316,30 @@ const missingSimuldubMediaById = computed(() => {
 
 const toast = useToast()
 const LIST_ERROR_TOAST_ID = "calendar-list-error"
+
+const {
+	display: timeDisplay,
+	ready: timeDisplayReady,
+	formatClockTime
+} = useTimeDisplay()
+
+// This page is server-rendered, and the server knows neither the visitor's zone nor the
+// choices kept in localStorage. Until the page is mounted the labels and the grid keep the
+// 24-hour local clock they always had, so the server HTML and the first client render match.
+const twelveHourClock = computed(() =>
+	timeDisplayReady.value && timeDisplay.value.hourCycle === "h12"
+)
+
+function formatLocalClock(date: Date): string {
+	const pad = (value: number) => String(value).padStart(2, "0")
+	return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** Only the printed times follow the chosen zone; vue-cal lays the grid out in the browser's. */
+function formatEventPeriod(start: Date, end: Date): string {
+	const format = timeDisplayReady.value ? formatClockTime : formatLocalClock
+	return `${format(start)} - ${format(end)}`
+}
 
 function isCancelled(event: { status?: string }) {
 	return event.status === "cancelled"

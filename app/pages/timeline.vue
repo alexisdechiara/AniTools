@@ -53,19 +53,18 @@ const { showPageLoader } = useProgressiveLoading(
 	computed(() => [initialized.value]),
 	{ allowPartial: false }
 )
-const dayFormatter = createDateFormatter({
-	day: "2-digit"
-})
-const weekdayFormatter = createDateFormatter({
-	weekday: "short"
-})
+const { createFormatter } = useTimeDisplay()
+// Computed, not built once: the day beside a card follows the zone chosen in Settings.
+// Month headings stay grouped by UTC month (see groupTimelineAnimeActivitiesByMonth).
+const dayFormatter = computed(() => createFormatter({ day: "2-digit" }))
+const weekdayFormatter = computed(() => createFormatter({ weekday: "short" }))
 
 function formatActivityDay(activity: AniListAnimeActivity) {
-	return dayFormatter.format(new Date(activity.createdAt * 1_000))
+	return dayFormatter.value.format(new Date(activity.createdAt * 1_000))
 }
 
 function formatActivityWeekday(activity: AniListAnimeActivity) {
-	return weekdayFormatter.format(new Date(activity.createdAt * 1_000))
+	return weekdayFormatter.value.format(new Date(activity.createdAt * 1_000))
 }
 
 function monthStats(group: TimelineMonthGroup) {

@@ -1,10 +1,13 @@
 import { formatDateTime } from "./format"
+import type { TimeDisplay } from "./time-display"
 
 export interface RunTimeFormatOptions {
 	/** The compact feed prints the day beside the card, so a same-day span is times only. */
 	compact?: boolean
 	/** Defaults to the browser's timezone. Fixed in tests. */
 	timeZone?: string
+	/** The visitor's zone and clock; an explicit `timeZone` wins over its zone. */
+	display?: TimeDisplay
 }
 
 const TIME_ONLY: Intl.DateTimeFormatOptions = { timeStyle: "short" }
@@ -17,10 +20,10 @@ const SHORT_DATE_AND_TIME: Intl.DateTimeFormatOptions = {
 }
 
 function withTimeZone(
-	options: Intl.DateTimeFormatOptions,
+	display: TimeDisplay | undefined,
 	timeZone: string | undefined
-): Intl.DateTimeFormatOptions {
-	return timeZone ? { ...options, timeZone } : options
+): TimeDisplay | undefined {
+	return timeZone ? { ...display, timeZone } : display
 }
 
 function toDate(seconds: number): Date {
@@ -31,10 +34,12 @@ function toDate(seconds: number): Date {
 export function runSpansSeveralDays(
 	startedAt: number,
 	endedAt: number,
-	timeZone?: string
+	timeZone?: string,
+	display?: TimeDisplay
 ): boolean {
-	const day = withTimeZone({ dateStyle: "short" }, timeZone)
-	return formatDateTime(toDate(startedAt), day) !== formatDateTime(toDate(endedAt), day)
+	const day: Intl.DateTimeFormatOptions = { dateStyle: "short" }
+	const zoned = withTimeZone(display, timeZone)
+	return formatDateTime(toDate(startedAt), day, zoned) !== formatDateTime(toDate(endedAt), day, zoned)
 }
 
 /**
@@ -46,14 +51,15 @@ export function formatRunSpan(
 	endedAt: number,
 	options: RunTimeFormatOptions = {}
 ): string {
-	const { compact = false, timeZone } = options
-	const severalDays = runSpansSeveralDays(startedAt, endedAt, timeZone)
+	const { compact = false, timeZone, display } = options
+	const zoned = withTimeZone(display, timeZone)
+	const severalDays = runSpansSeveralDays(startedAt, endedAt, timeZone, display)
 	const dated = compact ? SHORT_DATE_AND_TIME : DATE_AND_TIME
 	const startFormat = compact && !severalDays ? TIME_ONLY : dated
 	const endFormat = severalDays ? dated : TIME_ONLY
 
-	const start = formatDateTime(toDate(startedAt), withTimeZone(startFormat, timeZone))
-	const end = formatDateTime(toDate(endedAt), withTimeZone(endFormat, timeZone))
+	const start = formatDateTime(toDate(startedAt), startFormat, zoned)
+	const end = formatDateTime(toDate(endedAt), endFormat, zoned)
 	return `${start} – ${end}`
 }
 
@@ -61,11 +67,13 @@ export function formatRunSpan(
 export function formatRunUpdateTime(
 	createdAt: number,
 	severalDays: boolean,
-	timeZone?: string
+	timeZone?: string,
+	display?: TimeDisplay
 ): string {
 	return formatDateTime(
 		toDate(createdAt),
-		withTimeZone(severalDays ? SHORT_DATE_AND_TIME : TIME_ONLY, timeZone)
+		severalDays ? SHORT_DATE_AND_TIME : TIME_ONLY,
+		withTimeZone(display, timeZone)
 	)
 }
 

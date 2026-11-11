@@ -89,7 +89,9 @@ export const useUserStore = defineStore("User", () => {
 		titleLanguage: "ENGLISH",
 		displayAdultContent: false,
 		profileColor: "#000000",
-		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+		// Null until a profile supplies one. Never the zone of the machine that created the
+		// store: during server rendering that is the server's zone, not the visitor's.
+		timezone: null
 	})
 	const mediaListOptions = ref<MediaListOptions>({
 		scoreFormat: "POINT_100",
@@ -130,7 +132,7 @@ export const useUserStore = defineStore("User", () => {
 					: options.value.titleLanguage,
 				displayAdultContent: user.options.displayAdultContent,
 				profileColor: user.options.profileColor,
-				timezone: user.options.timezone
+				timezone: user.options.timezone ?? null
 			}
 		}
 
@@ -196,7 +198,7 @@ export const useUserStore = defineStore("User", () => {
 			titleLanguage: "ENGLISH",
 			displayAdultContent: false,
 			profileColor: "#000000",
-			timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+			timezone: null
 		}
 		mediaListOptions.value = {
 			scoreFormat: "POINT_100",

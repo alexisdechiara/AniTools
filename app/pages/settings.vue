@@ -3,6 +3,7 @@ import { FEATURE_REGISTRY } from "#shared/config/features"
 import SettingsAccountCard from "~/components/settings/AccountCard.vue"
 import SettingsAppearanceCard from "~/components/settings/AppearanceCard.vue"
 import SettingsScoreFormatCard from "~/components/settings/ScoreFormatCard.vue"
+import SettingsTimeDisplayCard from "~/components/settings/TimeDisplayCard.vue"
 import SettingsLocalDataCard from "~/components/settings/LocalDataCard.vue"
 
 definePageMeta({
@@ -37,6 +38,7 @@ useSeoMeta({
 				<SettingsAccountCard />
 				<SettingsAppearanceCard />
 				<SettingsScoreFormatCard />
+				<SettingsTimeDisplayCard />
 				<SettingsLocalDataCard />
 			</div>
 		</template>
