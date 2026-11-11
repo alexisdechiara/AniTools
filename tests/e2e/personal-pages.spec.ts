@@ -121,20 +121,20 @@ test("the calendar My list toggle keeps the Watching and Planning titles", async
 	const today = new Date()
 	const airingAt = (hour: number) =>
 		Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour).getTime() / 1_000)
-	const schedule = (id: number, title: string, hour: number) => ({
-		airingAt: airingAt(hour),
-		episode: 6,
-		media: { id, countryOfOrigin: "JP", duration: 24, format: "TV", title: { english: title, romaji: title } }
-	})
+	const titles: Array<[number, string, number]> = [
+		[4_101, completed, 9],
+		[4_102, watching, 11],
+		[4_103, planning, 13],
+		[9_999, offList, 15]
+	]
+	// Each anime once under `media`; the airings refer to it by id.
 	const calendar: CalendarApiResponse = {
-		airingSchedules: [
-			schedule(4_101, completed, 9),
-			schedule(4_102, watching, 11),
-			schedule(4_103, planning, 13),
-			schedule(9_999, offList, 15)
-		],
+		media: Object.fromEntries(titles.map(([id, title]) => [
+			id,
+			{ id, countryOfOrigin: "JP", duration: 24, format: "TV", title: { english: title, romaji: title } }
+		])),
+		airings: titles.map(([mediaId, , hour]) => ({ airingAt: airingAt(hour), episode: 6, mediaId })),
 		simuldubs: [],
-		missingMedia: [],
 		warnings: []
 	}
 	await page.route(url => url.pathname === "/api/calendar", route => route.fulfill({ json: calendar }))

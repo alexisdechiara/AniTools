@@ -24,6 +24,54 @@ export const MAX_CACHED_MEDIA = 2_000
 export const MAX_AIRING_REQUESTS = 2
 export const MEDIA_IDS_PER_REQUEST = 200
 
+/** One airing of the calendar response: the anime is sent once and referenced by id. */
+export interface CalendarAiringReference {
+	airingAt: number
+	episode: number
+	mediaId: number
+	timeUntilAiring: number | null
+}
+
+export interface CalendarMediaPayload<Media extends { id: number }> {
+	/** Every anime of the range once: the ones airing plus the ones only a simuldub refers to. */
+	media: Record<string, Media>
+	airings: CalendarAiringReference[]
+}
+
+/**
+ * The calendar response body. A long-running anime airs every week of a month and several
+ * simuldubs can share one title: repeating the anime on each row multiplied the response size.
+ */
+export function toCalendarMediaPayload<Media extends { id: number }>(
+	schedules: ReadonlyArray<{
+		airingAt: number
+		episode: number
+		timeUntilAiring: number | null
+		media: Media | null
+	}>,
+	extraMedia: readonly Media[] = []
+): CalendarMediaPayload<Media> {
+	const media: Record<string, Media> = {}
+	const airings: CalendarAiringReference[] = []
+
+	for (const schedule of schedules) {
+		if (!schedule.media) continue
+		media[schedule.media.id] ??= schedule.media
+		airings.push({
+			airingAt: schedule.airingAt,
+			episode: schedule.episode,
+			mediaId: schedule.media.id,
+			timeUntilAiring: schedule.timeUntilAiring
+		})
+	}
+
+	for (const extra of extraMedia) {
+		media[extra.id] ??= extra
+	}
+
+	return { media, airings }
+}
+
 interface CachedMedia {
 	/** `null`: requested but not returned (adult, not anime or deleted), so not asked again. */
 	media: AniListMediaSummary | null

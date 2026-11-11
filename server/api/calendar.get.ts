@@ -9,7 +9,10 @@ import {
 	getAniListAiringIds,
 	getAniListMediaByIdsBatch
 } from "~~/server/utils/anilist-client"
-import { createCalendarAiringLoader } from "~~/server/utils/calendar-airing"
+import {
+	createCalendarAiringLoader,
+	toCalendarMediaPayload
+} from "~~/server/utils/calendar-airing"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseCalendarQuery } from "~~/server/utils/request-validation"
 import { withTimeout } from "~~/server/utils/with-timeout"
@@ -251,10 +254,10 @@ export default defineEventHandler(async (event) => {
 	]
 
 	setResponseHeader(event, "Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300")
+	// Each anime is sent once (`media`) and referenced by `mediaId`; see toCalendarMediaPayload.
 	return {
-		airingSchedules: airingResult.value,
+		...toCalendarMediaPayload(airingResult.value, missingMediaResult.media),
 		simuldubs,
-		missingMedia: missingMediaResult.media,
 		warnings
 	}
 })

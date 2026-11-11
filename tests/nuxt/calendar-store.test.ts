@@ -1,5 +1,6 @@
 import { registerEndpoint } from "@nuxt/test-utils/runtime"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { watch } from "vue"
 import { MY_LIST_STATUSES, useCalendarStore } from "~/stores/Calendar"
 import { useEntriesStore } from "~/stores/Entries"
 import { usePreferencesStore } from "~/stores/Preferences"
@@ -256,5 +257,34 @@ describe("Calendar store My list filter", () => {
 		expect(store.currentStatus).toEqual([])
 		expect(store.isMyListActive).toBe(false)
 		expect(store.listError).toBe(false)
+	})
+
+	it("starts on the week vue-cal displays, ending on the last millisecond of Sunday", () => {
+		const { start, end } = useCalendarStore().dateRange
+
+		expect(start.getDay()).toBe(1)
+		expect(end.getDay()).toBe(0)
+		expect([end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds()])
+			.toEqual([23, 59, 59, 999])
+	})
+
+	it("replaces the date range in one step and ignores an identical range", () => {
+		const store = useCalendarStore()
+		const seen: Array<[number, number]> = []
+		const stop = watch(
+			() => [store.airingAtGreater, store.airingAtLesser] as [number, number],
+			range => seen.push(range),
+			{ flush: "sync" }
+		)
+		const start = new Date(2026, 10, 1)
+		const end = new Date(2026, 11, 6, 23, 59, 59, 999)
+
+		store.updateDateRange(start, end)
+		store.updateDateRange(new Date(start), new Date(end))
+		stop()
+
+		// A half-updated range (new start, old end) used to trigger a request of its own.
+		expect(seen).toEqual([[Math.floor(start.getTime() / 1000), Math.floor(end.getTime() / 1000)]])
+		expect(store.dateRange).toEqual({ start, end })
 	})
 })

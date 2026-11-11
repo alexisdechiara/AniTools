@@ -109,7 +109,7 @@ test("the unauthenticated session endpoint never exposes a token", async ({ requ
 
 test("the calendar My list toggle explains itself to a guest instead of filtering", async ({ page }) => {
 	await page.route(url => url.pathname === "/api/calendar", route => route.fulfill({
-		json: { airingSchedules: [], simuldubs: [], missingMedia: [], warnings: [] }
+		json: { media: {}, airings: [], simuldubs: [], warnings: [] }
 	}))
 	// Reached by a client-side navigation so the calendar request is made by the browser.
 	await page.goto("/login")
