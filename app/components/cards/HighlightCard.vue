@@ -1,176 +1,62 @@
-<template>
-  <MetricsCard v-bind="$attrs">
-    <div class="grid grid-cols-13 gap-x-6">
-      <div
-        class="col-span-6 flex justify-center items-center h-full w-full max-w-50 relative"
-      >
-        <template v-for="(anime, index) in highlightedAnimes" :key="anime.title">
-          <NuxtImg
-            v-if="anime.src"
-            v-show="index >= currentIndex"
-            :src="anime.src"
-            fit="cover"
-            class="h-fit w-full scale-90 aspect-3/4 rounded-lg transition-[scale,translate,opacity] absolute"
-            :class="[
-              indexToRotate(index),
-              index === currentIndex && 'animate-pulsing-jiggle',
-            ]"
-          />
-        </template>
-      </div>
-      <div class="col-span-7 flex flex-col gap-y-3 size-full relative">
-        <span
-          v-if="currentHighlightedAnime?.title"
-          class="text-xs text-toned font-medium text-pretty"
-        >
-          {{ currentHighlightedAnime.title }}
-        </span>
-        <span
-          v-if="currentHighlightedAnime?.name"
-          class="text-2xl font-semibold text-highlighted text-ellipsis"
-        >
-          {{ currentHighlightedAnime.name }}
-        </span>
-        <span
-          v-if="currentHighlightedAnime?.value"
-          class="text-4xl font-bold text-highlighted text-ellipsis"
-        >
-          {{ currentHighlightedAnime.value }}
-        </span>
-        <span v-else class="text-sm text-gray-500">No data available</span>
-        <div class="absolute top-0 right-0 flex gap-x-3 h-fit">
-          <UButton
-            icon="i-lucide-chevron-left"
-            size="xs"
-            color="neutral"
-            variant="link"
-            aria-label="Previous highlight"
-            :disabled="currentIndex === 0"
-            @click="currentIndex > 0 && currentIndex--"
-            :ui="{ base: 'p-0 cursor-pointer' }"
-          />
-          <UButton
-            icon="i-lucide-chevron-right"
-            size="xs"
-            color="neutral"
-            variant="link"
-            aria-label="Next highlight"
-            :disabled="currentIndex >= highlightedAnimes.length - 1"
-            @click="currentIndex < highlightedAnimes.length - 1 && currentIndex++"
-            :ui="{ base: 'p-0 cursor-pointer' }"
-          />
-        </div>
-      </div>
-    </div>
-  </MetricsCard>
-</template>
-
 <script lang="ts" setup>
-import { getMediaCover } from "~/utils/media-display";
-import { getEntryWatchMinutes } from "~/utils/statistics";
+import HighlightCarousel, {
+	type HighlightCarouselItem
+} from "~/components/cards/HighlightCarousel.vue"
+import { getMediaCover } from "~/utils/media-display"
+import { getEntryWatchMinutes } from "~/utils/statistics"
 
 const { getBestScoreAnime, getLongestAnime, getMostWatchedAnime } = storeToRefs(
-  useStatisticsStore()
-);
+	useStatisticsStore()
+)
 
-type Highlight = {
-  title: string;
-  name: string | null;
-  src?: string | null;
-  value: string | null;
-};
+const { format: formatScore } = usePersonalScore()
+const { title: getAnimeTitle } = useMediaTitle()
 
-const currentIndex = ref(0);
-const { format: formatScore } = usePersonalScore();
-const { title: getAnimeTitle } = useMediaTitle();
-const highlightedAnimes = computed<Highlight[]>(() => {
-  const highlights: Highlight[] = [];
-  const bestScore = getBestScoreAnime.value;
-  const longest = getLongestAnime.value;
-  const mostRewatched = getMostWatchedAnime.value;
+const highlights = computed<HighlightCarouselItem[]>(() => {
+	const items: HighlightCarouselItem[] = []
+	const bestScore = getBestScoreAnime.value
+	const longest = getLongestAnime.value
+	const mostRewatched = getMostWatchedAnime.value
 
-  if (bestScore?.media) {
-    highlights.push({
-      title: "Best rated anime",
-      name: getAnimeTitle(bestScore.media),
-      src: getMediaCover(bestScore.media),
-      value: bestScore.score ? formatScore(bestScore.score) : null,
-    });
-  }
+	if (bestScore?.media) {
+		items.push({
+			key: "best-rated",
+			label: "Best rated anime",
+			title: getAnimeTitle(bestScore.media),
+			cover: getMediaCover(bestScore.media, "medium"),
+			value: bestScore.score ? formatScore(bestScore.score) : null
+		})
+	}
 
-  if (longest?.media) {
-    highlights.push({
-      title: "Longest watch time",
-      name: getAnimeTitle(longest.media),
-      src: getMediaCover(longest.media),
-      value: formatWatchTime(getEntryWatchMinutes(longest)),
-    });
-  }
+	if (longest?.media) {
+		items.push({
+			key: "longest",
+			label: "Longest watch time",
+			title: getAnimeTitle(longest.media),
+			cover: getMediaCover(longest.media, "medium"),
+			value: formatWatchTime(getEntryWatchMinutes(longest))
+		})
+	}
 
-  if (mostRewatched?.media) {
-    const repeats = mostRewatched.repeat ?? 0;
-    highlights.push({
-      title: "Most rewatched anime",
-      name: getAnimeTitle(mostRewatched.media),
-      src: getMediaCover(mostRewatched.media),
-      value: `${repeats} ${repeats === 1 ? "time" : "times"}`,
-    });
-  }
+	if (mostRewatched?.media) {
+		const repeats = mostRewatched.repeat ?? 0
+		items.push({
+			key: "most-rewatched",
+			label: "Most rewatched anime",
+			title: getAnimeTitle(mostRewatched.media),
+			cover: getMediaCover(mostRewatched.media, "medium"),
+			value: `${repeats} ${repeats === 1 ? "time" : "times"}`
+		})
+	}
 
-  return highlights;
-});
-
-watch(highlightedAnimes, (highlights) => {
-  if (currentIndex.value >= highlights.length) {
-    currentIndex.value = Math.max(0, highlights.length - 1);
-  }
-});
-
-function indexToRotate(index: number): string {
-  switch (index) {
-    case 0:
-      return "rotate-[3deg] z-100";
-    case 1:
-      return "-rotate-[6deg] z-90";
-    case 2:
-      return "rotate-[1deg] z-80";
-    default:
-      return "";
-  }
-}
-
-const currentHighlightedAnime = computed(() => {
-  return highlightedAnimes.value[currentIndex.value];
-});
+	return items
+})
 </script>
 
-<style scoped>
-.animate-pulsing-jiggle {
-  animation-name: pulsing-jiggle;
-  animation-duration: 0.2s;
-  animation-timing-function: ease-in-out;
-  animation-fill-mode: both;
-}
-
-@keyframes pulsing-jiggle {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-
-  25% {
-    transform: rotate(1deg) scale(1.025);
-  }
-
-  50% {
-    transform: rotate(0deg) scale(1.05);
-  }
-
-  75% {
-    transform: rotate(-1deg) scale(1.025);
-  }
-
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-}
-</style>
+<template>
+	<MetricsCard v-bind="$attrs">
+		<HighlightCarousel
+			:items="highlights"
+			empty-label="No highlight yet. Score or finish a few anime on AniList to see them here." />
+	</MetricsCard>
+</template>

@@ -46,12 +46,12 @@ test("Rewind opens on the current year and counts the mocked activities", async 
 	const year = new Date().getUTCFullYear()
 	await expect(page).toHaveURL(url => url.pathname === `/rewind/${year}`)
 	await expect(page.getByRole("heading", { name: "Anime Rewind" })).toBeVisible()
-	// The metric card renders its value in a span titled with that value, next to the card title.
-	const listUpdates = page
-		.getByText("List updates", { exact: true })
-		.locator("xpath=ancestor::*[.//span[@title]][1]//span[@title]")
-	// The fixture records four anime activities this year (one per watched entry, at most four).
-	await expect(listUpdates).toHaveText("4")
+	// The fixture records four anime activities this year (one per watched entry, at most four),
+	// so the year counts four anime, in the numbers band and in the opening sentence.
+	await expect(page.locator("[data-rewind-stat='anime'] dd")).toHaveText("4")
+	await expect(page.locator("[data-rewind-headline]")).toContainText("4 anime")
+	await expect(page.getByRole("heading", { name: "The year in numbers", level: 2 })).toBeVisible()
+	await expect(page.getByRole("link", { name: "Share this Rewind" })).toHaveAttribute("href", "/create")
 	expect(calls.activities).toBeGreaterThan(0)
 })
 
@@ -84,6 +84,10 @@ test("Explore reuses the loaded collection and settles without an error", async 
 	await expect(page.getByText("You reached the end of this deck")).toBeVisible()
 	await expect(page.getByText("Discovery data could not be loaded")).toHaveCount(0)
 	await expect(page.getByText("Some suggestions could not be loaded")).toHaveCount(0)
+	// A public profile cannot write to AniList: the deck says so instead of a disabled button.
+	await expect(page.getByRole("button", { name: "Add all to Plan to Watch" })).toHaveCount(0)
+	await expect(page.getByRole("link", { name: "Sign in with AniList to save these to Plan to Watch" }))
+		.toHaveAttribute("href", "/login?redirect=/explore")
 
 	expect(calls.recommendations).toBeGreaterThan(0)
 	expect(calls.studioMedia).toBeGreaterThan(0)
