@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import StatisticsMediaStrip from "~/components/statistics/StatisticsMediaStrip.vue"
 import StatisticsPageShell from "~/components/statistics/StatisticsPageShell.vue"
+import { formatMeanScore } from "~/utils/score-format"
 import {
 	filterAndSortPeopleStatistics,
 	getAniListStaffUrl,
@@ -16,12 +17,13 @@ const props = defineProps<{
 }>()
 
 const statisticsStore = useStatisticsStore()
+const preferences = usePreferencesStore()
 const { staff, voiceActors } = storeToRefs(statisticsStore)
 const selectedMetric = ref<StatisticsPeopleMetric>("count")
 const search = ref("")
 const metricOptions = [
 	{ label: "Count", value: "count", icon: "i-lucide-list-ordered" },
-	{ label: "Mean score", value: "meanScore", icon: "i-lucide-percent" },
+	{ label: "Mean score", value: "meanScore", icon: "i-lucide-star" },
 	{ label: "Time watched", value: "minutesWatched", icon: "i-lucide-clock-3" }
 ]
 const items = computed(() =>
@@ -114,20 +116,23 @@ const visibleItems = computed(() =>
 										:label="item.language"
 										color="primary"
 										variant="soft"
-										size="sm"/>
+										size="sm"
+										class="text-xs tracking-normal normal-case"/>
 									<UBadge
 										v-if="item.characterCount !== null"
 										:label="`${item.characterCount} ${item.characterCount === 1 ? 'character' : 'characters'}`"
 										color="neutral"
 										variant="soft"
-										size="sm"/>
+										size="sm"
+										class="text-xs tracking-normal normal-case"/>
 									<UBadge
 										v-for="occupation in item.occupations.slice(0, 2)"
 										:key="occupation"
 										:label="occupation"
 										color="neutral"
 										variant="soft"
-										size="sm"/>
+										size="sm"
+										class="text-xs tracking-normal normal-case"/>
 								</div>
 								<dl class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
 									<div
@@ -140,7 +145,7 @@ const visibleItems = computed(() =>
 										class="rounded-lg px-2.5 py-2"
 										:class="selectedMetric === 'meanScore' ? 'bg-primary/10' : 'bg-muted/40'">
 										<dt class="text-xs text-muted">Mean score</dt>
-										<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ Number(item.meanScore.toFixed(2)) }}%</dd>
+										<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ formatMeanScore(item.meanScore, preferences.scoreFormat) }}</dd>
 									</div>
 									<div
 										class="rounded-lg px-2.5 py-2"
