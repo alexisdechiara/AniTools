@@ -112,3 +112,27 @@ export function buildCalendarEvents(
 		|| (left.episode ?? 0) - (right.episode ?? 0)
 	)
 }
+
+interface ListFilterableEvent {
+	media?: { id?: number | null } | null
+}
+
+/**
+ * Keeps the events whose media is on the list with one of `statuses`. With no status selected
+ * every event is kept; under an active filter an event without a media id is hidden.
+ */
+export function filterCalendarEventsByListStatus<T extends ListFilterableEvent>(
+	events: readonly T[],
+	statusByMediaId: ReadonlyMap<number, string>,
+	statuses: readonly string[]
+): T[] {
+	if (statuses.length === 0) return [...events]
+
+	const selected = new Set(statuses)
+	return events.filter((event) => {
+		const mediaId = event.media?.id
+		if (mediaId == null) return false
+		const status = statusByMediaId.get(mediaId)
+		return status !== undefined && selected.has(status)
+	})
+}

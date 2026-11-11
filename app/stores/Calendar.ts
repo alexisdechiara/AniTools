@@ -20,9 +20,13 @@ export function getDubbingLabel(code: string): string {
 	return DUBBING_LABELS[code] ?? code.toUpperCase()
 }
 
+/** The list statuses the header "My list" toggle stands for. */
+export const MY_LIST_STATUSES = ["CURRENT", "PLANNING"] as const
+
 export const useCalendarStore = defineStore("Calendar", () => {
 	const userStore = useUserStore()
 	const entriesStore = useEntriesStore()
+	const preferences = usePreferencesStore()
 
 	// ========== Refs UI ==========
 	const currentView = ref<CalendarView>("week")
@@ -41,11 +45,20 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	const dubbing = ref<string[]>(["jp", "cn", "en", "fr"])
 	// Languages the user explicitly unticked; they stay unticked across date ranges.
 	const excludedDubbing = ref<string[]>([])
+	// True when the list behind the status filter could not be loaded.
+	const listError = ref(false)
+	// Only the latest list request may report a failure.
+	let listRequest = 0
 
 	// ========== Getters ==========
 	const isMonthView = computed(() => currentView.value === "month")
 	const isDayView = computed(() => currentView.value === "day")
 	const isWeekView = computed(() => currentView.value === "week")
+	const hasStatusFilter = computed(() => currentStatus.value.length > 0)
+	const isMyListActive = computed(() =>
+		currentStatus.value.length === MY_LIST_STATUSES.length
+		&& MY_LIST_STATUSES.every(status => currentStatus.value.includes(status))
+	)
 
 	// ========== Actions Date Range ==========
 	const updateDateRange = (start: Date, end: Date) => {
@@ -89,8 +102,52 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		} else {
 			currentStatus.value.push(format)
 		}
-		// The list is only needed for this filter: load it on first use (no-op once loaded).
-		if (currentStatus.value.length > 0) void entriesStore.fetchAllAnimes().catch(() => undefined)
+		// Editing the selection by hand decides whether "My list" is what gets remembered.
+		preferences.setCalendarMyList(isMyListActive.value)
+		syncList()
+	}
+
+	/**
+	 * The list only serves the status filter: load it on first use (no-op once loaded).
+	 * Resolves to false, and raises `listError`, when the list could not be loaded.
+	 */
+	const loadList = async (): Promise<boolean> => {
+		const request = ++listRequest
+		listError.value = false
+		if (!userStore.isAuthenticated) return false
+
+		try {
+			await entriesStore.fetchAllAnimes()
+			return true
+		} catch {
+			if (request === listRequest && currentStatus.value.length > 0) listError.value = true
+			return false
+		}
+	}
+
+	const syncList = () => {
+		if (currentStatus.value.length > 0) {
+			void loadList()
+			return
+		}
+		listRequest += 1
+		listError.value = false
+	}
+
+	const setStatuses = (statuses: readonly string[]) => {
+		currentStatus.value = [...new Set(statuses)]
+		syncList()
+	}
+
+	/** The header toggle: Watching + Planning replace any selection, off clears every status. */
+	const setMyList = (active: boolean) => {
+		preferences.setCalendarMyList(active)
+		setStatuses(active ? MY_LIST_STATUSES : [])
+	}
+
+	/** Refetches the list for the current identity while a status filter is active. */
+	const refreshList = () => {
+		if (currentStatus.value.length > 0) void loadList()
 	}
 
 	const toggleDubbing = (lang: string) => {
@@ -225,6 +282,8 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentStatus.value = []
 		dubbing.value = ["jp", "cn", "en", "fr"]
 		excludedDubbing.value = []
+		listRequest += 1
+		listError.value = false
 	}
 
 	return {
@@ -241,17 +300,24 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentFormat,
 		currentStatus,
 		dubbing,
+		listError,
 
 		// Getters
 		isMonthView,
 		isDayView,
 		isWeekView,
+		hasStatusFilter,
+		isMyListActive,
 
 		// Actions
 		updateDateRange,
 		setDateRangeFromView,
 		handleWheel,
 		toggleFormat,
+		toggleStatus,
+		setStatuses,
+		setMyList,
+		refreshList,
 		toggleDubbing,
 		setAvailableDubbingOptions,
 		getFilterMenuItems,

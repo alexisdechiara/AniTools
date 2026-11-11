@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const preferences = usePreferencesStore()
+const calendarStore = useCalendarStore()
 const { reset: resetDashboardLayout } = useDashboardCards()
 const toast = useToast()
 
@@ -26,6 +27,11 @@ const storedItems: StoredItem[] = [
 		detail: "Which cards you keep, and in which order."
 	},
 	{
+		icon: "i-lucide-bookmark",
+		label: "Calendar: My list",
+		detail: "Whether the calendar opens filtered to your list. Saved per browser, not per profile."
+	},
+	{
 		icon: "i-lucide-rows-3",
 		label: "Tier lists",
 		detail: "Tiers, layout and the anime you placed. Edit them from Tierlist."
@@ -35,13 +41,29 @@ const storedItems: StoredItem[] = [
 const layoutResetOpen = ref(false)
 const preferencesResetOpen = ref(false)
 
+// Also turns the filter off when it is on in this tab, so the calendar matches what is stored.
+function forgetCalendarMyList() {
+	if (calendarStore.isMyListActive) calendarStore.setMyList(false)
+	preferences.setCalendarMyList(false)
+}
+
 function resetPreferences() {
+	forgetCalendarMyList()
 	preferences.reset()
 	preferencesResetOpen.value = false
 	toast.add({
 		title: "Preferences reset",
-		description: "Score display is back to Percentage.",
+		description: "Score display is back to Percentage, and the calendar opens unfiltered.",
 		icon: "i-lucide-rotate-ccw"
+	})
+}
+
+function resetCalendarMyList() {
+	forgetCalendarMyList()
+	toast.add({
+		title: "Calendar: My list reset",
+		description: "The calendar opens unfiltered again.",
+		icon: "i-lucide-bookmark"
 	})
 }
 
@@ -91,13 +113,20 @@ function resetLayout() {
 					variant="soft"
 					class="rounded-full"
 					@click="layoutResetOpen = true" />
+				<UButton
+					label="Reset Calendar: My list"
+					icon="i-lucide-bookmark"
+					color="neutral"
+					variant="soft"
+					class="rounded-full"
+					@click="resetCalendarMyList" />
 			</div>
 		</div>
 
 		<UModal
 			v-model:open="preferencesResetOpen"
 			title="Reset display preferences?"
-			description="Your score display format goes back to the AniTools default, and this can't be undone.">
+			description="Your score display format and the Calendar: My list choice go back to the AniTools default, and this can't be undone.">
 			<template #footer>
 				<UButton
 					label="Keep my preferences"

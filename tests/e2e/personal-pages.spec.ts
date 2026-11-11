@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
-import { mockPublicProfile, openAs, submitPublicProfile } from "./fixtures/anilist"
+import type { CalendarApiResponse } from "../../app/types/calendar"
+import { fixtureTitle, mockPublicProfile, openAs, submitPublicProfile } from "./fixtures/anilist"
 
 // Every page below is reached by clicking the app's own navigation: a full document load would be
 // rendered on the server, which cannot see these browser-side mocks and would forget the profile.
@@ -108,4 +109,61 @@ test("switching to another public profile shows none of the previous profile's d
 	await expect(page.getByText("E2eAlpha anime")).toHaveCount(0)
 	await expect(page.getByRole("button", { name: /E2eAlpha/ })).toHaveCount(0)
 	expect(betaCalls.animeCollection).toBe(1)
+})
+
+test("the calendar My list toggle keeps the Watching and Planning titles", async ({ page }) => {
+	const calls = await mockPublicProfile(page, { username: "E2eAlpha" })
+	// The first mocked profile owns media 4101 (completed), 4102 (watching) and 4103 (planning).
+	const completed = fixtureTitle("E2eAlpha", 4_101)
+	const watching = fixtureTitle("E2eAlpha", 4_102)
+	const planning = fixtureTitle("E2eAlpha", 4_103)
+	const offList = "E2E anime off the list"
+	const today = new Date()
+	const airingAt = (hour: number) =>
+		Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour).getTime() / 1_000)
+	const schedule = (id: number, title: string, hour: number) => ({
+		airingAt: airingAt(hour),
+		episode: 6,
+		media: { id, countryOfOrigin: "JP", duration: 24, format: "TV", title: { english: title, romaji: title } }
+	})
+	const calendar: CalendarApiResponse = {
+		airingSchedules: [
+			schedule(4_101, completed, 9),
+			schedule(4_102, watching, 11),
+			schedule(4_103, planning, 13),
+			schedule(9_999, offList, 15)
+		],
+		simuldubs: [],
+		missingMedia: [],
+		warnings: []
+	}
+	await page.route(url => url.pathname === "/api/calendar", route => route.fulfill({ json: calendar }))
+	await openAs(page, "E2eAlpha", "/")
+
+	await openFromNavigation(page, "Calendar")
+
+	await expect(page).toHaveURL(url => url.pathname === "/calendar")
+	const toggle = page.getByRole("button", { name: "My list", exact: true })
+	const eventOf = (title: string) => page.getByRole("button", { name: `${title}, episode 6` })
+	await expect(toggle).toHaveAttribute("aria-pressed", "false")
+	await expect(eventOf(completed)).toBeVisible()
+	await expect(eventOf(offList)).toBeVisible()
+
+	await toggle.click()
+
+	await expect(toggle).toHaveAttribute("aria-pressed", "true")
+	await expect(eventOf(watching)).toBeVisible()
+	await expect(eventOf(planning)).toBeVisible()
+	await expect(eventOf(completed)).toHaveCount(0)
+	await expect(eventOf(offList)).toHaveCount(0)
+	await expect(page.getByRole("button", { name: "Filter calendar events, filters active" })).toBeVisible()
+	await expect(page.getByText("My list on, 2 events")).toBeAttached()
+	expect(calls.animeCollection).toBeLessThanOrEqual(1)
+
+	await toggle.click()
+
+	await expect(toggle).toHaveAttribute("aria-pressed", "false")
+	await expect(eventOf(completed)).toBeVisible()
+	await expect(eventOf(offList)).toBeVisible()
+	await expect(page.getByRole("button", { name: "Filter calendar events", exact: true })).toBeVisible()
 })

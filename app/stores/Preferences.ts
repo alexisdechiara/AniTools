@@ -11,24 +11,33 @@ function isAniListScoreFormat(value: unknown): value is AniListScoreFormat {
 
 export const usePreferencesStore = defineStore("preferences", () => {
 	const scoreFormat = ref<AniListScoreFormat>("POINT_100")
+	// Whether the calendar opens filtered to the visitor's list. Per browser, not per profile.
+	const calendarMyList = ref(false)
 
 	function setScoreFormat(format: AniListScoreFormat) {
 		if (!isAniListScoreFormat(format)) return
 		scoreFormat.value = format
 	}
 
+	function setCalendarMyList(active: boolean) {
+		calendarMyList.value = active === true
+	}
+
 	function reset() {
 		scoreFormat.value = "POINT_100"
+		calendarMyList.value = false
 	}
 
 	return {
 		scoreFormat,
+		calendarMyList,
 		setScoreFormat,
+		setCalendarMyList,
 		reset
 	}
 }, {
 	persist: {
 		storage: piniaPluginPersistedstate.localStorage(),
-		pick: ["scoreFormat"]
+		pick: ["scoreFormat", "calendarMyList"]
 	}
 })
