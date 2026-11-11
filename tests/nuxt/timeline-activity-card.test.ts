@@ -63,7 +63,11 @@ describe("TimelineActivityCard", () => {
 		expect(toggle.element.tagName).toBe("BUTTON")
 		expect(toggle.text()).toBe("Show 3 updates")
 		expect(toggle.attributes("aria-expanded")).toBe("false")
-		expect(card.find("ol").exists()).toBe(false)
+
+		// The controlled list always exists, hidden while collapsed.
+		const list = card.get("ol")
+		expect(list.attributes("id")).toBe(toggle.attributes("aria-controls"))
+		expect(list.attributes("style")).toContain("display: none")
 	})
 
 	it("toggles aria-expanded and the list of updates, newest first", async () => {
@@ -83,6 +87,7 @@ describe("TimelineActivityCard", () => {
 
 		const list = card.get("ol")
 		expect(list.attributes("id")).toBe(toggle.attributes("aria-controls"))
+		expect(list.attributes("style") ?? "").not.toContain("display: none")
 		expect(list.findAll("li").map(item => item.get("span").text())).toEqual([
 			"watched episode · 5",
 			"watched episode · 4",
@@ -96,7 +101,31 @@ describe("TimelineActivityCard", () => {
 
 		await toggle.trigger("click")
 		expect(toggle.attributes("aria-expanded")).toBe("false")
-		expect(card.find("ol").exists()).toBe(false)
+		expect(card.get("ol").attributes("style")).toContain("display: none")
+	})
+
+	it("shows the time of a single update unless the timestamp is turned off", async () => {
+		const single = activity(1, NOON, "1122")
+		const card = await mountSuspended(TimelineActivityCard, {
+			props: { activity: single }
+		})
+		const time = card.get("time")
+		expect(time.attributes("datetime")).toBe(new Date(NOON * 1_000).toISOString())
+		expect(time.text()).not.toBe("")
+
+		const hidden = await mountSuspended(TimelineActivityCard, {
+			props: { activity: single, showTimestamp: false }
+		})
+		expect(hidden.find("time").exists()).toBe(false)
+
+		const run = singleRun([
+			activity(1, NOON, "3"),
+			activity(2, NOON + 25 * MINUTE, "4")
+		])
+		const hiddenRun = await mountSuspended(TimelineActivityCard, {
+			props: { activity: run.activity, run, showTimestamp: false }
+		})
+		expect(hiddenRun.find("[data-timeline-run-span]").exists()).toBe(false)
 	})
 
 	it("renders a run of one as a plain card without a toggle", async () => {

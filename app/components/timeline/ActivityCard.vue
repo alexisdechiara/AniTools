@@ -10,7 +10,7 @@ import {
 } from "~/utils/timeline-run-format"
 import type { TimelineEpisodeRun } from "~/utils/timeline-runs"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
 	activity: AniListActivity
 	/** Consecutive episode updates folded into this card; one update renders as a plain card. */
 	run?: TimelineEpisodeRun
@@ -18,7 +18,13 @@ const props = defineProps<{
 	side?: "left" | "right"
 	showTimestamp?: boolean
 	compact?: boolean
-}>()
+}>(), {
+	run: undefined,
+	layout: "vertical",
+	side: "right",
+	// Without this default Vue casts an absent boolean prop to false and hides the time.
+	showTimestamp: true
+})
 
 const { title: getAnimeTitle } = useMediaTitle()
 
@@ -125,7 +131,7 @@ const imageOrderClass = computed(() =>
 			<div class="flex items-start justify-between gap-3">
 				<UBadge v-if="!compact" :label="badge" color="neutral" variant="soft" size="sm"/>
 				<time
-					v-if="mergedRun && runStartedAt"
+					v-if="mergedRun && runStartedAt && showTimestamp"
 					:datetime="runStartedAt.toISOString()"
 					class="text-right text-xs text-dimmed"
 					:class="compact ? 'ml-auto' : ''"
@@ -133,7 +139,7 @@ const imageOrderClass = computed(() =>
 					{{ runSpan }}
 				</time>
 				<time
-					v-else-if="props.showTimestamp !== false"
+					v-else-if="showTimestamp"
 					:datetime="timestamp.toISOString()"
 					class="shrink-0 text-xs text-dimmed"
 					:class="compact ? 'ml-auto' : ''">
@@ -176,7 +182,7 @@ const imageOrderClass = computed(() =>
 						data-timeline-run-toggle
 						@click="expanded = !expanded" />
 					<ol
-						v-if="expanded"
+						v-show="expanded"
 						:id="updatesListId"
 						class="mt-3 divide-y divide-default border-t border-default"
 						:aria-label="`${mergedRun.activities.length} updates, newest first`">
@@ -184,7 +190,7 @@ const imageOrderClass = computed(() =>
 							v-for="update in runUpdates"
 							:key="update.id"
 							class="flex justify-between gap-3 py-2 text-xs last:pb-0">
-							<span class="min-w-0 break-words text-toned">{{ update.label }}</span>
+							<span class="min-w-0 wrap-break-word text-toned">{{ update.label }}</span>
 							<time :datetime="update.datetime" class="shrink-0 text-dimmed">{{ update.time }}</time>
 						</li>
 					</ol>
