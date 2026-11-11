@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const preferences = usePreferencesStore()
 const calendarStore = useCalendarStore()
+const explorePicks = useExplorePicksStore()
 const { reset: resetDashboardLayout } = useDashboardCards()
 const toast = useToast()
 
@@ -35,11 +36,17 @@ const storedItems: StoredItem[] = [
 		icon: "i-lucide-rows-3",
 		label: "Tier lists",
 		detail: "Tiers, layout and the anime you placed. Edit them from Tierlist."
+	},
+	{
+		icon: "i-lucide-heart",
+		label: "Explore picks",
+		detail: "Interested and passed titles, kept per profile. Up to 100 picks and 1 000 passes."
 	}
 ]
 
 const layoutResetOpen = ref(false)
 const preferencesResetOpen = ref(false)
+const picksResetOpen = ref(false)
 
 // Also turns the filter off when it is on in this tab, so the calendar matches what is stored.
 function forgetCalendarMyList() {
@@ -74,6 +81,16 @@ function resetLayout() {
 		title: "Dashboard layout reset",
 		description: "The default cards are back, in their original order.",
 		icon: "i-lucide-layout-dashboard"
+	})
+}
+
+function resetExplorePicks() {
+	explorePicks.clearAll()
+	picksResetOpen.value = false
+	toast.add({
+		title: "Explore picks cleared",
+		description: "Interested and passed titles are forgotten for every profile on this device.",
+		icon: "i-lucide-heart"
 	})
 }
 </script>
@@ -120,6 +137,14 @@ function resetLayout() {
 					variant="soft"
 					class="rounded-full"
 					@click="resetCalendarMyList" />
+				<UButton
+					label="Clear Explore picks"
+					icon="i-lucide-heart"
+					color="neutral"
+					variant="soft"
+					class="rounded-full"
+					@click="picksResetOpen = true" />
+
 			</div>
 		</div>
 
@@ -150,6 +175,21 @@ function resetLayout() {
 					class="ms-auto rounded-full"
 					@click="layoutResetOpen = false" />
 				<UButton label="Reset layout" color="error" class="rounded-full" @click="resetLayout" />
+			</template>
+		</UModal>
+
+		<UModal
+			v-model:open="picksResetOpen"
+			title="Clear Explore picks?"
+			description="Your interested and passed titles are forgotten for every profile on this device. Passed titles can then be suggested again, and this can't be undone.">
+			<template #footer>
+				<UButton
+					label="Keep my picks"
+					color="neutral"
+					variant="outline"
+					class="ms-auto rounded-full"
+					@click="picksResetOpen = false" />
+				<UButton label="Clear picks" color="error" class="rounded-full" @click="resetExplorePicks" />
 			</template>
 		</UModal>
 	</UPageCard>

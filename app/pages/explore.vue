@@ -6,6 +6,7 @@ import type {
 } from "~~/shared/types/anilist"
 import ExploreInterestedDeck from "~/components/explore/InterestedDeck.vue"
 import ExploreSwipeDeck from "~/components/explore/SwipeDeck.vue"
+import type { ExplorePickMedia } from "~/utils/explore-picks"
 
 definePageMeta({
 	feature: "explore",
@@ -51,8 +52,13 @@ const {
 	loadStudio
 } = useExplore()
 
-const decidedMediaIds = ref<Set<number>>(new Set())
-const interestedMedia = ref<AniListMediaSummary[]>([])
+// Picks and passes are saved per profile on this device. The undo history stays in memory.
+const picksStore = useExplorePicksStore()
+const {
+	decidedIds: decidedMediaIds,
+	interested: interestedMedia,
+	passed: passedMediaIds
+} = storeToRefs(picksStore)
 const decisionHistory = ref<SwipeDecision[]>([])
 const addedMediaIds = ref<Set<number>>(new Set())
 const addingMediaIds = ref<Set<number>>(new Set())
@@ -133,29 +139,25 @@ async function loadMoreCandidates(): Promise<void> {
 }
 
 function handleDecision(payload: SwipeDecision): void {
-	decidedMediaIds.value = new Set([...decidedMediaIds.value, payload.media.id])
 	decisionHistory.value = [...decisionHistory.value, payload]
 
-	if (payload.direction === "right") {
-		interestedMedia.value = [
-			...interestedMedia.value.filter(media => media.id !== payload.media.id),
-			payload.media
-		]
-	}
+	if (payload.direction === "right") picksStore.pick(payload.media)
+	else picksStore.pass(payload.media.id)
 
 	if (swipeQueue.value.length <= 5 && hasMorePages.value) {
 		void loadMoreCandidates()
 	}
 }
 
-function restoreDecision(media: AniListMediaSummary): void {
-	const nextDecidedIds = new Set(decidedMediaIds.value)
-	nextDecidedIds.delete(media.id)
-	decidedMediaIds.value = nextDecidedIds
-	interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+function forgetDecisionHistory(mediaId: number): void {
 	decisionHistory.value = decisionHistory.value.filter(
-		decision => decision.media.id !== media.id
+		decision => decision.media.id !== mediaId
 	)
+}
+
+function restoreDecision(media: ExplorePickMedia): void {
+	picksStore.restore(media.id)
+	forgetDecisionHistory(media.id)
 }
 
 function undoLastDecision(): void {
@@ -163,24 +165,22 @@ function undoLastDecision(): void {
 	if (!previous) return
 
 	decisionHistory.value = decisionHistory.value.slice(0, -1)
-	const nextDecidedIds = new Set(decidedMediaIds.value)
-	nextDecidedIds.delete(previous.media.id)
-	decidedMediaIds.value = nextDecidedIds
-	if (previous.direction === "right") {
-		interestedMedia.value = interestedMedia.value.filter(
-			media => media.id !== previous.media.id
-		)
-	}
+	picksStore.restore(previous.media.id)
 }
 
+// "Start over" brings the passed titles back. Saved picks only go through "Clear picks".
 function resetDecisions(): void {
-	decidedMediaIds.value = new Set()
-	interestedMedia.value = []
+	picksStore.clearPassed()
+	decisionHistory.value = decisionHistory.value.filter(decision => decision.direction === "right")
+}
+
+function clearPicks(): void {
+	picksStore.clear()
 	decisionHistory.value = []
 }
 
 async function saveToPlanning(
-	media: AniListMediaSummary,
+	media: ExplorePickMedia,
 	notify = true
 ): Promise<boolean> {
 	if (!userStore.isOAuthAuthenticated || addingMediaIds.value.has(media.id)) return false
@@ -192,7 +192,9 @@ async function saveToPlanning(
 			body: { mediaId: media.id }
 		})
 		addedMediaIds.value = new Set([...addedMediaIds.value, media.id])
-		interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+		// The title is now excluded through the list, so it is no longer a pending pick.
+		picksStore.restore(media.id)
+		forgetDecisionHistory(media.id)
 		// The list changed on AniList: other pages must refetch instead of trusting their copy.
 		useEntriesStore().invalidate()
 		useStatisticsStore().invalidate()
@@ -222,7 +224,7 @@ async function saveToPlanning(
 	}
 }
 
-async function addToPlanning(media: AniListMediaSummary): Promise<void> {
+async function addToPlanning(media: ExplorePickMedia): Promise<void> {
 	await saveToPlanning(media)
 }
 
@@ -252,8 +254,13 @@ async function addAllToPlanning(): Promise<void> {
 	}
 }
 
-onMounted(() => {
-	void initialize()
+onMounted(async () => {
+	// Read the saved picks first: the identity is known here and nothing is written before.
+	picksStore.load()
+	await initialize()
+	// A title added on anilist.co since the last visit is no longer a pick. A failed or
+	// truncated list leaves `existingMediaIds` empty, so nothing is dropped by mistake.
+	picksStore.removeListed(existingMediaIds.value)
 })
 </script>
 
@@ -335,12 +342,14 @@ onMounted(() => {
 					<ExploreInterestedDeck
 						class="self-start lg:sticky lg:top-4"
 						:media="interestedMedia"
+						:passed-count="passedMediaIds.length"
 						:can-add-to-planning="userStore.isOAuthAuthenticated"
 						:adding-media-ids="addingMediaIdList"
 						:adding-all="addingAllToPlanning"
 						:undo-disabled="!decisionHistory.length || addingAllToPlanning"
 						@add-to-planning="addToPlanning"
 						@add-all-to-planning="addAllToPlanning"
+						@clear="clearPicks"
 						@undo="restoreDecision"
 						@undo-last="undoLastDecision" />
 				</div>
