@@ -33,6 +33,9 @@ const neutrals = ["slate", "gray", "zinc", "neutral", "stone"];
 
 const user = useUserStore();
 const accountLabel = computed(() => user.isAuthenticated ? user.username : "Guest");
+// A public profile is somebody's list opened by name: nothing can be changed from here.
+const isPublicProfile = computed(() => user.isAuthenticated && user.authMode === "public");
+const PUBLIC_PROFILE_NOTE = "Public profile · read-only";
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [
@@ -136,7 +139,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
     },
     user.isAuthenticated
       ? {
-          label: user.isOAuthAuthenticated ? "Log out" : "Clear profile",
+          label: user.isOAuthAuthenticated ? "Log out" : "Forget this profile",
           icon: "i-lucide-log-out",
           onSelect() {
             logout();
@@ -161,21 +164,29 @@ const items = computed<DropdownMenuItem[][]>(() => [
     class="py-3"
   >
     <UButton
-      v-bind="{
-        avatar: user.avatar,
-        label: collapsed ? undefined : accountLabel,
-        trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down',
-      }"
+      :avatar="user.avatar"
+      :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
       color="neutral"
       variant="ghost"
-			:aria-label="`Open account menu for ${accountLabel}`"
+      :aria-label="isPublicProfile
+        ? `Open account menu for ${accountLabel} (public profile, read-only)`
+        : `Open account menu for ${accountLabel}`"
+      :title="collapsed && isPublicProfile ? `${accountLabel} · ${PUBLIC_PROFILE_NOTE}` : undefined"
       block
       :square="collapsed"
       class="data-[state=open]:bg-elevated"
       :ui="{
         trailingIcon: 'text-dimmed',
       }"
-    />
+    >
+      <span v-if="!collapsed" class="min-w-0 flex-1 text-start">
+        <span class="block truncate">{{ accountLabel }}</span>
+        <span
+          v-if="isPublicProfile"
+          data-public-profile-note
+          class="block truncate text-xs font-normal text-muted">{{ PUBLIC_PROFILE_NOTE }}</span>
+      </span>
+    </UButton>
 
     <template #chip-leading="{ item }">
       <span
