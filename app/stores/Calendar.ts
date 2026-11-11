@@ -1,23 +1,17 @@
 import { defineStore } from "pinia"
 import type { DropdownMenuItem } from "@nuxt/ui"
+import { getAudioLanguageLabel } from "~/utils/calendar-audio"
 import {
+	getCalendarRange,
 	getCalendarViewRange,
 	type CalendarViewRangeInput
 } from "~/utils/calendarRange"
 
 type CalendarView = "day" | "week" | "month"
 
-const DUBBING_LABELS: Readonly<Record<string, string>> = {
-	cn: "Chinese",
-	en: "English",
-	fr: "French",
-	jp: "Japanese",
-	kr: "Korean"
-}
-
-/** Dubbing languages are stored as the country code of their flag icon; this is the readable name. */
+/** Kept for existing call sites; the labels live with the audio helper. */
 export function getDubbingLabel(code: string): string {
-	return DUBBING_LABELS[code] ?? code.toUpperCase()
+	return getAudioLanguageLabel(code)
 }
 
 /** The list statuses the header "My list" toggle stands for. */
@@ -35,9 +29,16 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	// ========== Date Range ==========
 	const calendarRange = getCalendarRange()
 
-	const dateRange = reactive<{ start: Date, end: Date }>({ start: new Date(calendarRange.start), end: new Date(calendarRange.end) })
-	const airingAtGreater = computed(() => Math.floor(dateRange.start.getTime() / 1000))
-	const airingAtLesser = computed(() => Math.floor(dateRange.end.getTime() / 1000))
+	// Replaced as a whole: assigning `start` then `end` exposed a half-updated range (new start,
+	// old end) to the calendar request, which fired once for it and once for the real range.
+	// The end is the last millisecond of Sunday, like the range vue-cal reports for a week: an
+	// exclusive end (next Monday) differed by one second and made the mounted calendar refetch.
+	const dateRange = ref<{ start: Date, end: Date }>({
+		start: new Date(calendarRange.start),
+		end: new Date(calendarRange.end.getTime() - 1)
+	})
+	const airingAtGreater = computed(() => Math.floor(dateRange.value.start.getTime() / 1000))
+	const airingAtLesser = computed(() => Math.floor(dateRange.value.end.getTime() / 1000))
 
 	// ========== Filtres ==========
 	const currentFormat = ref<string[]>(["TV", "ONA", "MOVIE"])
@@ -62,8 +63,11 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 	// ========== Actions Date Range ==========
 	const updateDateRange = (start: Date, end: Date) => {
-		dateRange.start = start
-		dateRange.end = end
+		if (
+			dateRange.value.start.getTime() === start.getTime()
+			&& dateRange.value.end.getTime() === end.getTime()
+		) return
+		dateRange.value = { start, end }
 	}
 
 	const setDateRangeFromView = (view: CalendarViewRangeInput) => {
@@ -265,7 +269,9 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 		const dubbingLabel: DropdownMenuItem[] = [
 			{
-				label: "Dubbing", children: [
+				label: "Audio language", children: [
+					// The legend of the flag dots printed on the events.
+					{ type: "label", label: "Flags on an event: original audio, then dubs" },
 					...dubbingItems
 				]
 			}

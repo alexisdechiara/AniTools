@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { buildCalendarEvents } from "../../app/utils/calendar-events"
+import {
+	buildCalendarEvents,
+	buildCalendarEventsFromResponse,
+	expandCalendarResponse
+} from "../../app/utils/calendar-events"
 import type {
 	CalendarAiringSchedule,
+	CalendarApiResponse,
 	CalendarMedia,
 	CalendarSimuldubItem
 } from "../../app/types/calendar"
@@ -99,5 +104,49 @@ describe("buildCalendarEvents", () => {
 		)
 
 		expect(events).toEqual([])
+	})
+})
+
+describe("deduplicated calendar response", () => {
+	const airingAt = Date.parse("2026-07-29T18:00:00.000Z") / 1000
+	const other: CalendarMedia = { id: 2, countryOfOrigin: "CN", duration: 20, title: { english: "Other anime" } }
+	const response: CalendarApiResponse = {
+		media: { 1: media, 2: other },
+		airings: [
+			{ airingAt, episode: 3, mediaId: 1, timeUntilAiring: 60 },
+			{ airingAt: airingAt + 7 * 86_400, episode: 4, mediaId: 1 },
+			{ airingAt, episode: 9, mediaId: 404 }
+		],
+		simuldubs: [createSimuldub({ anilist_media_id: 2, id: "dub-2", start_date: "2026-07-30T12:00:00.000Z" })],
+		warnings: []
+	}
+
+	it("gives every airing its anime back and drops the ones without", () => {
+		const { airingSchedules, mediaById } = expandCalendarResponse(response)
+
+		expect(airingSchedules).toEqual([
+			{ airingAt, episode: 3, timeUntilAiring: 60, media },
+			{ airingAt: airingAt + 7 * 86_400, episode: 4, timeUntilAiring: undefined, media }
+		])
+		// One object per anime, shared by its episodes.
+		expect(airingSchedules[1]?.media).toBe(airingSchedules[0]?.media)
+		expect([...mediaById.keys()]).toEqual([1, 2])
+	})
+
+	it("builds the same events as the per-airing media shape did", () => {
+		const { airingSchedules } = expandCalendarResponse(response)
+		const legacy = buildCalendarEvents(airingSchedules, response.simuldubs, new Map([[2, other]]))
+		const events = buildCalendarEventsFromResponse(response)
+
+		expect(events).toEqual(legacy)
+		expect(events.map(event => [event.media.id, event.episode, event.languages])).toEqual([
+			[1, 3, ["jp"]],
+			[2, 3, ["en"]],
+			[1, 4, ["jp"]]
+		])
+	})
+
+	it("tolerates an empty response", () => {
+		expect(buildCalendarEventsFromResponse({ media: {}, airings: [], simuldubs: [] })).toEqual([])
 	})
 })

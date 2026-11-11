@@ -3,7 +3,8 @@ import {
 	formatRunSpan,
 	formatRunUpdateTime,
 	pluraliseEpisodeStatus,
-	runSpansSeveralDays
+	runSpansSeveralDays,
+	sentenceCaseStatus
 } from "../../app/utils/timeline-run-format"
 
 const at = (day: number, hour: number, minute: number) =>
@@ -50,5 +51,16 @@ describe("timeline run formatting", () => {
 		expect(pluraliseEpisodeStatus("Watched Episode")).toBe("Watched Episodes")
 		expect(pluraliseEpisodeStatus("watched")).toBe("watched episodes")
 		expect(pluraliseEpisodeStatus(null)).toBe("episodes")
+	})
+
+	it("prints AniList's lower-case statuses as the start of a sentence", () => {
+		expect(sentenceCaseStatus("completed")).toBe("Completed")
+		expect(sentenceCaseStatus("plans to watch")).toBe("Plans to watch")
+		expect(sentenceCaseStatus("  watched episode ")).toBe("Watched episode")
+		expect(sentenceCaseStatus("Rewatched")).toBe("Rewatched")
+		expect(sentenceCaseStatus(pluraliseEpisodeStatus("watched episode"))).toBe("Watched episodes")
+		expect(sentenceCaseStatus("")).toBe("Updated")
+		expect(sentenceCaseStatus(null)).toBe("Updated")
+		expect(sentenceCaseStatus(undefined)).toBe("Updated")
 	})
 })

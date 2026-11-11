@@ -3,7 +3,8 @@ import type { AniListAiringId } from "../../server/utils/anilist-client"
 import {
 	createCalendarAiringLoader,
 	MAX_CACHED_MEDIA,
-	MEDIA_CACHE_TTL_MS
+	MEDIA_CACHE_TTL_MS,
+	toCalendarMediaPayload
 } from "../../server/utils/calendar-airing"
 import type { AniListMediaSummary } from "../../shared/types/anilist"
 
@@ -198,5 +199,37 @@ describe("calendar airing loader", () => {
 
 		loader.clear()
 		expect(loader.cachedMediaCount()).toBe(0)
+	})
+})
+
+describe("calendar response payload", () => {
+	it("sends each anime once and references it from its airings", async () => {
+		const rows = airingRows(697, 137)
+		const { loader } = setup({ rows })
+		const schedules = await loader.loadAiringSchedules(START, END)
+
+		const payload = toCalendarMediaPayload(schedules, [fakeMedia(900), fakeMedia(1)])
+
+		expect(Object.keys(payload.media)).toHaveLength(138)
+		expect(payload.media[1]).toEqual(fakeMedia(1))
+		expect(payload.media[900]).toEqual(fakeMedia(900))
+		expect(payload.airings).toHaveLength(697)
+		expect(payload.airings[0]).toEqual({
+			airingAt: rows[0]!.airingAt,
+			episode: rows[0]!.episode,
+			mediaId: rows[0]!.mediaId,
+			timeUntilAiring: rows[0]!.timeUntilAiring
+		})
+		expect(payload.airings.map(airing => airing.mediaId)).toEqual(rows.map(row => row.mediaId))
+		expect(payload.airings.every(airing => !("media" in airing))).toBe(true)
+		// The repeated anime was the bulk of the response.
+		expect(JSON.stringify(payload).length).toBeLessThan(JSON.stringify(schedules).length)
+	})
+
+	it("skips a schedule without media and accepts an empty range", () => {
+		expect(toCalendarMediaPayload([
+			{ airingAt: START, episode: 1, timeUntilAiring: null, media: null }
+		])).toEqual({ media: {}, airings: [] })
+		expect(toCalendarMediaPayload([])).toEqual({ media: {}, airings: [] })
 	})
 })

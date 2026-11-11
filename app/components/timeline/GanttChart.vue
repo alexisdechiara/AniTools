@@ -111,6 +111,14 @@ function groupIcon(section: TimelineGanttSection): string {
 	return "i-lucide-message-square-text"
 }
 
+// Each lane of the chart holds one kind of activity; its label says what is counted in it.
+function groupCountLabel(section: TimelineGanttSection, count: number): string {
+	const one = count === 1
+	if (section === "movies" || section === "series") return `${count} ${one ? "title" : "titles"}`
+	if (section === "text") return `${count} ${one ? "post" : "posts"}`
+	return `${count} ${one ? "message" : "messages"}`
+}
+
 function detailData(row: TimelineGanttRow) {
 	return { media: row.media, score: null }
 }
@@ -160,6 +168,10 @@ watch(initialDuration, duration => {
 				Newest on the left · older activity to the right
 			</p>
 			<p class="flex items-center gap-1.5">
+				<UIcon name="i-lucide-rows-3" class="size-4" />
+				One row per kind of activity
+			</p>
+			<p class="flex items-center gap-1.5">
 				<UIcon name="i-lucide-move-horizontal" class="size-4" />
 				Scroll to explore · pinch or wheel to zoom
 			</p>
@@ -200,8 +212,8 @@ watch(initialDuration, duration => {
 									<span class="block truncate text-xs font-semibold text-highlighted">
 										{{ group.label }}
 									</span>
-									<span class="block text-[10px] text-muted">
-										{{ group.count }} {{ group.count === 1 ? "item" : "items" }}
+									<span class="block text-[11px] text-muted">
+										{{ groupCountLabel(group.section, group.count) }}
 									</span>
 								</span>
 							</div>
