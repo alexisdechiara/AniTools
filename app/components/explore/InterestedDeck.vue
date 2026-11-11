@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AniListMediaSummary } from "~~/shared/types/anilist"
-import { getExploreRelationBadge, getExploreTitle } from "~/utils/explore"
+import { getExploreRelationBadge } from "~/utils/explore"
+import { getMediaCover } from "~/utils/media-display"
 
 const props = withDefaults(defineProps<{
 	addingAll?: boolean
@@ -26,11 +27,10 @@ const emit = defineEmits<{
 const deckMedia = computed(() => [...props.media].reverse())
 const addingIds = computed(() => new Set(props.addingMediaIds))
 
+const { title: getAnimeTitle } = useMediaTitle()
+
 function cover(media: AniListMediaSummary): string | null {
-	return media.coverImage?.extraLarge
-		?? media.coverImage?.large
-		?? media.coverImage?.medium
-		?? null
+	return getMediaCover(media)
 }
 
 function aniListUrl(media: AniListMediaSummary): string {
@@ -109,11 +109,11 @@ function relationBadge(media: AniListMediaSummary) {
 						rel="noopener noreferrer"
 						data-interested-image-link
 						class="group/image relative w-16 shrink-0 overflow-hidden bg-muted"
-						:aria-label="`Open ${getExploreTitle(item)} on AniList`">
+						:aria-label="`Open ${getAnimeTitle(item)} on AniList`">
 						<NuxtImg
 							v-if="cover(item)"
 							:src="cover(item)!"
-							:alt="`${getExploreTitle(item)} cover`"
+							:alt="`${getAnimeTitle(item)} cover`"
 							width="160"
 							height="224"
 							loading="lazy"
@@ -131,7 +131,7 @@ function relationBadge(media: AniListMediaSummary) {
 					<div class="flex min-w-0 flex-1 items-center gap-2 p-2.5">
 						<div class="min-w-0 flex-1">
 							<p class="line-clamp-2 text-sm leading-tight font-semibold text-highlighted">
-								{{ getExploreTitle(item) }}
+								{{ getAnimeTitle(item) }}
 							</p>
 							<p class="mt-1 truncate text-[11px] text-muted">
 								{{ item.format?.replaceAll("_", " ") || "Anime" }}
