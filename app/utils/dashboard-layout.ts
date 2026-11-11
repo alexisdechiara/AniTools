@@ -5,15 +5,23 @@ import {
 
 export const DASHBOARD_LAYOUT_STORAGE_KEY = "anitools:dashboard-layout:v1"
 
+/** Separate from the layout key so the saved card order keeps its plain-array format. */
+export const DASHBOARD_ONBOARDING_STORAGE_KEY = "anitools:dashboard-onboarding:v1"
+
+/**
+ * Order of a dashboard that was never customised. The time-sensitive lists fill the first row
+ * (three thirds of the 12-column grid), then the totals, the status split and the scores.
+ * A saved layout is never rewritten to match: this only applies to new ones.
+ */
 export const DEFAULT_DASHBOARD_CARD_IDS: readonly DashboardCardId[] = [
+	"next-episodes",
+	"current-anime",
+	"recent-updates",
 	"watch-time",
 	"anime-count",
 	"episode-count",
-	"mean-score",
 	"status",
-	"next-episodes",
-	"current-anime",
-	"recent-updates"
+	"mean-score"
 ]
 
 const VALID_CARD_IDS = new Set<DashboardCardId>(DASHBOARD_CARD_IDS)
@@ -168,6 +176,40 @@ export function removeDashboardCard(
 	cardId: DashboardCardId
 ): DashboardCardId[] {
 	return cardIds.filter(id => id !== cardId)
+}
+
+/** Puts a card back at the position it was removed from, clamped to the current list. */
+export function insertDashboardCard(
+	cardIds: readonly DashboardCardId[],
+	cardId: DashboardCardId,
+	index: number
+): DashboardCardId[] {
+	if (cardIds.includes(cardId)) return [...cardIds]
+
+	const position = Number.isInteger(index)
+		? Math.min(Math.max(index, 0), cardIds.length)
+		: cardIds.length
+	const restored = [...cardIds]
+	restored.splice(position, 0, cardId)
+	return restored
+}
+
+export interface DashboardOnboardingState {
+	/** The dashboard was opened before in this browser. */
+	seen: boolean
+	/** The "Start here" row was dismissed for good. */
+	startHereDismissed: boolean
+}
+
+export function normalizeDashboardOnboarding(value: unknown): DashboardOnboardingState {
+	const record = typeof value === "object" && value !== null
+		? value as Record<string, unknown>
+		: {}
+
+	return {
+		seen: record.seen === true,
+		startHereDismissed: record.startHereDismissed === true
+	}
 }
 
 export function moveDashboardCard(

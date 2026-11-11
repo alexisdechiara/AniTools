@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest"
+import { getDashboardCard } from "../../app/config/components"
 import {
 	DASHBOARD_GRID_COLUMNS,
 	DEFAULT_DASHBOARD_CARD_IDS,
 	addDashboardCard,
 	getDashboardDeleteAttractionOffset,
+	insertDashboardCard,
 	isDashboardDeleteTargetHit,
 	moveDashboardCard,
 	normalizeDashboardCardIds,
+	normalizeDashboardOnboarding,
 	packDashboardLayout,
 	removeDashboardCard,
 	scaleDashboardCardWidth
@@ -53,6 +56,39 @@ describe("dashboard layout preferences", () => {
 		expect(moveDashboardCard(source, "current-anime", 1)).toEqual(source)
 	})
 
+	it("puts a removed card back at its position, clamped to the current list", () => {
+		const source = ["watch-time", "current-anime"] as const
+
+		expect(insertDashboardCard(source, "status", 1)).toEqual([
+			"watch-time",
+			"status",
+			"current-anime"
+		])
+		expect(insertDashboardCard(source, "status", 0)).toEqual(["status", "watch-time", "current-anime"])
+		expect(insertDashboardCard(source, "status", 9)).toEqual(["watch-time", "current-anime", "status"])
+		expect(insertDashboardCard(source, "status", -3)).toEqual(["status", "watch-time", "current-anime"])
+		expect(insertDashboardCard(source, "status", Number.NaN)).toEqual([
+			"watch-time",
+			"current-anime",
+			"status"
+		])
+		expect(insertDashboardCard(source, "watch-time", 1)).toEqual(source)
+		expect(source).toEqual(["watch-time", "current-anime"])
+	})
+
+	it("reads the first-run state defensively", () => {
+		expect(normalizeDashboardOnboarding(null)).toEqual({ seen: false, startHereDismissed: false })
+		expect(normalizeDashboardOnboarding("yes")).toEqual({ seen: false, startHereDismissed: false })
+		expect(normalizeDashboardOnboarding({ seen: true, startHereDismissed: "true" })).toEqual({
+			seen: true,
+			startHereDismissed: false
+		})
+		expect(normalizeDashboardOnboarding({ seen: true, startHereDismissed: true })).toEqual({
+			seen: true,
+			startHereDismissed: true
+		})
+	})
+
 	it("detects the dashboard delete target with a forgiving drop margin", () => {
 		const bounds = { top: 100, right: 180, bottom: 180, left: 100 }
 
@@ -68,6 +104,53 @@ describe("dashboard layout preferences", () => {
 			{ top: 700, right: 580, bottom: 780, left: 500 }
 		)).toEqual({ x: 340, y: 540 })
 		expect(getDashboardDeleteAttractionOffset(null, null)).toBeNull()
+	})
+})
+
+describe("default dashboard layout", () => {
+	const defaultLayout = (columns: number) => packDashboardLayout(
+		DEFAULT_DASHBOARD_CARD_IDS.map(id => ({ id, size: getDashboardCard(id).size })),
+		columns
+	)
+
+	it("puts the next airing episodes in the first row, first", () => {
+		expect(DEFAULT_DASHBOARD_CARD_IDS[0]).toBe("next-episodes")
+
+		for (const columns of Object.values(DASHBOARD_GRID_COLUMNS)) {
+			const nextEpisodes = defaultLayout(columns).find(item => item.i === "next-episodes")
+			expect(nextEpisodes).toMatchObject({ x: 0, y: 0 })
+		}
+	})
+
+	it("keeps the same eight cards as before, each once", () => {
+		expect(DEFAULT_DASHBOARD_CARD_IDS.toSorted()).toEqual([
+			"anime-count",
+			"current-anime",
+			"episode-count",
+			"mean-score",
+			"next-episodes",
+			"recent-updates",
+			"status",
+			"watch-time"
+		])
+	})
+
+	it("fills the 12-column grid without a gap", () => {
+		const layout = defaultLayout(DASHBOARD_GRID_COLUMNS.lg)
+
+		expect(layout.map(({ i, x, y }) => [i, x, y])).toEqual([
+			["next-episodes", 0, 0],
+			["current-anime", 4, 0],
+			["recent-updates", 8, 0],
+			["watch-time", 0, 3],
+			["anime-count", 3, 3],
+			["episode-count", 6, 3],
+			["status", 9, 3],
+			["mean-score", 0, 4]
+		])
+		const cells = layout.reduce((total, item) => total + item.w * item.h, 0)
+		const rows = Math.max(...layout.map(item => item.y + item.h))
+		expect(cells).toBe(rows * DASHBOARD_GRID_COLUMNS.lg)
 	})
 })
 

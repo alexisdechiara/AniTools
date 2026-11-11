@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { getMediaCover } from "~/utils/media-display"
 
-const { getAllAnimes } = storeToRefs(useEntriesStore())
+const entriesStore = useEntriesStore()
+const { getAllAnimes } = storeToRefs(entriesStore)
+
+// An empty card must not claim the list is empty when the list itself is missing or partial.
+const emptyMessage = computed(() => {
+	if (entriesStore.error) return "Your list could not be loaded, so titles in progress cannot be shown."
+	if (entriesStore.truncated) return "No title in progress in the part of your list that was loaded."
+	return "Nothing on this list is marked as watching or rewatching."
+})
 
 const currentAnime = computed(() =>
 	getAllAnimes.value
@@ -78,7 +86,7 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 					name="i-lucide-circle-pause"
 					class="size-7 text-muted"/>
 				<p class="text-sm text-muted">
-					No anime is currently marked as watching.
+					{{ emptyMessage }}
 				</p>
 			</div>
 		</div>

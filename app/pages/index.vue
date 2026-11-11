@@ -3,6 +3,7 @@ import type { CSSProperties } from "vue"
 import { GridItem, GridLayout, type LayoutItem } from "grid-layout-plus"
 import { FEATURE_REGISTRY } from "#shared/config/features"
 import DashboardDeleteDropTarget from "~/components/dashboard/DeleteDropTarget.vue"
+import DashboardStartHere from "~/components/dashboard/StartHere.vue"
 import {
 	DASHBOARD_CARDS,
 	getDashboardCard,
@@ -37,9 +38,17 @@ const {
 	isHydrated,
 	add,
 	remove,
+	restore,
 	move,
 	reorder
 } = useDashboardCards()
+const { isReturningVisitor, showStartHere, dismissStartHere } = useDashboardOnboarding()
+const toast = useToast()
+// "Welcome back" would be wrong on a first visit, which is also what the server renders.
+const greeting = computed(() => isReturningVisitor.value
+	? `Welcome back, ${userStore.getUsername}`
+	: `Hello, ${userStore.getUsername}`
+)
 const addCardModalOpen = ref(false)
 const activeDragCardId = ref<DashboardCardId | null>(null)
 const deleteTargetActive = ref(false)
@@ -213,6 +222,26 @@ function isCardAdded(cardId: DashboardCardId): boolean {
 	return cardIds.value.includes(cardId)
 }
 
+/** Removes a card and offers to put it back where it was. */
+function removeCard(cardId: DashboardCardId): void {
+	const index = remove(cardId)
+	if (index < 0) return
+
+	toast.add({
+		title: `${getDashboardCard(cardId).label} removed`,
+		icon: "i-lucide-trash-2",
+		color: "neutral",
+		// Long enough to read the title and reach the action with a keyboard.
+		duration: 10_000,
+		actions: [{
+			label: "Undo",
+			color: "neutral",
+			variant: "outline",
+			onClick: () => restore(cardId, index)
+		}]
+	})
+}
+
 function getDeleteTargetBounds(): DOMRect | null {
 	if (!import.meta.client) return null
 	return document
@@ -284,7 +313,7 @@ function finishCardDrag(event: PointerEvent): void {
 
 	if (cardId && shouldRemove) {
 		deleteConfirmed.value = true
-		remove(cardId)
+		removeCard(cardId)
 		if (deleteConfirmationTimer) clearTimeout(deleteConfirmationTimer)
 		deleteConfirmationTimer = setTimeout(() => {
 			deleteConfirmed.value = false
@@ -323,30 +352,31 @@ function beginCardDrag(cardId: DashboardCardId, event: PointerEvent): void {
 	window.addEventListener("pointercancel", cancelCardDrag)
 }
 
+/** Shared by the visible options button of each card and its right-click menu. */
 function cardActions(cardId: DashboardCardId, index: number) {
-	const card = getDashboardCard(cardId)
-
 	return [
 		[
 			{
 				label: "Move earlier",
 				icon: "i-lucide-arrow-left",
+				kbds: ["alt", "arrowleft"],
 				disabled: index === 0,
 				onClick: () => move(cardId, -1)
 			},
 			{
 				label: "Move later",
 				icon: "i-lucide-arrow-right",
+				kbds: ["alt", "arrowright"],
 				disabled: index === layoutCards.value.length - 1,
 				onClick: () => move(cardId, 1)
 			}
 		],
 		[
 			{
-				label: `Remove ${card.label}`,
+				label: "Remove",
 				icon: "i-lucide-trash",
 				color: "error" as const,
-				onClick: () => remove(cardId)
+				onClick: () => removeCard(cardId)
 			}
 		]
 	]
@@ -370,23 +400,14 @@ onBeforeUnmount(() => {
 	<UDashboardPanel id="home">
 		<template #body>
 			<div class="space-y-6">
-				<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-					<div>
-						<p class="text-sm font-medium text-primary">
-							Personal dashboard
-						</p>
-						<h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-							Welcome back, {{ userStore.getUsername }}
-						</h1>
-						<p class="mt-1 text-base text-muted">
-							Your AniList summary, upcoming episodes and latest list changes.
-						</p>
-					</div>
-					<div class="flex flex-wrap gap-2">
+				<PageHeader
+					:title="greeting"
+					description="Your AniList summary, upcoming episodes and latest list changes.">
+					<template #actions>
 						<UModal
 							v-model:open="addCardModalOpen"
 							title="Dashboard card catalogue"
-							description="Add Dashboard, Statistics and all-time Rewind cards. Choices are saved only in this browser."
+							description="Add Dashboard, Statistics and all-time Rewind cards. To remove one later, open its options menu (the three dots on the card) and choose Remove. Choices are saved only in this browser."
 							:ui="{ content: 'sm:max-w-3xl' }">
 							<UButton
 								icon="i-lucide-plus"
@@ -440,8 +461,10 @@ onBeforeUnmount(() => {
 								</div>
 							</template>
 						</UModal>
-					</div>
-				</header>
+					</template>
+				</PageHeader>
+
+				<DashboardStartHere v-if="showStartHere" @dismiss="dismissStartHere" />
 
 				<UAlert
 					v-if="error"
@@ -464,10 +487,12 @@ onBeforeUnmount(() => {
 						label="Preparing your dashboard"
 						description="Loading your AniList summary and restoring your widget layout." />
 
+					<!-- The grid pads itself by one 16px margin: pull it back so cards align with the header. -->
 					<GridLayout
 					v-else-if="cardIds.length"
 					key="dashboard-grid"
 					v-model:layout="dashboardLayout"
+					class="-mx-4"
 					:col-num="12"
 					:row-height="104"
 					:margin="[16, 16]"
@@ -511,6 +536,8 @@ onBeforeUnmount(() => {
 									:is="card.component"
 									v-bind="cardProps(card.id)"
 									draggable
+									:options-items="cardActions(card.id, index)"
+									:options-label="card.label"
 									class="size-full"
 									@move="move(card.id, $event)"/>
 								<template #fallback>
