@@ -60,6 +60,11 @@ const MAX_ACTIVITY_PAGE_SIZE = 50
 const MAX_EXPLORE_PAGE_SIZE = 20
 const MAX_AIRING_PAGE_SIZE = 50
 const MAX_MEDIA_BATCH_SIZE = 50
+const AIRING_ID_PAGES_PER_REQUEST = 32
+const MAX_AIRING_ID_PAGE_SIZE = 50
+const MAX_AIRING_ID_FIRST_PAGE = 1_000
+// 5 pages of the full media selection is the measured complexity ceiling (6 → 522 > 500); 4 leaves headroom.
+const MEDIA_BATCH_PAGES_PER_REQUEST = 4
 const MAX_MEDIA_RELATION_EDGES = 500
 const MAX_SEARCH_RESULTS = 10
 const MAX_SEARCH_LENGTH = 100
@@ -84,7 +89,9 @@ export const ANILIST_ALLOWED_OPERATIONS = [
 	"search",
 	"media",
 	"airing-schedules",
+	"airing-ids",
 	"media-by-ids",
+	"media-by-ids-batch",
 	"media-list-entry",
 	"save-media-list-entry"
 ] as const
@@ -568,6 +575,55 @@ const MEDIA_BY_IDS_QUERY = `
 	}
 `
 
+/**
+ * Airing rows without their media: AniList accepts dozens of such pages in one request
+ * (measured: 40 pages, 2,000 rows), where the full-media query costs one request per 50.
+ * Only interpolates integers validated by getAniListAiringIds.
+ */
+function buildAiringIdsQuery(pageCount: number, firstPage: number): string {
+	const pages = Array.from({ length: pageCount }, (_, index) => `
+		p${index}: Page(page: ${firstPage + index}, perPage: ${MAX_AIRING_ID_PAGE_SIZE}) {
+			pageInfo { hasNextPage }
+			airingSchedules(
+				airingAt_greater: $airingAtGreater
+				airingAt_lesser: $airingAtLesser
+				sort: TIME
+			) {
+				airingAt
+				episode
+				timeUntilAiring
+				mediaId
+			}
+		}
+	`).join("")
+	return `
+		query AniToolsAiringIds($airingAtGreater: Int!, $airingAtLesser: Int!) {
+			${pages}
+		}
+	`
+}
+
+/**
+ * Up to MEDIA_BATCH_PAGES_PER_REQUEST aliased pages of MEDIA_BY_IDS_QUERY's selection, one per
+ * non-empty chunk of ids. Only interpolates the chunk count validated by getAniListMediaByIdsBatch.
+ */
+function buildMediaByIdsBatchQuery(chunkCount: number): string {
+	const indexes = Array.from({ length: chunkCount }, (_, index) => index)
+	const variables = indexes.map(index => `$ids${index}: [Int!]!`).join(", ")
+	const pages = indexes.map(index => `
+		m${index}: Page(page: 1, perPage: ${MAX_MEDIA_BATCH_SIZE}) {
+			media(id_in: $ids${index}, type: ANIME, isAdult: false) {
+				${MEDIA_SUMMARY_FIELDS}
+			}
+		}
+	`).join("")
+	return `
+		query AniToolsMediaByIdsBatch(${variables}) {
+			${pages}
+		}
+	`
+}
+
 const MEDIA_LIST_ENTRY_QUERY = `
 	query AniToolsMediaListEntry($userId: Int!, $mediaId: Int!) {
 		MediaList(userId: $userId, mediaId: $mediaId, type: ANIME) {
@@ -711,6 +767,27 @@ const mediaIdsSchema = z.array(mediaIdSchema)
 	.min(1)
 	.max(MAX_MEDIA_BATCH_SIZE)
 	.transform(mediaIds => [...new Set(mediaIds)])
+
+const airingIdsQuerySchema = z.object({
+	airingAtGreater: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
+	airingAtLesser: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
+	firstPage: z.number().int().min(1).max(MAX_AIRING_ID_FIRST_PAGE).default(1)
+}).strict().refine(
+	query => query.airingAtGreater < query.airingAtLesser,
+	{
+		message: "airingAtGreater must be earlier than airingAtLesser",
+		path: ["airingAtLesser"]
+	}
+)
+
+const airingIdsPageCountSchema = z.number().int().min(1).max(AIRING_ID_PAGES_PER_REQUEST)
+
+const mediaIdsBatchSchema = z.array(mediaIdSchema)
+	.transform(mediaIds => [...new Set(mediaIds)].sort((left, right) => left - right))
+	.refine(
+		mediaIds => mediaIds.length <= MEDIA_BATCH_PAGES_PER_REQUEST * MAX_MEDIA_BATCH_SIZE,
+		{ message: `At most ${MEDIA_BATCH_PAGES_PER_REQUEST * MAX_MEDIA_BATCH_SIZE} media ids per request` }
+	)
 
 const publicAccessSchema = z.object({
 	mode: z.literal("public"),
@@ -1833,6 +1910,130 @@ export async function getAniListMediaByIds(
 		}
 
 		return [normalizeMedia(media)]
+	})
+}
+
+export interface AniListAiringId {
+	airingAt: number
+	episode: number
+	timeUntilAiring: number | null
+	mediaId: number
+}
+
+const airingIdRowSchema = z.object({
+	airingAt: z.number().int().positive().max(GRAPHQL_INT_MAX),
+	episode: z.number().int().positive(),
+	timeUntilAiring: z.number().int().nullable(),
+	mediaId: z.number().int().positive()
+})
+
+const airingIdsPageSchema = z.object({
+	pageInfo: z.object({
+		hasNextPage: z.boolean().nullable()
+	}).nullable(),
+	airingSchedules: z.array(airingIdRowSchema.nullable())
+		.max(MAX_AIRING_ID_PAGE_SIZE)
+		.nullable()
+}).nullable()
+
+const airingIdsResponseSchema = z.object(Object.fromEntries(
+	Array.from({ length: AIRING_ID_PAGES_PER_REQUEST }, (_, index) => [`p${index}`, airingIdsPageSchema])
+))
+
+/**
+ * Airing rows of a range, AIRING_ID_PAGES_PER_REQUEST pages of ids at a time in one request.
+ * The media are loaded separately (getAniListMediaByIdsBatch), once per anime.
+ */
+export async function getAniListAiringIds(
+	query: { airingAtGreater: number, airingAtLesser: number, firstPage?: number },
+	options: AniListRequestOptions = {}
+): Promise<{ airings: AniListAiringId[], hasNextPage: boolean, nextPage: number }> {
+	const validatedQuery = parseQuery(airingIdsQuerySchema, query)
+	const pageCount = parseQuery(airingIdsPageCountSchema, AIRING_ID_PAGES_PER_REQUEST)
+	const data = await requestAniList(
+		buildAiringIdsQuery(pageCount, validatedQuery.firstPage),
+		{
+			// AniList's airingAt_greater is exclusive; the calendar range start is inclusive.
+			airingAtGreater: Math.max(0, validatedQuery.airingAtGreater - 1),
+			airingAtLesser: validatedQuery.airingAtLesser
+		},
+		airingIdsResponseSchema,
+		null,
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
+	)
+
+	const pages = Array.from({ length: pageCount }, (_, index) => data[`p${index}`] ?? null)
+	const airings = pages.flatMap(page => (page?.airingSchedules ?? []).flatMap(row => row
+		? [{
+				airingAt: row.airingAt,
+				episode: row.episode,
+				timeUntilAiring: row.timeUntilAiring,
+				mediaId: row.mediaId
+			}]
+		: []))
+
+	return {
+		airings,
+		hasNextPage: pages[pages.length - 1]?.pageInfo?.hasNextPage ?? false,
+		nextPage: validatedQuery.firstPage + pageCount
+	}
+}
+
+const mediaBatchPageSchema = z.object({
+	media: z.array(mediaSchema.nullable())
+		.max(MAX_MEDIA_BATCH_SIZE)
+		.nullable()
+}).nullable()
+
+/**
+ * Up to MEDIA_BATCH_PAGES_PER_REQUEST × 50 anime by id in one request, with the full media
+ * selection of getAniListMediaByIds. An empty list never reaches AniList.
+ */
+export async function getAniListMediaByIdsBatch(
+	mediaIds: readonly number[],
+	options: AniListRequestOptions = {}
+): Promise<AniListMediaSummary[]> {
+	const validatedMediaIds = parseQuery(mediaIdsBatchSchema, mediaIds)
+	if (validatedMediaIds.length === 0) return []
+
+	const chunks: number[][] = []
+	for (let index = 0; index < validatedMediaIds.length; index += MAX_MEDIA_BATCH_SIZE) {
+		chunks.push(validatedMediaIds.slice(index, index + MAX_MEDIA_BATCH_SIZE))
+	}
+
+	const data = await requestAniList(
+		buildMediaByIdsBatchQuery(chunks.length),
+		Object.fromEntries(chunks.map((chunk, index) => [`ids${index}`, chunk])),
+		z.object(Object.fromEntries(
+			chunks.map((_, index) => [`m${index}`, mediaBatchPageSchema])
+		)),
+		null,
+		{ ...options, cacheTtlMs: options.cacheTtlMs ?? ANILIST_CACHE_TTL.catalogue }
+	)
+
+	const requestedIds = new Set(validatedMediaIds)
+	return chunks.flatMap((_, index) => {
+		const page = data[`m${index}`]
+		if (!page) {
+			throw upstreamError(
+				502,
+				"AniList media lookup returned no page",
+				"ANILIST_MEDIA_LOOKUP_FAILED"
+			)
+		}
+
+		return (page.media ?? []).flatMap((media) => {
+			if (
+				!media
+				|| !requestedIds.has(media.id)
+				|| media.type !== "ANIME"
+				|| media.isAdult === true
+			) {
+				return []
+			}
+
+			return [normalizeMedia(media)]
+		})
 	})
 }
 

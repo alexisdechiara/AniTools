@@ -6,11 +6,13 @@ import {
 	ANILIST_ALLOWED_OPERATIONS,
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
+	getAniListAiringIds,
 	getAniListAiringSchedulesPage,
 	getAniListAnimeCollectionResponse,
 	getAniListAnimeListIdsResponse,
 	getAniListAnimeListResponse,
 	getAniListMediaByIds,
+	getAniListMediaByIdsBatch,
 	getAniListMediaResponse,
 	getAniListSearchResponse,
 	getAniListStatisticsResponse,
@@ -167,7 +169,9 @@ describe("AniList endpoint query validation", () => {
 			"search",
 			"media",
 			"airing-schedules",
+			"airing-ids",
 			"media-by-ids",
+			"media-by-ids-batch",
 			"media-list-entry",
 			"save-media-list-entry"
 		])
@@ -514,6 +518,148 @@ describe("AniList allowlisted client", () => {
 			mediaIds: [7, 8],
 			perPage: 2
 		})
+	})
+
+	function airingIdsResponse(
+		pages: Record<number, unknown[]>,
+		lastHasNextPage = false
+	) {
+		return {
+			data: Object.fromEntries(Array.from({ length: 32 }, (_, index) => [`p${index}`, {
+				pageInfo: { hasNextPage: index === 31 ? lastHasNextPage : Boolean(pages[index + 1]) },
+				airingSchedules: pages[index] ?? []
+			}]))
+		}
+	}
+
+	function airingRow(mediaId: number, airingAt: number) {
+		return { airingAt, episode: 1, timeUntilAiring: 600, mediaId }
+	}
+
+	it("loads airing ids of many pages in one fixed anonymous request", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({
+			0: [airingRow(1, 1_800_000_001), airingRow(2, 1_800_000_002)],
+			1: [airingRow(3, 1_800_000_003), null],
+			2: [airingRow(1, 1_800_000_004)]
+		})))
+
+		const result = await getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })
+
+		expect(result).toEqual({
+			airings: [
+				airingRow(1, 1_800_000_001),
+				airingRow(2, 1_800_000_002),
+				airingRow(3, 1_800_000_003),
+				airingRow(1, 1_800_000_004)
+			],
+			hasNextPage: false,
+			nextPage: 33
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsAiringIds")
+		expect(body.query).toContain("mediaId")
+		expect(body.query).toContain("p0:")
+		expect(body.query).toContain("p31:")
+		expect(body.query).not.toContain("p32:")
+		expect(body.query).not.toContain("description")
+		expect(body.variables).toEqual({
+			// AniList's bound is exclusive, so the inclusive range start is sent one second earlier.
+			airingAtGreater: 1_798_999_999,
+			airingAtLesser: 1_801_000_000
+		})
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("reports the next airing-id page when the last page has more", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({
+			31: [airingRow(5, 1_800_000_010)]
+		}, true)))
+
+		const result = await getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })
+
+		expect(result.hasNextPage).toBe(true)
+		expect(result.nextPage).toBe(33)
+		expect(result.airings).toEqual([airingRow(5, 1_800_000_010)])
+	})
+
+	it("rejects an invalid airing-id range or first page before calling AniList", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({})))
+
+		await expect(getAniListAiringIds({
+			airingAtGreater: 1_801_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })).rejects.toMatchObject({ statusCode: 400 })
+		await expect(getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000,
+			firstPage: 0
+		}, { fetch: requester })).rejects.toMatchObject({ statusCode: 400 })
+		expect(requester).not.toHaveBeenCalled()
+	})
+
+	it("loads up to 200 media in one request with one alias per non-empty chunk", async () => {
+		const ids = Array.from({ length: 120 }, (_, index) => index + 1)
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				m0: { media: ids.slice(0, 50).map(id => ({ ...media, id })) },
+				m1: {
+					media: [
+						...ids.slice(50, 98).map(id => ({ ...media, id })),
+						{ ...media, id: 99, isAdult: true },
+						{ ...media, id: 100, type: "MANGA" }
+					]
+				},
+				m2: { media: [...ids.slice(100).map(id => ({ ...media, id })), null] }
+			}
+		}))
+
+		const result = await getAniListMediaByIdsBatch([...ids].reverse(), {
+			fetch: requester
+		})
+
+		expect(requester).toHaveBeenCalledTimes(1)
+		expect(result.map(item => item.id)).toEqual(ids.filter(id => id !== 99 && id !== 100))
+		expect(result[0]).toMatchObject({ genres: ["Action"], rankings: [], externalLinks: [] })
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, number[]>
+		}
+		expect(body.query).toContain("query AniToolsMediaByIdsBatch")
+		expect(body.query).toContain("m0:")
+		expect(body.query).toContain("m1:")
+		expect(body.query).toContain("m2:")
+		expect(body.query).not.toContain("m3:")
+		expect(body.query).toContain("externalLinks")
+		expect(Object.keys(body.variables)).toEqual(["ids0", "ids1", "ids2"])
+		expect(body.variables.ids0).toEqual(ids.slice(0, 50))
+		expect(body.variables.ids1).toEqual(ids.slice(50, 100))
+		expect(body.variables.ids2).toEqual(ids.slice(100))
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("never calls AniList for an empty media batch and rejects more than 200 ids", async () => {
+		const requester = fetchMock(async () => jsonResponse({ data: {} }))
+
+		await expect(getAniListMediaByIdsBatch([], { fetch: requester })).resolves.toEqual([])
+		await expect(getAniListMediaByIdsBatch(
+			Array.from({ length: 201 }, (_, index) => index + 1),
+			{ fetch: requester }
+		)).rejects.toMatchObject({ statusCode: 400 })
+		await expect(getAniListMediaByIdsBatch([0], { fetch: requester }))
+			.rejects.toMatchObject({ statusCode: 400 })
+		expect(requester).not.toHaveBeenCalled()
 	})
 
 	it("sends public usernames only as GraphQL variables", async () => {
