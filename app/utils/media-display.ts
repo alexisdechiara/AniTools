@@ -24,7 +24,7 @@ export interface MediaDisplayLike {
 	description?: string | null
 }
 
-export type MediaCoverSize = "large" | "small"
+export type MediaCoverSize = "large" | "medium" | "small"
 
 type TitleField = keyof MediaTitleLike
 
@@ -67,8 +67,9 @@ export function getMediaTitle(
 }
 
 /**
- * The cover URL to show. `"large"` prefers the biggest image, `"small"` the smallest one (for
- * thumbnails). Returns `null` when the media has no cover.
+ * The cover URL to show. `"large"` prefers the biggest image (extraLarge, large, medium),
+ * `"medium"` a mid-size one for thumbnails (large, medium, extraLarge) and `"small"` the smallest
+ * one (medium, large, extraLarge). Returns `null` when the media has no cover.
  */
 export function getMediaCover(
 	media: Pick<MediaDisplayLike, "coverImage"> | null | undefined,
@@ -79,7 +80,9 @@ export function getMediaCover(
 
 	const order = size === "small"
 		? [cover.medium, cover.large, cover.extraLarge]
-		: [cover.extraLarge, cover.large, cover.medium]
+		: size === "medium"
+			? [cover.large, cover.medium, cover.extraLarge]
+			: [cover.extraLarge, cover.large, cover.medium]
 
 	for (const url of order) {
 		const value = nonEmpty(url)

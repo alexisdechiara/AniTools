@@ -274,7 +274,7 @@ export function buildTimelineGanttRows(
 				description: getGanttRowDescription(latestActivity, sortedActivities.length),
 				startedAt: firstActivity.createdAt,
 				endedAt: latestActivity.createdAt,
-				cover: getMediaCover(media),
+				cover: getMediaCover(media, "medium"),
 				color: media?.coverImage?.color ?? null,
 				url: media?.siteUrl ?? null,
 				media,

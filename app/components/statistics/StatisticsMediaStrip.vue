@@ -20,7 +20,7 @@ const media = computed(() =>
 			return [{
 				id: entry.media.id,
 				title: getAnimeTitle(entry.media),
-				cover: getMediaCover(entry.media),
+				cover: getMediaCover(entry.media, "medium"),
 				url: entry.media.siteUrl ?? `https://anilist.co/anime/${entry.media.id}`,
 				color: entry.media.coverImage?.color ?? undefined
 			}]

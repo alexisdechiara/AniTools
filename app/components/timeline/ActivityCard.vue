@@ -24,7 +24,7 @@ const mediaUrl = computed(() =>
 )
 const cover = computed(() =>
 	props.activity.kind === "anime"
-		? getMediaCover(props.activity.media)
+		? getMediaCover(props.activity.media, "medium")
 		: null
 )
 const text = computed(() => getActivityText(props.activity))

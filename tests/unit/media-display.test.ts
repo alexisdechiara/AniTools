@@ -76,6 +76,13 @@ describe("getMediaCover", () => {
 		expect(getMediaCover({ coverImage: { extraLarge: "xl.jpg" } }, "small")).toBe("xl.jpg")
 	})
 
+	it("prefers large, then medium, then extraLarge for the medium size", () => {
+		expect(getMediaCover({ coverImage: cover }, "medium")).toBe("l.jpg")
+		expect(getMediaCover({ coverImage: { extraLarge: "xl.jpg", medium: "m.jpg" } }, "medium")).toBe("m.jpg")
+		expect(getMediaCover({ coverImage: { extraLarge: "xl.jpg" } }, "medium")).toBe("xl.jpg")
+		expect(getMediaCover({ coverImage: { medium: "m.jpg" } }, "medium")).toBe("m.jpg")
+	})
+
 	it("skips empty strings and returns null when there is no cover", () => {
 		expect(getMediaCover({ coverImage: { extraLarge: "", large: "l.jpg" } })).toBe("l.jpg")
 		expect(getMediaCover({ coverImage: { extraLarge: null, large: null, medium: null } })).toBeNull()

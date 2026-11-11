@@ -23,7 +23,7 @@
           >
             <NuxtImg
               v-if="item.entries && item.entries.length > 0"
-              :src="getMediaCover(item.entries[0]?.media, 'small') ?? ''"
+              :src="getMediaCover(item.entries[0]?.media, 'medium') ?? ''"
               :alt="getAnimeTitle(item.entries[0]?.media)"
               class="size-10 rounded-sm aspect-square object-cover"
             />

@@ -51,7 +51,7 @@
           }"
         >
           <NuxtImg
-            :src="getMediaCover(item) ?? ''"
+            :src="getMediaCover(item, 'medium') ?? ''"
             :alt="getAnimeTitle(item)"
             class="h-24 rounded-sm object-cover"
           />
