@@ -22,14 +22,19 @@
             @mouseleave="handleMouseLeave()"
           >
             <NuxtImg
-              v-if="item.entries && item.entries.length > 0"
-              :src="getMediaCover(item.entries[0]?.media, 'medium') ?? ''"
-              :alt="getAnimeTitle(item.entries[0]?.media)"
-              class="size-10 rounded-sm aspect-square object-cover"
+              v-if="thumbnail(item)"
+              :src="thumbnail(item)!"
+              :alt="`${getAnimeTitle(item.entries?.[0]?.media)} cover`"
+              width="40"
+              height="40"
+              fit="cover"
+              format="webp"
+              loading="lazy"
+              class="size-10 shrink-0 rounded-sm aspect-square object-cover"
             />
             <div
               v-else
-              class="size-10 bg-elevated rounded-sm aspect-square relative overflow-hidden"
+              class="size-10 shrink-0 bg-elevated rounded-sm aspect-square relative overflow-hidden"
             >
               <Icon
                 :name="item.icon || 'i-lucide-help-circle'"
@@ -89,6 +94,11 @@ function formatMetric(item: listType): string {
   if (selectedSort.value === "meanScore") return formatMeanScore(item.meanScore);
   if (selectedSort.value === "minutesWatched") return formatWatchTime(item.minutesWatched ?? 0);
   return formatNumber(item.count ?? 0);
+}
+
+// A 40px thumbnail: AniList's smallest cover (100px wide) already covers 2x screens.
+function thumbnail(item: listType): string | null {
+  return getMediaCover(item.entries?.[0]?.media, "small");
 }
 
 const handleMouseOver = (name: string) => {
