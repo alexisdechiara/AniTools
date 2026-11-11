@@ -51,7 +51,7 @@ test("Create uses the selected AniList artwork without a file upload", async ({ 
 	await expect(page.locator('input[type="file"]')).toHaveCount(0)
 	await page.getByRole("button", { name: "Select anime..." }).click()
 	await page.getByPlaceholder("Search anime...").fill("Cowboy")
-	await page.getByRole("button", { name: "Use Cowboy Bebop" }).click()
+	await page.getByRole("option", { name: "Use Cowboy Bebop" }).click()
 
 	await expect(page.getByRole("dialog")).toBeHidden()
 	await expect(page.getByRole("button", { name: "Cowboy Bebop", exact: true })).toBeVisible()
