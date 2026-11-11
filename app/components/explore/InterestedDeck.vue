@@ -34,7 +34,9 @@ const emit = defineEmits<{
 	undoLast: []
 }>()
 
-const UNDO_HINT = "Undo is not kept across reloads. Each pick has its own undo."
+// Saving to AniList needs an OAuth session. The login page sends the visitor back here.
+const signInLink = { path: "/login", query: { redirect: "/explore" } }
+const UNDO_HINT ="Undo is not kept across reloads. Each pick has its own undo."
 
 const deckMedia = computed(() => [...props.media].reverse())
 const addingIds = computed(() => new Set(props.addingMediaIds))
@@ -70,7 +72,8 @@ function countLabel(count: number, noun: string): string {
 }
 
 function cover(media: ExplorePickMedia): string | null {
-	return getMediaCover(media)
+	// A 64px-wide thumbnail: the mid-size AniList cover is enough, even at 2x.
+	return getMediaCover(media, "medium")
 }
 
 function relationBadge(media: ExplorePickMedia) {
@@ -163,6 +166,7 @@ function confirmClear(): void {
 			</div>
 
 			<UButton
+				v-if="canAddToPlanning"
 				icon="i-lucide-list-plus"
 				label="Add all to Plan to Watch"
 				color="warning"
@@ -171,16 +175,24 @@ function confirmClear(): void {
 				block
 				class="rounded-full"
 				:loading="addingAll"
-				:disabled="!canAddToPlanning || !media.length || addingAll"
+				:disabled="!media.length || addingAll"
 				@click="emit('addAllToPlanning')" />
+			<!-- A public profile is read-only: say why nothing can be saved and what works instead. -->
+			<p v-else class="text-sm text-pretty text-muted" data-planning-sign-in>
+				This public profile is read-only.
+				<NuxtLink
+					:to="signInLink"
+					class="font-medium text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Sign in with AniList to save these to Plan to Watch</NuxtLink>,
+				or export your picks.
+			</p>
 
 			<div class="grid grid-cols-2 gap-2">
 				<UDropdownMenu :items="exportItems" :content="{ align: 'start' }" :disabled="!media.length">
 					<UButton
 						icon="i-lucide-download"
-						label="Export"
-						color="neutral"
-						variant="soft"
+						:label="canAddToPlanning ? 'Export' : 'Export picks'"
+						:color="canAddToPlanning ? 'neutral' : 'primary'"
+						:variant="canAddToPlanning ? 'soft' : 'solid'"
 						size="sm"
 						block
 						class="rounded-full"
@@ -247,8 +259,10 @@ function confirmClear(): void {
 							v-if="cover(item)"
 							:src="cover(item)!"
 							:alt="`${getAnimeTitle(item)} cover`"
-							width="160"
-							height="224"
+							width="64"
+							height="96"
+							fit="cover"
+							format="webp"
 							loading="lazy"
 							class="size-full object-cover transition duration-200 group-hover/image:scale-105" />
 						<span v-else class="flex size-full items-center justify-center">

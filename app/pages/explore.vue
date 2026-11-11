@@ -267,7 +267,8 @@ onMounted(async () => {
 <template>
 	<UDashboardPanel id="explore" :ui="{ body: 'pt-3 sm:pt-4' }">
 		<template #body>
-			<div class="mx-auto w-full max-w-304 space-y-4">
+			<!-- On phones the deck's action bar is fixed to the viewport: keep the page end clear of it. -->
+			<div class="mx-auto w-full max-w-304 space-y-4" :class="currentMedia ? 'pb-20 sm:pb-0' : ''">
 				<PageHeader
 					eyebrow="Discover"
 					title="Explore"
