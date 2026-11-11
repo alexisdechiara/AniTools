@@ -5,7 +5,6 @@ import type {
 	AniListSearchResponse
 } from "~~/shared/types/anilist"
 import { getCreateMediaTitle } from "~/utils/create-artwork"
-import { hasMediaDetails } from "~/utils/media-details"
 
 interface PickerItem {
 	id: number
@@ -69,7 +68,6 @@ const activeMedia = computed(() => activeId.value
 	? mediaCache.get(activeId.value) ?? activeItem.value?.media ?? null
 	: null
 )
-// List suggestions carry no description: it appears once the details request below resolves.
 const description = computed(() => (activeMedia.value?.description ?? "")
 	.replace(/<br\s*\/?>/gi, " ")
 	.replace(/<[^>]*>/g, "")
@@ -129,7 +127,7 @@ watch(visibleItems, (items) => {
 async function resolveMedia(item: PickerItem): Promise<AniListMediaListSummary | null> {
 	const cached = mediaCache.get(item.id)
 	if (cached) return cached
-	if (item.media && hasMediaDetails(item.media)) {
+	if (item.media) {
 		mediaCache.set(item.id, item.media)
 		return item.media
 	}

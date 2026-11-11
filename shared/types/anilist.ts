@@ -181,10 +181,10 @@ export interface AniListMediaSummary {
 	} | null
 }
 
-/** Fields only a details view renders; list queries do not select them. */
+/** Fields only a details view renders; list queries do not select them. The description is
+ * not one of them: previews show it from list media. */
 export type AniListMediaDetailField =
 	| "idMal"
-	| "description"
 	| "rankings"
 	| "externalLinks"
 	| "trailer"

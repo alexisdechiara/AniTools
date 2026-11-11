@@ -166,17 +166,19 @@ const MEDIA_SUMMARY_FIELDS = `
 	}
 `
 
-// What a list row needs: MEDIA_SUMMARY_FIELDS without the details-view fields (idMal,
-// description, rankings, external links, trailer), the tag spoiler/adult flags and the relation
-// titles and formats. Tier-list franchise grouping only reads relation types and ids. A field a
-// card or a calculation needs goes in both sets; one only a details view needs goes in the full
-// set, and the details popover fetches it on demand (see app/utils/media-details.ts).
+// What a list row needs: MEDIA_SUMMARY_FIELDS without the details-view fields (idMal, rankings,
+// external links, trailer), the tag spoiler/adult flags and the relation titles and formats.
+// The description stays: previews show it without a details request. Tier-list franchise
+// grouping only reads relation types and ids. A field a card or a calculation needs goes in
+// both sets; one only a details view needs goes in the full set, and the details popover
+// fetches it on demand (see app/utils/media-details.ts).
 const MEDIA_LIST_FIELDS = `
 	id
 	type
 	title { romaji english native userPreferred }
 	coverImage { extraLarge large medium color }
 	bannerImage
+	description
 	format
 	status
 	episodes
@@ -899,7 +901,6 @@ const mediaSchema = z.object({
 // node titles and formats are optional, and stay absent (undefined, never null) once normalised.
 const mediaListSchema = mediaSchema.partial({
 	idMal: true,
-	description: true,
 	rankings: true,
 	externalLinks: true,
 	trailer: true

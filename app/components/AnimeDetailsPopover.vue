@@ -357,9 +357,12 @@ function decodeHtmlEntities(value: string): string {
 
 const sanitizedDescription = computed(() => decodeHtmlEntities((media.value?.description || '').replace(/(<([^>]+)>)/ig, '')));
 
-watch(open, async (isOpen) => {
+// Details are fetched only once the details section is on screen: the summary renders from the
+// list media it was given.
+watch([open, showDetails], async ([isOpen, detailsShown]) => {
 	const mediaId = Number(props.data?.media?.id)
-	if (!isOpen || remoteMedia.value || !Number.isInteger(mediaId) || mediaId <= 0) return
+	if (!isOpen || !detailsShown || remoteMedia.value || detailsLoading.value) return
+	if (!Number.isInteger(mediaId) || mediaId <= 0) return
 	if (hasMediaDetails(props.data?.media)) return
 
 	detailsLoading.value = true

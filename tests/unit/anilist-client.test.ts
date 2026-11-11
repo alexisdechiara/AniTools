@@ -114,16 +114,23 @@ const media = {
 	relations: null
 }
 
-const MEDIA_DETAIL_FIELDS = ["idMal", "description", "rankings", "externalLinks", "trailer"]
+const MEDIA_DETAIL_FIELDS = ["idMal", "rankings", "externalLinks", "trailer"]
 
-// The slim shape list, collection and airing queries select: no details-view fields, no tag
-// flags, relation nodes reduced to their id.
+// The slim shape list, collection and airing queries select: the description but no
+// details-view fields, no tag flags, relation nodes reduced to their id.
 const listMedia: Record<string, unknown> = {
 	...Object.fromEntries(Object.entries(media)
 		.filter(([field]) => !MEDIA_DETAIL_FIELDS.includes(field))),
 	tags: [{ id: 3, name: "Alchemy", category: "Theme-Fantasy", rank: 95 }],
 	relations: {
 		edges: [{ relationType: "PREQUEL", node: { id: 121 } }]
+	}
+}
+
+function expectListMediaFieldSet(query: string | undefined) {
+	expect(query).toContain("description")
+	for (const field of [...MEDIA_DETAIL_FIELDS, "isMediaSpoiler"]) {
+		expect(query).not.toContain(field)
 	}
 }
 
@@ -457,7 +464,8 @@ describe("AniList allowlisted client", () => {
 			}]
 		})
 		const airingMedia = result.airingSchedules[0]?.media
-		expect(airingMedia?.description).toBeUndefined()
+		expect(airingMedia?.description).toBe(media.description)
+		expect(airingMedia && "trailer" in airingMedia).toBe(false)
 		expect(airingMedia && "rankings" in airingMedia).toBe(false)
 		expect(airingMedia && "externalLinks" in airingMedia).toBe(false)
 
@@ -467,8 +475,7 @@ describe("AniList allowlisted client", () => {
 			variables: Record<string, unknown>
 		}
 		expect(body.query).toContain("query AniToolsAiringSchedules")
-		expect(body.query).not.toContain("description")
-		expect(body.query).not.toContain("externalLinks")
+		expectListMediaFieldSet(body.query)
 		expect(body.variables).toEqual({
 			page: 2,
 			perPage: 50,
@@ -588,8 +595,7 @@ describe("AniList allowlisted client", () => {
 			total: 11
 		})
 		expect(body.query).toContain("query AniToolsAnimeList")
-		expect(body.query).not.toContain("description")
-		expect(body.query).not.toContain("externalLinks")
+		expectListMediaFieldSet(body.query)
 		expect(body.variables).toMatchObject({
 			username: "Alexis",
 			page: 2,
@@ -676,9 +682,7 @@ describe("AniList allowlisted client", () => {
 		expect(result.source).toEqual({ mode: "public", username: "Alexis" })
 		expect(requestBodies).toHaveLength(2)
 		expect(requestBodies[0]?.query).toContain("query AniToolsAnimeCollection")
-		expect(requestBodies[0]?.query).not.toContain("description")
-		expect(requestBodies[0]?.query).not.toContain("externalLinks")
-		expect(requestBodies[0]?.query).not.toContain("isMediaSpoiler")
+		expectListMediaFieldSet(requestBodies[0]?.query)
 		expect(requestBodies.map(body => body.variables.chunk)).toEqual([1, 2])
 		// Absent details stay undefined, so hasMediaDetails reads them as "not fetched yet".
 		const collectionMedia = result.entries[0]?.media
@@ -687,7 +691,7 @@ describe("AniList allowlisted client", () => {
 			genres: ["Action"],
 			relations: { edges: [{ relationType: "PREQUEL", node: { id: 121 } }] }
 		})
-		expect(collectionMedia?.description).toBeUndefined()
+		expect(collectionMedia?.description).toBe(media.description)
 		expect(collectionMedia?.rankings).toBeUndefined()
 		expect(collectionMedia?.externalLinks).toBeUndefined()
 		expect(collectionMedia?.trailer).toBeUndefined()
