@@ -20,15 +20,31 @@ interface FaqEntry {
 const faq: FaqEntry[] = [
 	{
 		question: "Do I need to create an account?",
-		answer: "No. AniTools never creates accounts of its own. Calendar, Tierlist and Create work without signing in. Dashboard, Statistics, Rewind, Explore, Podium and Timeline need your anime list, so they ask you to either sign in with AniList or enter a public AniList username."
+		answer: "No. AniTools never creates accounts of its own. Calendar, Tier list and Create work without signing in. Dashboard, Statistics, Rewind, Explore, Podium and Timeline need your anime list, so they ask you to either sign in with AniList or enter a public AniList username."
 	},
 	{
 		question: "Where is my data stored?",
-		answer: "Your anime list and profile are fetched live from AniList and never stored on our servers. What does stay on your device, in this browser's local storage, is: your display preferences (Settings), the last profile you viewed, and anything you build in Tierlist or Create. Clearing your browser data removes all of it."
+		answer: "Your anime list and profile are fetched live from AniList and never stored on our servers. What does stay on your device, in this browser's local storage, is: your display preferences (Settings), the last profile you viewed, and anything you build in Tier list or Create. Clearing your browser data removes all of it."
 	},
 	{
 		question: "What's the difference between signing in and using a public username?",
 		answer: "Signing in with AniList uses OAuth and lets AniTools read your list on your behalf, including private data like your own scores. Entering a public username instead reads whatever that AniList profile has made public, with no login required — handy for looking at your own list without going through OAuth, or checking a friend's."
+	},
+	{
+		question: "What can a public profile do, and what can't it?",
+		answer: "A public profile opens Dashboard, Statistics, Rewind, Explore, Podium and Timeline with whatever that AniList account shows publicly. It is read-only: it cannot see private entries and cannot add a title to Planning from Explore, which needs an AniList sign-in."
+	},
+	{
+		question: "How does Rewind estimate watch time, and why can a recap be partial?",
+		answer: "AniList does not record when each episode was watched. Rewind rebuilds the year from your list activity, your progress and the average episode length of each anime, so the total is an estimate. For a very active year only the most recent part of the activity history is loaded, and Rewind says so when a recap is partial."
+	},
+	{
+		question: "Does changing the score format change my AniList scores?",
+		answer: "No. The score format in Settings only changes how scores are displayed in this browser. Your scores and the format chosen on your AniList account stay exactly as they are."
+	},
+	{
+		question: "Where are my tier lists and other local data kept?",
+		answer: "In this browser's local storage, on this device only: tier lists, the Dashboard card layout, Explore picks and display preferences. They are not synced between devices. Export a tier list as JSON to keep a copy or move it to another browser."
 	},
 	{
 		question: "How does the Calendar merge simuldub information?",
@@ -49,14 +65,9 @@ const faq: FaqEntry[] = [
 	<UDashboardPanel id="support">
 		<template #body>
 			<div class="mx-auto w-full max-w-2xl space-y-8">
-				<header>
-					<h1 class="text-2xl font-bold tracking-tight text-highlighted">
-						Support
-					</h1>
-					<p class="mt-1 text-sm text-muted">
-						Answers to common questions about how AniTools works.
-					</p>
-				</header>
+				<PageHeader
+					title="Support"
+					description="Answers to common questions about how AniTools works." />
 
 				<div class="overflow-hidden rounded-lg border border-default">
 					<CollapseButton

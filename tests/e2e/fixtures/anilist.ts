@@ -424,6 +424,6 @@ export async function submitPublicProfile(page: Page, username: string, redirect
 		return Boolean(root?.__vue_app__)
 	})
 	await page.getByLabel("AniList username").fill(username)
-	await page.getByRole("button", { name: "Load public AniList profile" }).click()
+	await page.getByRole("button", { name: "View profile" }).click()
 	await expect(page).toHaveURL(url => url.pathname === redirect)
 }

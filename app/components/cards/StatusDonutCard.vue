@@ -16,9 +16,11 @@
 import { computed } from "vue"
 import { storeToRefs } from "pinia"
 import { sortStatistics } from "~/utils/statistics"
+import { reconcileStatusStatistics } from "~/utils/dashboard-status"
 import { donutMetricValue, type DonutCardDisplayProps, type DonutCardItem } from "~/utils/donut-card"
 
 const { statuses: statusesRef, statusSort } = storeToRefs(useStatisticsStore())
+const entriesStore = useEntriesStore()
 
 export type DonutStatus = DonutCardItem
 
@@ -34,42 +36,39 @@ withDefaults(
 	}
 )
 
-// Mappage des statuts aux couleurs
 const statusColors: Record<string, string> = {
 	COMPLETED: "var(--color-completed)",
 	PLANNING: "var(--color-planning)",
 	DROPPED: "var(--color-dropped)",
-	CURRENT: "var(--color-watching)", // CURRENT utilise la même couleur que WATCHING
+	CURRENT: "var(--color-watching)",
 	WATCHING: "var(--color-watching)",
 	PAUSED: "var(--color-paused)"
 }
 
-// Type pour les statuts d'anime
-interface AnimeStatus {
-	status: string
-	meanScore?: number
-	minutesWatched?: number
-	count?: number
+const STATUS_NAMES: Record<string, string> = {
+	CURRENT: "Watching",
+	REPEATING: "Rewatching"
 }
 
-// Transforme les données pour le composant DonutChart
+// The statistics are a snapshot AniList refreshes on its own schedule; the list is live. Once
+// the whole list is loaded its counts replace the snapshot's, so this card agrees with the
+// list cards next to it. See reconcileStatusStatistics.
+const liveEntries = computed(() =>
+	entriesStore.isInitialized && !entriesStore.truncated && !entriesStore.error
+		? entriesStore.entries
+		: null
+)
+
 const chartData = computed<DonutStatus[]>(() => {
-	const statuses = (statusesRef.value || []) as AnimeStatus[]
-
-	if (!statuses || statuses.length === 0) return []
-
-	const mapped = statuses
-		.filter((s): s is AnimeStatus => !!s.status)
-		.map((s) => ({
-			color: statusColors[s.status] || "var(--ui-text-muted)",
-			name:
-				s.status === "CURRENT"
-					? "Watching"
-					: s.status.charAt(0) + s.status.slice(1).toLowerCase(),
-			value: donutMetricValue(s, statusSort.value),
-			count: s.count ?? 0,
-			meanScore: s.meanScore,
-			minutesWatched: s.minutesWatched
+	const mapped = reconcileStatusStatistics(statusesRef.value, liveEntries.value)
+		.map(item => ({
+			color: statusColors[item.status] || "var(--ui-text-muted)",
+			name: STATUS_NAMES[item.status]
+				?? item.status.charAt(0) + item.status.slice(1).toLowerCase(),
+			value: donutMetricValue(item, statusSort.value),
+			count: item.count,
+			meanScore: item.meanScore,
+			minutesWatched: item.minutesWatched
 		} satisfies DonutStatus))
 
 	return sortStatistics(mapped, statusSort.value)

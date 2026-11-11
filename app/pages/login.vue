@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { FEATURE_REGISTRY } from "#shared/config/features"
+import {
+	FEATURE_NAVIGATION_GROUPS,
+	FEATURE_REGISTRY,
+	featureNeedsProfile,
+	findFeatureByPath
+} from "#shared/config/features"
 import { getSafeInternalPath } from "~/utils/navigation"
 
 definePageMeta({
@@ -31,11 +36,20 @@ const username = ref("")
 const isLoading = ref(false)
 const profileError = ref<string | null>(null)
 
-const publicTools = [
-	{ label: "Calendar", to: "/calendar", icon: "i-lucide-calendar-days" },
-	{ label: "Tier list", to: "/tierlist", icon: "i-lucide-rows-3" },
-	{ label: "Create", to: "/create", icon: "i-lucide-circle-fading-plus" }
-]
+const navigationFeatures = FEATURE_NAVIGATION_GROUPS
+	.filter(group => group.id !== "app")
+	.flatMap(group => group.features)
+	.map(featureId => ({ id: featureId, ...FEATURE_REGISTRY[featureId] }))
+const publicTools = navigationFeatures.filter(feature => !featureNeedsProfile(feature.id))
+const profileFeatures = navigationFeatures.filter(feature => featureNeedsProfile(feature.id))
+
+// The route guard sends guests here with the page they asked for: say which one it was.
+const requestedFeature = computed(() => {
+	if (route.query.redirect === undefined) return null
+
+	const featureId = findFeatureByPath(getSafeInternalPath(route.query.redirect, ""))
+	return featureId && featureNeedsProfile(featureId) ? FEATURE_REGISTRY[featureId] : null
+})
 
 watch(username, () => {
 	profileError.value = null
@@ -116,7 +130,7 @@ async function loadPublicProfile() {
 <template>
 	<div class="flex min-h-dvh items-center justify-center bg-default p-4 sm:p-8">
 		<section
-			class="login-hero w-full max-w-100 bg-[linear-gradient(165deg,var(--color-hero-surface-from),var(--color-hero-surface-to))] px-5 py-6 text-white shadow-2xl sm:px-8 sm:py-9"
+			class="login-hero w-full max-w-100 border border-transparent bg-[linear-gradient(165deg,var(--color-hero-surface-from),var(--color-hero-surface-to))] bg-origin-border px-5 py-6 text-white shadow-2xl sm:px-8 sm:py-9 dark:border-accented"
 			aria-labelledby="login-title">
 			<div class="mb-6 flex items-center gap-2.5">
 				<span
@@ -128,6 +142,17 @@ async function loadPublicProfile() {
 					<span class="text-primary-400">Ani</span>Tools
 				</span>
 			</div>
+
+			<p
+				v-if="requestedFeature"
+				data-login-reason
+				class="mb-4 flex items-start gap-2 rounded-xl bg-white/8 px-3 py-2.5 text-sm leading-snug text-white/90">
+				<UIcon name="i-lucide-lock" class="mt-0.5 size-4 shrink-0 text-white/65" aria-hidden="true" />
+				<span>
+					Connect a profile to open {{ requestedFeature.label }}.
+					<span class="text-white/65">It reads your AniList anime list.</span>
+				</span>
+			</p>
 
 			<h1 id="login-title" class="mb-2 text-2xl leading-tight font-bold tracking-tight sm:text-3xl">
 				Your AniList, with tools.
@@ -170,13 +195,14 @@ async function loadPublicProfile() {
 						class="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/55 sm:text-sm">
 					<button
 						type="submit"
-						aria-label="Load public AniList profile"
 						:disabled="!canSubmit"
-						class="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition-opacity hover:bg-primary-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-45">
+						class="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary-500 px-4 text-sm font-semibold text-white transition-opacity hover:bg-primary-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-45">
 						<UIcon
-							:name="isLoading ? 'i-lucide-loader-circle' : 'i-lucide-arrow-right'"
-							:class="['size-4.5', isLoading ? 'animate-spin' : '']"
+							v-if="isLoading"
+							name="i-lucide-loader-circle"
+							class="size-4 animate-spin"
 							aria-hidden="true" />
+						View profile
 					</button>
 				</div>
 				<p
@@ -193,14 +219,29 @@ async function loadPublicProfile() {
 				Public profiles are read-only. No AniList token ever reaches the browser.
 			</p>
 
-			<nav aria-labelledby="public-tools-title" class="mt-6 border-t border-white/10 pt-5">
-				<p id="public-tools-title" class="mb-3 text-center text-xs font-medium text-white/65">
+			<section aria-labelledby="profile-features-title" class="mt-6 border-t border-white/10 pt-5">
+				<h2 id="profile-features-title" class="mb-3 text-center text-xs font-medium text-white/65">
+					With a profile
+				</h2>
+				<ul class="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs font-medium text-white/85">
+					<li
+						v-for="feature in profileFeatures"
+						:key="feature.id"
+						class="inline-flex items-center gap-1.5">
+						<UIcon :name="feature.icon" class="size-4 text-white/65" aria-hidden="true" />
+						{{ feature.label }}
+					</li>
+				</ul>
+			</section>
+
+			<nav aria-labelledby="public-tools-title" class="mt-5 border-t border-white/10 pt-5">
+				<h2 id="public-tools-title" class="mb-3 text-center text-xs font-medium text-white/65">
 					No account needed for these
-				</p>
+				</h2>
 				<ul class="grid grid-cols-3 gap-2">
-					<li v-for="tool in publicTools" :key="tool.to">
+					<li v-for="tool in publicTools" :key="tool.id">
 						<NuxtLink
-							:to="tool.to"
+							:to="tool.path"
 							class="flex flex-col items-center gap-1.5 rounded-2xl bg-white/6 px-2 py-3 text-xs font-medium text-white/85 transition-colors hover:bg-white/12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
 							<UIcon :name="tool.icon" class="size-5" aria-hidden="true" />
 							{{ tool.label }}

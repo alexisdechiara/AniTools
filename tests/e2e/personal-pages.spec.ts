@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import type { CalendarApiResponse } from "../../app/types/calendar"
+import { getDefaultRewindYear } from "../../shared/config/features"
 import { fixtureTitle, mockPublicProfile, openAs, submitPublicProfile } from "./fixtures/anilist"
 
 // Every page below is reached by clicking the app's own navigation: a full document load would be
@@ -17,7 +18,9 @@ test("the dashboard shows the public profile's own list", async ({ page }) => {
 	await mockPublicProfile(page, { username: "E2eAlpha" })
 	await openAs(page, "E2eAlpha", "/")
 
-	await expect(page.getByRole("heading", { name: "Welcome back, E2eAlpha" })).toBeVisible()
+	// A first visit is greeted neutrally; "Welcome back" only appears from the second one.
+	await expect(page.getByRole("heading", { name: "Hello, E2eAlpha", level: 1 })).toBeVisible()
+	await expect(page.getByRole("heading", { name: "Start here", level: 2 })).toBeVisible()
 	await expect(page.getByText(/E2eAlpha anime \d+/).first()).toBeVisible()
 
 	const overflow = await page.evaluate(() =>
@@ -37,15 +40,23 @@ test("statistics list the genres of the mocked profile", async ({ page }) => {
 	await expect(page.getByText("Mystery", { exact: true }).first()).toBeVisible()
 })
 
-test("Rewind opens on the current year and counts the mocked activities", async ({ page }) => {
+test("Rewind opens on the last completed year and counts the mocked activities", async ({ page }) => {
 	const calls = await mockPublicProfile(page, { username: "E2eAlpha" })
 	await openAs(page, "E2eAlpha", "/")
 
 	await openFromNavigation(page, "Rewind")
 
+	// Until December the link opens the last completed year; the fixture's activities are dated
+	// in the running year, so the recap is then switched to it.
 	const year = new Date().getUTCFullYear()
-	await expect(page).toHaveURL(url => url.pathname === `/rewind/${year}`)
+	const defaultYear = getDefaultRewindYear(new Date())
+	await expect(page).toHaveURL(url => url.pathname === `/rewind/${defaultYear}`)
 	await expect(page.getByRole("heading", { name: "Anime Rewind" })).toBeVisible()
+	if (defaultYear !== year) {
+		await page.getByRole("combobox", { name: "Rewind year" }).click()
+		await page.getByRole("option", { name: String(year), exact: true }).click()
+		await expect(page).toHaveURL(url => url.pathname === `/rewind/${year}`)
+	}
 	// The fixture records four anime activities this year (one per watched entry, at most four),
 	// so the year counts four anime, in the numbers band and in the opening sentence.
 	await expect(page.locator("[data-rewind-stat='anime'] dd")).toHaveText("4")
@@ -104,7 +115,7 @@ test("switching to another public profile shows none of the previous profile's d
 	await expect(page.getByRole("button", { name: /^Show details for E2eAlpha anime \d+$/ }).first()).toBeVisible()
 
 	await page.getByRole("button", { name: "Open account menu for E2eAlpha" }).click()
-	await page.getByRole("menuitem", { name: "Clear profile" }).click()
+	await page.getByRole("menuitem", { name: "Forget this profile" }).click()
 	await expect(page).toHaveURL(url => url.pathname === "/login")
 
 	await submitPublicProfile(page, "E2eBeta", "/podium")

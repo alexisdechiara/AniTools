@@ -46,7 +46,15 @@ const mobileTitle = computed(() =>
 					orientation="vertical"
 					tooltip
 					popover
-					:ui="{ childItem: 'first:pt-2' }" />
+					:ui="{
+						childItem: 'first:pt-2',
+						label: 'px-2.5 pt-2 pb-1 text-xs/5 font-medium text-muted'
+					}">
+					<template #locked-trailing>
+						<UIcon name="i-lucide-lock" class="size-3.5 text-dimmed" aria-hidden="true" />
+						<span class="sr-only">({{ NAVIGATION_LOCK_LABEL.toLowerCase() }})</span>
+					</template>
+				</UNavigationMenu>
 			</template>
 
 			<template #footer="{ collapsed }">
@@ -58,10 +66,12 @@ const mobileTitle = computed(() =>
 			<!-- Below lg the sidebar becomes a drawer: this bar is the only way to open it. -->
 			<div
 				data-mobile-navbar
-				class="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-default bg-default/90 px-3 backdrop-blur lg:hidden">
+				class="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-default bg-default/90 ps-1 pe-4 backdrop-blur lg:hidden">
+				<!-- 44px target; the icon stays on the 16px gutter the page content starts at. -->
 				<UDashboardSidebarToggle
 					color="neutral"
 					variant="ghost"
+					class="size-11 justify-center"
 					aria-label="Open navigation" />
 				<p class="min-w-0 truncate text-sm font-semibold text-highlighted">
 					{{ mobileTitle }}
