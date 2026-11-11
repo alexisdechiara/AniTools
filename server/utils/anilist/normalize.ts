@@ -1,15 +1,24 @@
 import type * as z from "zod"
 import type {
+	AniListActivity,
 	AniListMediaListSummary,
 	AniListMediaSummary,
 	AniListPageInfo,
-	AniListSource
+	AniListSource,
+	AniListStatistics
 } from "~~/shared/types/anilist"
+import {
+	MAX_STATISTIC_GROUPS,
+	MAX_MEDIA_IDS_PER_STATISTIC
+} from "./constants"
 import type {
 	AniListAccess,
 	mediaSchema,
 	mediaListSchema,
-	nullablePageInfoSchema
+	nullablePageInfoSchema,
+	statisticStaffSchema,
+	statisticsSchema,
+	activitySchema
 } from "./schemas"
 
 export function sourceFromAccess(access: AniListAccess): AniListSource {
@@ -86,5 +95,100 @@ export function normalizeListMedia(
 		...(rankings === undefined ? {} : { rankings: withoutNulls(rankings) }),
 		...(externalLinks === undefined ? {} : { externalLinks: withoutNulls(externalLinks) }),
 		relations: normalizeRelations(media.relations)
+	}
+}
+
+function boundedGroup<T extends { mediaIds: Array<number | null> }>(
+	items: Array<T | null> | null
+) {
+	return (items ?? [])
+		.filter((item): item is T => item !== null)
+		.slice(0, MAX_STATISTIC_GROUPS)
+		.map(item => ({
+			...item,
+			mediaIds: item.mediaIds
+				.filter((mediaId): mediaId is number => mediaId !== null)
+				.slice(0, MAX_MEDIA_IDS_PER_STATISTIC)
+		}))
+}
+
+export function normalizeStatistics(
+	statistics: z.infer<typeof statisticsSchema>
+): AniListStatistics {
+	const normalizePerson = (person: z.infer<typeof statisticStaffSchema>) => ({
+		id: person.id,
+		name: person.name,
+		language: person.languageV2,
+		image: person.image,
+		primaryOccupations: (person.primaryOccupations ?? [])
+			.filter((occupation): occupation is string => occupation !== null),
+		siteUrl: person.siteUrl
+	})
+	const voiceActors = boundedGroup(statistics.voiceActors).map(item => ({
+		...item,
+		voiceActor: item.voiceActor ? normalizePerson(item.voiceActor) : null,
+		characterIds: item.characterIds
+			.filter((characterId): characterId is number => characterId !== null)
+			.slice(0, MAX_MEDIA_IDS_PER_STATISTIC)
+	}))
+	const staff = boundedGroup(statistics.staff).map(item => ({
+		...item,
+		staff: item.staff ? normalizePerson(item.staff) : null
+	}))
+
+	return {
+		...statistics,
+		statuses: boundedGroup(statistics.statuses),
+		scores: boundedGroup(statistics.scores),
+		formats: boundedGroup(statistics.formats),
+		countries: boundedGroup(statistics.countries),
+		genres: boundedGroup(statistics.genres),
+		tags: boundedGroup(statistics.tags),
+		startYears: boundedGroup(statistics.startYears),
+		releaseYears: boundedGroup(statistics.releaseYears),
+		studios: boundedGroup(statistics.studios),
+		voiceActors,
+		staff,
+		lengths: boundedGroup(statistics.lengths)
+	}
+}
+
+export function normalizeActivity(
+	activity: z.infer<typeof activitySchema>
+): AniListActivity {
+	switch (activity.__typename) {
+		case "ListActivity":
+			return {
+				kind: "anime",
+				id: activity.id,
+				type: activity.type,
+				status: activity.status,
+				progress: activity.progress,
+				createdAt: activity.createdAt,
+				replyCount: activity.replyCount,
+				user: activity.user,
+				media: activity.media
+			}
+		case "TextActivity":
+			return {
+				kind: "text",
+				id: activity.id,
+				type: activity.type,
+				text: activity.text ?? "",
+				createdAt: activity.createdAt,
+				replyCount: activity.replyCount,
+				user: activity.user
+			}
+		case "MessageActivity":
+			return {
+				kind: "message",
+				id: activity.id,
+				type: activity.type,
+				message: activity.message ?? "",
+				createdAt: activity.createdAt,
+				replyCount: activity.replyCount,
+				user: activity.user,
+				messenger: activity.messenger
+			}
 	}
 }
