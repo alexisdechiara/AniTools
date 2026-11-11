@@ -23,20 +23,8 @@
           >
             <NuxtImg
               v-if="item.entries && item.entries.length > 0"
-              :src="
-                item.entries[0]?.media
-                  ?.coverImage?.large ||
-                item.entries[0]?.media
-                  ?.coverImage?.medium ||
-                ''
-              "
-              :alt="
-                item.entries[0]?.media?.title
-                  ?.english ||
-                item.entries[0]?.media?.title
-                  ?.romaji ||
-                ''
-              "
+              :src="getMediaCover(item.entries[0]?.media, 'medium') ?? ''"
+              :alt="getAnimeTitle(item.entries[0]?.media)"
               class="size-10 rounded-sm aspect-square object-cover"
             />
             <div
@@ -76,6 +64,8 @@
 <script lang="ts" setup>
 import type { AnimeListEntry } from "../../stores/Entries";
 import type { MetricSort } from "../../stores/Statistics";
+import { getMediaCover } from "~/utils/media-display";
+const { title: getAnimeTitle } = useMediaTitle();
 const hoveredItem = ref<string | null>(null);
 
 const sortItems = [

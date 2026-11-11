@@ -1,5 +1,6 @@
 import * as z from "zod"
 import type { AniListScoreFormat } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
 import { scoreToPercent } from "~/utils/score-format"
 import type {
 	TierlistEntry,
@@ -236,11 +237,7 @@ export function getTierlistEntryId(entry: TierlistEntry): number {
 }
 
 export function getTierlistEntryTitle(entry: TierlistEntry): string {
-	return entry.media.title?.userPreferred
-		?? entry.media.title?.english
-		?? entry.media.title?.romaji
-		?? entry.media.title?.native
-		?? `Anime ${entry.media.id}`
+	return getMediaTitle(entry.media)
 }
 
 export function sanitizeTierlistEntry(input: unknown): TierlistEntry | null {

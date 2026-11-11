@@ -4,6 +4,7 @@ import type {
 	CalendarMedia,
 	CalendarSimuldubItem
 } from "~/types/calendar"
+import { getMediaTitle } from "~/utils/media-display"
 
 export const languageToCountry = (item?: unknown): string | undefined => {
 	if (typeof item !== "string") {
@@ -27,14 +28,6 @@ export const languageToCountry = (item?: unknown): string | undefined => {
 		default:
 			return normalizedItem
 	}
-}
-
-function getMediaTitle(media: CalendarMedia) {
-	return media.title?.userPreferred
-		|| media.title?.english
-		|| media.title?.romaji
-		|| media.title?.native
-		|| `Anime #${media.id}`
 }
 
 function getDurationInMilliseconds(media: CalendarMedia) {

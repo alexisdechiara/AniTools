@@ -3,6 +3,7 @@ import type {
 	AniListMediaListSummary,
 	AniListMediaSummary
 } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
 
 export interface ExploreSeed {
 	media: AniListMediaListSummary
@@ -136,11 +137,7 @@ export function filterExploreMedia(
 }
 
 export function getExploreTitle(media: AniListMediaListSummary): string {
-	return media.title?.userPreferred
-		?? media.title?.english
-		?? media.title?.romaji
-		?? media.title?.native
-		?? "Untitled anime"
+	return getMediaTitle(media)
 }
 
 export function getExploreRelationBadge(
@@ -150,11 +147,7 @@ export function getExploreRelationBadge(
 	for (const relationType of EXPLORE_RELATION_PRIORITY) {
 		const edge = edges.find(item => item.relationType === relationType && item.node)
 		if (!edge?.node) continue
-		const relatedTitle = edge.node.title?.userPreferred
-			?? edge.node.title?.english
-			?? edge.node.title?.romaji
-			?? edge.node.title?.native
-			?? "a related anime"
+		const relatedTitle = edge.node.title ? getMediaTitle(edge.node) : "a related anime"
 		const label = EXPLORE_RELATION_LABELS[relationType] ?? "Related anime"
 
 		if (relationType === "PREQUEL") {

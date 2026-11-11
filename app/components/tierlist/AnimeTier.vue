@@ -81,7 +81,7 @@ import type {
 	TierlistLaneId,
 	TierlistMoveTarget
 } from "~/types/tierlist"
-import { getTierlistEntryTitle } from "~/utils/tierlist-model"
+import { getMediaCover } from "~/utils/media-display"
 
 const props = defineProps<{
 	item: TierlistEntry
@@ -107,13 +107,9 @@ const emit = defineEmits<{
 const { isInspectorEnabled, setHovered, clearHovered, selectItem, hoveredTarget } = useInspector()
 const showDetails = ref(false)
 const mediaId = computed(() => String(props.item.media.id))
-const title = computed(() => getTierlistEntryTitle(props.item))
-const coverUrl = computed(() =>
-	props.item.media.coverImage?.extraLarge
-	?? props.item.media.coverImage?.large
-	?? props.item.media.coverImage?.medium
-	?? ""
-)
+const { title: getAnimeTitle } = useMediaTitle()
+const title = computed(() => getAnimeTitle(props.item.media))
+const coverUrl = computed(() => getMediaCover(props.item.media) ?? "")
 
 function removeAnime(): void {
 	emit("remove", props.item)

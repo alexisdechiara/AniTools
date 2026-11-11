@@ -10,6 +10,7 @@ import {
 	type DashboardCardId
 } from "~/config/components"
 import type { RecentListUpdate } from "~/types/dashboard"
+import { getMediaCover } from "~/utils/media-display"
 import {
 	DASHBOARD_GRID_COLUMNS,
 	type DashboardGridBreakpoint,
@@ -29,6 +30,7 @@ const userStore = useUserStore()
 const entriesStore = useEntriesStore()
 const statisticsStore = useStatisticsStore()
 const { getAllAnimes } = storeToRefs(entriesStore)
+const { title: getAnimeTitle } = useMediaTitle()
 const { load, error } = useAniListOverviewData()
 const {
 	cardIds,
@@ -184,13 +186,10 @@ const recentUpdates = computed<RecentListUpdate[]>(() =>
 		.slice(0, 8)
 		.map(entry => ({
 			id: entry.id,
-			title: entry.media?.title?.userPreferred
-				?? entry.media?.title?.english
-				?? entry.media?.title?.romaji
-				?? "Untitled anime",
+			title: getAnimeTitle(entry.media),
 			status: entry.status ?? "UNKNOWN",
 			updatedAt: entry.updatedAt ?? 0,
-			coverImage: entry.media?.coverImage?.medium
+			coverImage: getMediaCover(entry.media, "small")
 		}))
 )
 

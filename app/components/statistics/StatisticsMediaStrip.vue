@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getMediaCover } from "~/utils/media-display"
+
 const props = withDefaults(defineProps<{
 	mediaIds: readonly number[]
 	limit?: number
@@ -7,6 +9,7 @@ const props = withDefaults(defineProps<{
 })
 
 const entriesStore = useEntriesStore()
+const { title: getAnimeTitle } = useMediaTitle()
 
 const media = computed(() =>
 	entriesStore
@@ -16,13 +19,8 @@ const media = computed(() =>
 
 			return [{
 				id: entry.media.id,
-				title: entry.media.title?.userPreferred
-					?? entry.media.title?.english
-					?? entry.media.title?.romaji
-					?? `Anime #${entry.media.id}`,
-				cover: entry.media.coverImage?.large
-					?? entry.media.coverImage?.medium
-					?? null,
+				title: getAnimeTitle(entry.media),
+				cover: getMediaCover(entry.media, "medium"),
 				url: entry.media.siteUrl ?? `https://anilist.co/anime/${entry.media.id}`,
 				color: entry.media.coverImage?.color ?? undefined
 			}]

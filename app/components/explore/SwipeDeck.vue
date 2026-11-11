@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AniListMediaSummary } from "~~/shared/types/anilist"
-import { getExploreRelationBadge, getExploreTitle } from "~/utils/explore"
+import { getExploreRelationBadge } from "~/utils/explore"
+import { getMediaCover, sanitizeMediaDescription } from "~/utils/media-display"
 
 type SwipeDirection = "left" | "right"
 
@@ -32,12 +33,9 @@ const drag = reactive({
 })
 let decisionTimer: ReturnType<typeof setTimeout> | null = null
 
-const title = computed(() => props.media ? getExploreTitle(props.media) : "")
-const cover = computed(() => props.media?.coverImage?.extraLarge
-	?? props.media?.coverImage?.large
-	?? props.media?.coverImage?.medium
-	?? null
-)
+const { title: getAnimeTitle } = useMediaTitle()
+const title = computed(() => props.media ? getAnimeTitle(props.media) : "")
+const cover = computed(() => getMediaCover(props.media))
 const score = computed(() => props.media?.averageScore ?? props.media?.meanScore)
 const themeColor = computed(() => props.media?.coverImage?.color
 	?? "var(--ui-color-primary-400)"
@@ -53,12 +51,7 @@ const mediaTags = computed(() => {
 const aniListUrl = computed(() => props.media?.siteUrl
 	?? (props.media ? `https://anilist.co/anime/${props.media.id}` : "")
 )
-const description = computed(() => (props.media?.description ?? "")
-	.replace(/<br\s*\/?>/gi, " ")
-	.replace(/<[^>]*>/g, "")
-	.replace(/\s+/g, " ")
-	.trim()
-)
+const description = computed(() => sanitizeMediaDescription(props.media?.description))
 const relationBadge = computed(() => props.media
 	? getExploreRelationBadge(props.media)
 	: null
@@ -78,10 +71,7 @@ const cardStyle = computed(() => ({
 }))
 
 function mediaCover(media: AniListMediaSummary): string | null {
-	return media.coverImage?.extraLarge
-		?? media.coverImage?.large
-		?? media.coverImage?.medium
-		?? null
+	return getMediaCover(media)
 }
 
 function resetDrag(): void {

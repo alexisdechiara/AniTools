@@ -4,6 +4,7 @@ import type {
 	TierlistSnapshot,
 	TierlistTier
 } from "~/types/tierlist"
+import { getMediaCover } from "~/utils/media-display"
 import {
 	createTierlistExportDocument,
 	getTierlistEntryTitle,
@@ -58,10 +59,7 @@ function resolveCanvasColor(value: string, fallback: string): string {
 }
 
 function getCoverUrl(entry: TierlistEntry): string | null {
-	return entry.media.coverImage?.extraLarge
-		?? entry.media.coverImage?.large
-		?? entry.media.coverImage?.medium
-		?? null
+	return getMediaCover(entry.media)
 }
 
 function roundRect(

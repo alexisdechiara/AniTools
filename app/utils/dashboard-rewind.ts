@@ -1,4 +1,5 @@
 import type { AniListAnimeListEntry } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
 import type { RewindAnimeMetric, RewindBreakdown } from "~/utils/rewind"
 import { getEntryWatchMinutes } from "~/utils/statistics"
 
@@ -11,10 +12,7 @@ export interface AllTimeRewindSummary {
 }
 
 function getTitle(entry: AniListAnimeListEntry): string {
-	return entry.media?.title?.userPreferred
-		?? entry.media?.title?.english
-		?? entry.media?.title?.romaji
-		?? `Anime #${entry.media?.id ?? entry.id}`
+	return getMediaTitle(entry.media ?? { id: entry.id })
 }
 
 function toMetric(entry: AniListAnimeListEntry): RewindAnimeMetric {

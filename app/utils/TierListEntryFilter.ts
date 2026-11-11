@@ -8,12 +8,15 @@ export function matchesTierlistFilters(entry: TierlistEntry, filters: TierlistFi
 	const media = entry.media
 
 	if (filters.title) {
-		const title = media.title?.english
-			?? media.title?.romaji
-			?? media.title?.native
-			?? media.title?.userPreferred
-			?? ""
-		if (!normalize(title).includes(normalize(filters.title))) return false
+		// Search every name the anime goes by, not only the one currently displayed.
+		const query = normalize(filters.title)
+		const names = [
+			media.title?.english,
+			media.title?.romaji,
+			media.title?.native,
+			media.title?.userPreferred
+		]
+		if (!names.some(name => normalize(name).includes(query))) return false
 	}
 
 	if (

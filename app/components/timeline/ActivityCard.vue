@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AniListActivity } from "~~/shared/types/anilist"
+import { getMediaCover } from "~/utils/media-display"
 import { getActivityText } from "~/utils/timeline"
 
 const props = defineProps<{
@@ -10,12 +11,11 @@ const props = defineProps<{
 	compact?: boolean
 }>()
 
+const { title: getAnimeTitle } = useMediaTitle()
+
 const mediaTitle = computed(() => {
 	if (props.activity.kind !== "anime") return null
-	return props.activity.media?.title?.userPreferred
-		?? props.activity.media?.title?.english
-		?? props.activity.media?.title?.romaji
-		?? "Untitled anime"
+	return getAnimeTitle(props.activity.media)
 })
 const mediaUrl = computed(() =>
 	props.activity.kind === "anime" && props.activity.media
@@ -24,8 +24,7 @@ const mediaUrl = computed(() =>
 )
 const cover = computed(() =>
 	props.activity.kind === "anime"
-		? props.activity.media?.coverImage?.large
-			?? props.activity.media?.coverImage?.medium
+		? getMediaCover(props.activity.media, "medium")
 		: null
 )
 const text = computed(() => getActivityText(props.activity))

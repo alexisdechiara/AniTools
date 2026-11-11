@@ -6,7 +6,6 @@ import type {
 } from "~~/shared/types/anilist"
 import ExploreInterestedDeck from "~/components/explore/InterestedDeck.vue"
 import ExploreSwipeDeck from "~/components/explore/SwipeDeck.vue"
-import { getExploreTitle } from "~/utils/explore"
 
 definePageMeta({
 	feature: "explore",
@@ -27,6 +26,7 @@ interface SwipeDecision {
 }
 
 const userStore = useUserStore()
+const { title: getAnimeTitle } = useMediaTitle()
 const toast = useToast()
 const {
 	existingMediaIds,
@@ -91,7 +91,7 @@ const currentReason = computed(() => {
 	if (!currentMedia.value) return "Recommended for you"
 	if (recommendationIds.value.has(currentMedia.value.id)) {
 		return selectedSeed.value
-			? `Because you liked ${getExploreTitle(selectedSeed.value.media)}`
+			? `Because you liked ${getAnimeTitle(selectedSeed.value.media)}`
 			: "Recommended for you"
 	}
 	return selectedStudio.value
@@ -199,7 +199,7 @@ async function saveToPlanning(
 		if (notify) {
 			toast.add({
 				title: "Added to Plan to Watch",
-				description: `${getExploreTitle(media)} is now in your AniList planning list.`,
+				description: `${getAnimeTitle(media)} is now in your AniList planning list.`,
 				color: "success",
 				icon: "i-lucide-bookmark-check"
 			})
