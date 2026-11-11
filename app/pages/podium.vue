@@ -73,6 +73,15 @@ const categoryPodium = computed(() => {
 	return sortBreakdownItems(items, metric.value).slice(0, 3)
 })
 
+// The anime board ranks by score only (see `sortAnimeEntriesByScore`): equal scores keep the
+// order AniList returned the list in. Category boards break ties by name (`sortBreakdownItems`).
+const ANIME_TIE_NOTE = "Tied titles share a rank. Equal scores keep the order AniList returns your list in."
+const CATEGORY_TIE_NOTE = "Tied entries share a rank and are listed alphabetically."
+const categoryHasTie = computed(() => {
+	const values = categoryPodium.value.map(item => item[metric.value])
+	return values.some((_, index) => isTiedRank(values, index))
+})
+
 async function load(force = false) {
 	// The store records the failure in `error`, which this page renders.
 	await entriesStore.fetchAllAnimes(force).catch(() => undefined)
@@ -87,13 +96,10 @@ onMounted(() => {
 	<UDashboardPanel id="podium">
 		<template #body>
 			<UContainer class="pb-8 sm:pb-12">
-				<UPageHero
+				<PageHeader
 					title="Podium"
-					:description="userStore.getUsername ? `@${userStore.getUsername}` : 'Sign in to see your podium'"
-					:ui="{
-						container: 'pt-0 pb-6 sm:pt-0 sm:pb-8 lg:pt-0 lg:pb-10',
-						headline: 'w-full justify-center'
-					}" />
+					:description="userStore.getUsername ? `The top three of @${userStore.getUsername}'s AniList list.` : 'Sign in to see your podium.'"
+					class="mb-6" />
 
 				<UAlert
 					v-if="!showPageLoader && error"
@@ -121,7 +127,7 @@ onMounted(() => {
 					description="Sign in with AniList, or enter a public username, to rank your list."/>
 
 				<template v-else-if="hasData">
-					<div class="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
 						<UTabs
 							v-model="board"
 							:items="boards"
@@ -139,6 +145,7 @@ onMounted(() => {
 							title="Top 3 anime"
 							:items="animePodium"
 							empty-label="No scored anime yet."
+							:tie-note="ANIME_TIE_NOTE"
 							class="mt-6" />
 						<MetricsCard
 							v-else
@@ -157,6 +164,12 @@ onMounted(() => {
 								:metric="metric"
 								:icon="activeBoard.icon"
 								:empty-label="`No ${activeBoard.label.toLowerCase()} ranked yet.`" />
+							<p
+								v-if="categoryHasTie"
+								class="mt-3 text-center text-xs text-pretty text-muted"
+								data-tie-note>
+								{{ CATEGORY_TIE_NOTE }}
+							</p>
 						</MetricsCard>
 					</Transition>
 				</template>
