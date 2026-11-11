@@ -1,3 +1,29 @@
+/*
+ * Soft and subtle status colours sit on a 10% tint of themselves, where the alias used for
+ * text on a plain surface no longer reaches 4.5:1 (success 700 on its own tint: 4.4:1). The
+ * 800 steps clear it on every surface; dark keeps the 400 steps, which already pass. Class
+ * names stay literal so Tailwind can see them. Ratios are asserted in
+ * tests/unit/theme-contrast.test.ts.
+ */
+const tintedStatusText = {
+	success: "text-success-800 dark:text-success-400",
+	info: "text-info-800 dark:text-info-400",
+	warning: "text-warning-800 dark:text-warning-400",
+	error: "text-error-800 dark:text-error-400"
+} as const
+
+const statusColors = ["success", "info", "warning", "error"] as const
+const tintedVariants = ["soft", "subtle"] as const
+// Outline and ghost buttons pick up the same tint on hover, so they take the same ink.
+const tintedButtonVariants = [...tintedVariants, "outline", "ghost"] as const
+
+const tintedStatus = statusColors.flatMap(color =>
+	tintedVariants.map(variant => ({ color, variant, text: tintedStatusText[color] }))
+)
+const tintedStatusButtons = statusColors.flatMap(color =>
+	tintedButtonVariants.map(variant => ({ color, variant, class: tintedStatusText[color] }))
+)
+
 export default defineAppConfig({
 	ui: {
 		colors: {
@@ -5,7 +31,39 @@ export default defineAppConfig({
 			secondary: "amber",
 			neutral: "gray"
 		},
+		button: {
+			compoundVariants: [
+				// Hover used to fade the fill to 75%, which drops the label below 4.5:1; step the fill instead.
+				{
+					color: "primary",
+					variant: "solid",
+					class: "hover:bg-primary-700 active:bg-primary-700 dark:hover:bg-primary-300 dark:active:bg-primary-300"
+				},
+				...tintedStatusButtons
+			]
+		},
+		badge: {
+			compoundVariants: tintedStatus.map(({ color, variant, text }) => ({ color, variant, class: text }))
+		},
+		alert: {
+			slots: {
+				// The default 90% opacity takes status descriptions back under 4.5:1 on their tint.
+				description: "opacity-100"
+			},
+			compoundVariants: tintedStatus.map(({ color, variant, text }) => ({ color, variant, class: { root: text } }))
+		},
 		navigationMenu: {
+			compoundVariants: [
+				// Nuxt UI colours the active pill label with the primary; the label reads better as ink, the icon keeps the accent.
+				{
+					color: "primary",
+					variant: "pill",
+					active: true,
+					class: {
+						link: "text-highlighted"
+					}
+				}
+			],
 			variants: {
 				orientation: {
 					vertical: {
@@ -17,7 +75,8 @@ export default defineAppConfig({
 				},
 				active: {
 					true: {
-						link: "bg-primary-100 text-highlighted before:rounded-3xl rounded-3xl"
+						// 12% of the primary alias is the lavender pill light mode always had; dark uses its tinted surface.
+						link: "bg-primary/12 dark:bg-elevated before:rounded-3xl rounded-3xl"
 					}
 				}
 			}

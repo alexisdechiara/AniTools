@@ -55,9 +55,9 @@ function metricValue(item: StatisticsBreakdownItem): string {
 			<span
 				class="mb-3 flex items-center justify-center rounded-full ring-4 shadow-lg"
 				:class="[
-					index === 0 ? 'size-20 bg-amber-400/15 text-amber-500 ring-amber-400/30 animate-podium-glow' : '',
-					index === 1 ? 'size-16 bg-slate-400/15 text-slate-400 ring-slate-400/30' : '',
-					index === 2 ? 'size-14 bg-orange-700/15 text-orange-600 ring-orange-700/30' : ''
+					index === 0 ? 'size-20 bg-medal-gold/15 text-medal-gold ring-medal-gold/30 animate-podium-glow' : '',
+					index === 1 ? 'size-16 bg-medal-silver/15 text-medal-silver ring-medal-silver/30' : '',
+					index === 2 ? 'size-14 bg-medal-bronze/15 text-medal-bronze ring-medal-bronze/30' : ''
 				]">
 				<UIcon :name="icon" :class="index === 0 ? 'size-9' : index === 1 ? 'size-7' : 'size-6'" />
 			</span>
@@ -69,9 +69,9 @@ function metricValue(item: StatisticsBreakdownItem): string {
 			<div
 				class="mt-3 flex w-full flex-col items-center justify-start rounded-t-xl border border-b-0 px-2 pt-3 text-center"
 				:class="[
-					index === 0 ? 'h-28 border-amber-400/50 bg-amber-400/15' : '',
-					index === 1 ? 'h-20 border-slate-400/50 bg-slate-400/15' : '',
-					index === 2 ? 'h-14 border-orange-700/50 bg-orange-700/15' : ''
+					index === 0 ? 'h-28 border-medal-gold/50 bg-medal-gold/15' : '',
+					index === 1 ? 'h-20 border-medal-silver/50 bg-medal-silver/15' : '',
+					index === 2 ? 'h-14 border-medal-bronze/50 bg-medal-bronze/15' : ''
 				]">
 				<span class="text-3xl leading-none font-black text-highlighted">
 					{{ ranks[index] }}
