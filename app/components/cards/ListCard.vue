@@ -7,7 +7,7 @@
       variant="soft"
       class="absolute top-6 right-6 z-10 cursor-pointer"
       :ui="{ content: 'min-w-fit', item: 'px-2 cursor-pointer' }"
-      aria-label="Sort"
+      aria-label="Rank by"
     />
     <ol class="flex flex-col group mt-2">
       <template v-for="(item, index) in list" :key="item.name">

@@ -170,3 +170,21 @@ export function useDashboardOnboarding() {
 		dismissStartHere
 	}
 }
+
+/**
+ * Forgets the first-run state, so the next dashboard visit greets and guides like a first one.
+ * Unlike `useDashboardOnboarding`, calling it from another page does not record a visit.
+ */
+export function resetDashboardOnboarding() {
+	useState<DashboardOnboardingState>("dashboard-onboarding").value = normalizeDashboardOnboarding(null)
+	useState<boolean>("dashboard-onboarding-returning").value = false
+	// The next dashboard visit reads storage again.
+	useState<boolean>("dashboard-onboarding-hydrated").value = false
+	if (!import.meta.client) return
+
+	try {
+		localStorage.removeItem(DASHBOARD_ONBOARDING_STORAGE_KEY)
+	} catch {
+		// Nothing to forget when storage is unavailable.
+	}
+}

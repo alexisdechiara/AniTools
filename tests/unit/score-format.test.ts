@@ -3,6 +3,7 @@ import { ANILIST_SCORE_FORMATS } from "../../shared/types/anilist"
 import {
 	SCORE_FORMAT_DESCRIPTIONS,
 	formatPersonalScore,
+	formatScoreAxisTick,
 	formatScoreFromPercent,
 	scoreToPercent
 } from "../../app/utils/score-format"
@@ -52,5 +53,36 @@ describe("score format conversion", () => {
 		for (const format of ANILIST_SCORE_FORMATS) {
 			expect(SCORE_FORMAT_DESCRIPTIONS[format]).toBe(formatScoreFromPercent(83, format))
 		}
+	})
+})
+
+describe("score axis ticks", () => {
+	it("labels the zero tick as zero instead of the lowest score step", () => {
+		expect(formatScoreAxisTick(0, "POINT_100")).toBe("0%")
+		expect(formatScoreAxisTick(0, "POINT_10")).toBe("0/10")
+		expect(formatScoreAxisTick(0, "POINT_10_DECIMAL")).toBe("0.0/10")
+		expect(formatScoreAxisTick(0, "POINT_5")).toBe("0/5")
+		expect(formatScoreAxisTick(0, "POINT_3")).toBe("")
+	})
+
+	it("converts a 0-100 tick to the display format", () => {
+		expect(formatScoreAxisTick(70, "POINT_100")).toBe("70%")
+		expect(formatScoreAxisTick(70, "POINT_10")).toBe("7/10")
+		expect(formatScoreAxisTick(70, "POINT_10_DECIMAL")).toBe("7.0/10")
+		expect(formatScoreAxisTick(80, "POINT_5")).toBe("4/5")
+		expect(formatScoreAxisTick(85, "POINT_3")).toBe("🙂")
+	})
+
+	it("keeps one decimal for a tick between two steps so neighbours stay distinct", () => {
+		expect(formatScoreAxisTick(65, "POINT_10")).toBe("6.5/10")
+		expect(formatScoreAxisTick(10, "POINT_5")).toBe("0.5/5")
+		expect(formatScoreAxisTick(62.4, "POINT_100")).toBe("62%")
+	})
+
+	it("clamps out-of-range ticks and ignores missing ones", () => {
+		expect(formatScoreAxisTick(120, "POINT_10")).toBe("10/10")
+		expect(formatScoreAxisTick(-5, "POINT_100")).toBe("0%")
+		expect(formatScoreAxisTick(null, "POINT_100")).toBe("")
+		expect(formatScoreAxisTick(Number.NaN, "POINT_5")).toBe("")
 	})
 })

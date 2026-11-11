@@ -25,7 +25,7 @@ const storedItems: StoredItem[] = [
 	{
 		icon: "i-lucide-layout-dashboard",
 		label: "Dashboard layout",
-		detail: "Which cards you keep, and in which order."
+		detail: "Which cards you keep and in which order, plus whether the first-visit greeting and the Start here row were already shown. Reset dashboard layout brings both back."
 	},
 	{
 		icon: "i-lucide-bookmark",
@@ -35,7 +35,7 @@ const storedItems: StoredItem[] = [
 	{
 		icon: "i-lucide-rows-3",
 		label: "Tier lists",
-		detail: "Tiers, layout and the anime you placed. Edit them from Tierlist."
+		detail: "Tiers, layout and the anime you placed. Edit them from Tier list."
 	},
 	{
 		icon: "i-lucide-heart",
@@ -76,10 +76,11 @@ function resetCalendarMyList() {
 
 function resetLayout() {
 	resetDashboardLayout()
+	resetDashboardOnboarding()
 	layoutResetOpen.value = false
 	toast.add({
 		title: "Dashboard layout reset",
-		description: "The default cards are back, in their original order.",
+		description: "The default cards are back in their original order, and the Start here row returns.",
 		icon: "i-lucide-layout-dashboard"
 	})
 }
@@ -166,7 +167,7 @@ function resetExplorePicks() {
 		<UModal
 			v-model:open="layoutResetOpen"
 			title="Reset dashboard layout?"
-			description="Your card selection and order go back to the AniTools default. Cards you removed come back, and this can't be undone.">
+			description="Your card selection and order go back to the AniTools default. Cards you removed come back, the first-visit greeting and Start here row return, and this can't be undone.">
 			<template #footer>
 				<UButton
 					label="Keep my layout"

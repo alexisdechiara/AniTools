@@ -152,8 +152,7 @@ function stepHeight(index: number): string {
 
 <style scoped>
 /*
- * Medal colours come from the theme (`--color-medal-*` in main.css). The fallbacks are the
- * colours this card has always used: amber-400, slate-400 and orange-700.
+ * Medal colours come from the theme (`--color-medal-*` in main.css, light and dark).
  */
 [data-medal] {
 	border-color: color-mix(in oklab, var(--medal) 50%, transparent);
@@ -161,14 +160,14 @@ function stepHeight(index: number): string {
 }
 
 [data-medal="gold"] {
-	--medal: var(--color-medal-gold, oklch(82.8% 0.189 84.429));
+	--medal: var(--color-medal-gold);
 }
 
 [data-medal="silver"] {
-	--medal: var(--color-medal-silver, oklch(70.4% 0.04 256.788));
+	--medal: var(--color-medal-silver);
 }
 
 [data-medal="bronze"] {
-	--medal: var(--color-medal-bronze, oklch(55.3% 0.195 38.402));
+	--medal: var(--color-medal-bronze);
 }
 </style>

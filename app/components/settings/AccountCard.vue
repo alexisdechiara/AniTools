@@ -29,7 +29,7 @@ const copy = computed(() => {
 		default:
 			return {
 				title: "Not connected",
-				description: "Calendar, Tierlist and Create work as they are. Connect AniList to unlock Dashboard, Statistics, Rewind, Podium, Explore and Timeline.",
+				description: "Calendar, Tier list and Create work as they are. Connect AniList to unlock Dashboard, Statistics, Rewind, Podium, Explore and Timeline.",
 				badge: "Guest"
 			}
 	}

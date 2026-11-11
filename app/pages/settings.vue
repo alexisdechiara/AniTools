@@ -23,17 +23,9 @@ useSeoMeta({
 	<UDashboardPanel id="settings">
 		<template #body>
 			<div class="mx-auto w-full max-w-3xl space-y-6 pb-8 sm:pb-12">
-				<header>
-					<p class="text-xs font-semibold tracking-[0.02em] text-primary uppercase">
-						Preferences
-					</p>
-					<h1 class="mt-0.5 text-2xl font-semibold tracking-tight text-highlighted sm:text-3xl">
-						Settings
-					</h1>
-					<p class="mt-1.5 max-w-[46ch] text-sm text-muted">
-						How AniTools looks and reads on this device. Nothing here changes your AniList account.
-					</p>
-				</header>
+				<PageHeader
+					title="Settings"
+					description="How AniTools looks and reads on this device. Nothing here changes your AniList account." />
 
 				<SettingsAccountCard />
 				<SettingsAppearanceCard />

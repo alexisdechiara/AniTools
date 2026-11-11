@@ -66,6 +66,7 @@ import {
   VisArea,
   VisBrush,
 } from "@unovis/vue";
+import { formatMeanScore, formatScoreAxisTick } from "~/utils/score-format";
 
 export type LineMetric = "count" | "meanScore" | "minutesWatched";
 
@@ -102,6 +103,8 @@ const props = withDefaults(
     showY: true,
   }
 );
+
+const { displayFormat } = usePersonalScore();
 
 const emit = defineEmits<{ (e: "update:domain", value: [number, number]): void }>();
 
@@ -151,7 +154,7 @@ const showBrush = computed<boolean>(() => {
 
 // Y axis formatter
 function formatYAxis(value: number, metric: LineMetric): string {
-  if (metric === "meanScore") return `${Math.round(value)}%`;
+  if (metric === "meanScore") return formatScoreAxisTick(value, displayFormat.value);
   if (metric === "count") return String(Math.round(value));
   // minutesWatched -> best unit
   const maxValue = Math.max(
@@ -175,7 +178,7 @@ const crosshairTemplate = (d: LineDatum) => {
       <span class='font-bold text-base mb-0.5'>${d.year}</span>
       <div class='inline-flex justify-between items-center gap-4'>
         <span class='text-thin'>Mean Score</span>
-        <span class='font-medium'>${d.meanScore} %</span>
+        <span class='font-medium'>${formatMeanScore(d.meanScore, displayFormat.value)}</span>
       </div>
       <div class='inline-flex justify-between items-center gap-4'>
         <span class='text-thin'>Titles Watched</span>

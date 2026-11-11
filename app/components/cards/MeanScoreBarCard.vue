@@ -17,7 +17,7 @@ type="x"
 :domain-line="false"
 :tick-line="false"
 tick-text-align="center"
-				:tick-format="(tick: number) => Number.isInteger(tick) ? scoring[tick]?.x ?? '' : ''"
+				:tick-format="formatTick"
 :num-ticks="10" />
 			<VisTooltip :triggers="triggers" />
 		</VisXYContainer>
@@ -28,6 +28,7 @@ tick-text-align="center"
 import { VisXYContainer, VisStackedBar, VisTooltip, VisAxis } from "@unovis/vue";
 import { StackedBar } from "@unovis/ts";
 import type { TabsItem } from "@nuxt/ui";
+import { formatScoreAxisTick } from "~/utils/score-format";
 
 const items = ref<TabsItem[]>([
 	{
@@ -45,7 +46,14 @@ const items = ref<TabsItem[]>([
 const selectedTab = ref("count");
 
 const { scores, meanScore } = storeToRefs(useStatisticsStore());
-const { formatPercent } = usePersonalScore();
+const { formatPercent, displayFormat } = usePersonalScore();
+
+// Ticks are bar indexes: each one is labelled with its score in the display format.
+function formatTick(tick: number): string {
+	if (!Number.isInteger(tick)) return "";
+	const score = scoring.value[tick]?.x;
+	return score === undefined ? "" : formatScoreAxisTick(score, displayFormat.value);
+}
 // Computed property pour gérer l'affichage en fonction de l'onglet sélectionné
 const scoring = computed(
 	() =>

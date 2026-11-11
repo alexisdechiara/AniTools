@@ -39,6 +39,10 @@ const faq: FaqEntry[] = [
 		answer: "AniList does not record when each episode was watched. Rewind rebuilds the year from your list activity, your progress and the average episode length of each anime, so the total is an estimate. For a very active year only the most recent part of the activity history is loaded, and Rewind says so when a recap is partial."
 	},
 	{
+		question: "Does AniTools cache or keep what it loads from AniList?",
+		answer: "Only briefly. Public responses, such as the airing calendar or a public profile, use a short HTTP cache so repeated visits do not ask AniList again right away. When you are signed in, your activity is never stored on the server: it is kept only in the browser tab, for five minutes, then loaded again."
+	},
+	{
 		question: "Does changing the score format change my AniList scores?",
 		answer: "No. The score format in Settings only changes how scores are displayed in this browser. Your scores and the format chosen on your AniList account stay exactly as they are."
 	},

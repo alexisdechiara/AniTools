@@ -25,7 +25,7 @@
             content: 'min-w-fit',
             item: 'px-2 cursor-pointer',
           }"
-          aria-label="Sort"/>
+          aria-label="Rank by"/>
       </div>
     </template>
     <!-- Dashboard controls. The options button is always visible: hover does not exist on touch. -->
@@ -75,9 +75,9 @@
         v-if="change !== undefined"
         class="ms-auto inline-flex h-fit items-center gap-x-1.5 text-xs font-normal"
         :class="change > 0
-          ? 'text-success-600'
+          ? 'text-success'
           : change < 0
-            ? 'text-error-600'
+            ? 'text-error'
             : 'text-muted'">
         <div class="inline-flex gap-x-0.5">
           {{ change > 0 ? "+" : change < 0 ? "-" : "" }}

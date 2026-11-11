@@ -85,6 +85,35 @@ export function formatMeanScore(
 	return formatScoreFromPercent(Math.min(100, meanPercent), displayFormat)
 }
 
+/**
+ * Formats a chart axis tick held on the 0-100 scale, unit included.
+ *
+ * Unlike a score, a tick can sit at zero or between two steps of a coarse scale, so it is
+ * never clamped to the lowest step and keeps one decimal when it falls between steps.
+ */
+export function formatScoreAxisTick(
+	percent: number | null | undefined,
+	displayFormat: AniListScoreFormat
+): string {
+	if (percent == null || !Number.isFinite(percent)) return ""
+
+	const clamped = Math.min(100, Math.max(0, percent))
+	const scaled = (clamped / 100) * SCORE_FORMAT_MAX[displayFormat]
+
+	switch (displayFormat) {
+		case "POINT_100":
+			return `${Math.round(scaled)}%`
+		case "POINT_10_DECIMAL":
+			return `${scaled.toFixed(1)}/10`
+		case "POINT_10":
+			return `${Number(scaled.toFixed(1))}/10`
+		case "POINT_5":
+			return `${Number(scaled.toFixed(1))}/5`
+		case "POINT_3":
+			return clamped <= 0 ? "" : formatScoreFromPercent(clamped, displayFormat)
+	}
+}
+
 /** Formats a personal AniList list score stored in `sourceFormat` for display in `displayFormat`. */
 export function formatPersonalScore(
 	rawScore: number | null | undefined,
