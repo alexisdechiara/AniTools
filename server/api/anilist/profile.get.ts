@@ -1,27 +1,13 @@
-import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
 	getAniListProfileResponse,
-	handleAniListRouteError,
-	parseAniListProfileQuery,
-	resolveAniListAccess,
-	setAniListResponseCache
+	parseAniListProfileQuery
 } from "~~/server/utils/anilist-client"
+import { defineAniListRoute } from "~~/server/utils/anilist/route"
 
-export default defineEventHandler(async (event) => {
-	enforceRateLimit(event, {
-		namespace: "anilist-profile",
-		limit: 30,
-		windowMs: 60_000
-	})
-
-	const query = parseAniListProfileQuery(getQuery(event))
-	const access = await resolveAniListAccess(event, query.username)
-	setAniListResponseCache(event, access.mode, 300)
-
-	try {
-		return await getAniListProfileResponse(access)
-	} catch (error) {
-		await handleAniListRouteError(event, error, access)
-		throw error
-	}
+export default defineAniListRoute({
+	namespace: "anilist-profile",
+	limit: 30,
+	publicMaxAge: 300,
+	parse: parseAniListProfileQuery,
+	run: access => getAniListProfileResponse(access)
 })

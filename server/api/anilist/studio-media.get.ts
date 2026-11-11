@@ -1,27 +1,13 @@
-import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
 	getAniListStudioMediaResponse,
-	handleAniListRouteError,
-	parseAniListStudioMediaQuery,
-	resolveAniListAccess,
-	setAniListResponseCache
+	parseAniListStudioMediaQuery
 } from "~~/server/utils/anilist-client"
+import { defineAniListRoute } from "~~/server/utils/anilist/route"
 
-export default defineEventHandler(async (event) => {
-	enforceRateLimit(event, {
-		namespace: "anilist-studio-media",
-		limit: 24,
-		windowMs: 60_000
-	})
-
-	const query = parseAniListStudioMediaQuery(getQuery(event))
-	const access = await resolveAniListAccess(event, query.username)
-	setAniListResponseCache(event, access.mode, 300)
-
-	try {
-		return await getAniListStudioMediaResponse(access, query)
-	} catch (error) {
-		await handleAniListRouteError(event, error, access)
-		throw error
-	}
+export default defineAniListRoute({
+	namespace: "anilist-studio-media",
+	limit: 24,
+	publicMaxAge: 300,
+	parse: parseAniListStudioMediaQuery,
+	run: (access, query) => getAniListStudioMediaResponse(access, query)
 })
