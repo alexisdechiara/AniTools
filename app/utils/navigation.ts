@@ -22,6 +22,16 @@ export function getSafeInternalPath(value: unknown, fallback = "/") {
 		if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.includes("\\")) {
 			return fallback
 		}
+		// A return path that points at the sign-in machinery itself can only loop.
+		const { pathname } = parsed
+		if (
+			pathname === "/login"
+			|| pathname.startsWith("/login/")
+			|| pathname === "/auth"
+			|| pathname.startsWith("/auth/")
+		) {
+			return fallback
+		}
 		return normalized
 	} catch {
 		return fallback
