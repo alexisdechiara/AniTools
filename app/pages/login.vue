@@ -48,10 +48,29 @@ onBeforeMount(() => {
 	if (prefilled && !username.value) username.value = prefilled
 })
 
-if (route.query.authError) {
+const AUTH_ERROR_MESSAGES: Record<string, { title: string, description: string }> = {
+	unavailable: {
+		title: "AniList sign-in isn't available",
+		description: "This server isn't set up for AniList sign-in right now. You can still open a public profile below."
+	},
+	rate_limited: {
+		title: "Too many sign-in attempts",
+		description: "Wait a minute, then try again."
+	}
+}
+const DEFAULT_AUTH_ERROR_MESSAGE = {
+	title: "AniList sign-in didn't finish",
+	description: "The authorization was cancelled or has expired. Try again, or open a public profile instead."
+}
+
+const authError = route.query.authError?.toString()
+if (authError) {
+	// Only fixed copy is shown: the raw query value is used as a lookup key and never rendered.
+	const message = Object.hasOwn(AUTH_ERROR_MESSAGES, authError)
+		? AUTH_ERROR_MESSAGES[authError]
+		: DEFAULT_AUTH_ERROR_MESSAGE
 	toast.add({
-		title: "AniList sign-in didn't finish",
-		description: "The authorization was cancelled or has expired. Try again, or open a public profile instead.",
+		...message,
 		color: "error",
 		icon: "i-lucide-circle-alert"
 	})

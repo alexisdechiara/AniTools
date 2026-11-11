@@ -106,8 +106,12 @@ const AniListAuthConfigSchema = z.object({
 	clientId: z.string().min(1).max(128),
 	clientSecret: z.string().min(1).max(1024),
 	redirectUri: z.string().url().max(2048).refine((value) => {
-		const protocol = new URL(value).protocol
-		return protocol === "http:" || protocol === "https:"
+		try {
+			const protocol = new URL(value).protocol
+			return protocol === "http:" || protocol === "https:"
+		} catch {
+			return false
+		}
 	}),
 	sessionPassword: z.string().min(32).max(1024),
 	sessionPreviousPassword: z.string().min(32).max(1024).optional()
@@ -383,6 +387,16 @@ export function sanitizeReturnTo(value: unknown) {
 
 		const sanitized = `${parsed.pathname}${parsed.search}${parsed.hash}`
 		if (!sanitized.startsWith("/") || sanitized.startsWith("//") || sanitized.includes("\\")) {
+			return "/"
+		}
+		// A return path that points at the sign-in machinery itself can only loop.
+		const { pathname } = parsed
+		if (
+			pathname === "/login"
+			|| pathname.startsWith("/login/")
+			|| pathname === "/auth"
+			|| pathname.startsWith("/auth/")
+		) {
 			return "/"
 		}
 		return sanitized.length <= 2048 ? sanitized : "/"
