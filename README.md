@@ -10,22 +10,29 @@ secret OAuth et le jeton utilisateur restent côté serveur.
 
 ## Fonctionnalités
 
-- Calendar public : vues jour/semaine/mois, épisodes AniList, simuldubs Directus,
-  recherche et filtres.
+- Calendar public : vues jour/semaine/mois (résumé par jour en vue Mois),
+  épisodes AniList, simuldubs Directus, recherche, filtres et bascule « My list »
+  (titres Watching et Planning) mémorisée localement.
 - Dashboard personnalisable et responsive : statistiques, épisodes à venir,
-  animes en cours et mises à jour récentes.
-- Statistics : vue d'ensemble, genres, tags, studios, voice actors et staff.
-- Rewind annuel : genres, saisons, top/flop, sélection et temps regardé estimé.
-- Tierlist publique : import AniList, mode franchise, classement, persistance,
+  animes en cours, mises à jour récentes et carte optionnelle « Behind »
+  (épisodes diffusés non vus) ; menu d'options par carte et retrait annulable.
+- Statistics : vue d'ensemble, genres, tags, studios, voice actors et staff,
+  avec des moyennes dans le format de score choisi.
+- Rewind annuel : phrase d'accroche, chiffres de l'année, genres, saisons,
+  top/flop, sélection, temps regardé estimé et lien de partage vers Create.
+- Tier list publique : import AniList, mode franchise, classement, persistance,
   JSON et exports PNG/JPEG/WebP.
 - Explore : recommandations AniList en pile swipe, découverte par studio,
-  exclusion des titres déjà présents dans la liste complète et ajout à
-  « Planning » avec une session AniList.
-- Timeline : activité regroupée par semaines ou mois.
+  exclusion des titres déjà présents dans la liste complète, sélections
+  conservées sur l'appareil (avec export) et ajout à « Planning » avec une
+  session AniList.
+- Timeline : activité regroupée par mois, épisodes consécutifs réunis en une
+  carte, et vue Gantt.
 - Create : cartes anime (score, note, genres) et cartes de statistiques AniList,
   rendues localement via Canvas, sans upload.
 - Podium : top 3 des animes, genres, tags et studios de la liste.
-- Settings : thème, format d'affichage des scores et données locales.
+- Settings : thème, format d'affichage des scores, fuseau horaire et horloge
+  12/24 h, données locales.
 - Support : FAQ publique et lien vers le dépôt GitHub.
 
 `/calendar`, `/tierlist`, `/create`, `/settings` et `/support` fonctionnent sans

@@ -298,9 +298,33 @@ et un seul `<main>` par page) ; e2e mis à jour.
 - Tierlist : bandeau de démarrage quand la liste est vide, bouton
   « Customize » explicite à la place de l'icône d'inspecteur.
 
+### Corrections et features livrées le 11 novembre 2026
+
+- Calendar : bascule « My list » de premier niveau mémorisée localement, résumé
+  par jour en vue Mois, réponse dédupliquée (`media` + `airings`), deux requêtes
+  AniList par plage froide, heures dans le fuseau et l'horloge choisis.
+- Settings : carte « Time display » (fuseau du profil pour une session OAuth,
+  du navigateur sinon ; horloge 12/24 h), `PageHeader` comme les autres pages.
+- Dashboard : carte optionnelle « Behind », menu d'options visible par carte,
+  retrait annulable, accueil de première visite et rangée « Start here ».
+- Navigation groupée (« Your list », « Tools », « AniTools ») et cadenas sur
+  les pages qui demandent un profil.
+- Explore : sélections « Interested » et titres écartés conservés sur
+  l'appareil par profil, avec export.
+- Timeline : épisodes consécutifs regroupés en une carte dépliable.
+- Rewind : phrase d'accroche, sections en récit, méthode repliée, lien de
+  partage vers Create.
+- Statistics : moyennes et axes dans le format de score choisi ; cartes de
+  graphiques rendues côté client (plus d'erreur 500 en chargement direct, y
+  compris sur Rewind).
+- Tier list : sélecteur d'anime en combobox clavier, tiers vides compacts, bac
+  « Unranked » collant.
+- Thème : contrastes AA et anneau de focus, gardés par un test unitaire.
+- Erreurs : page 404 pour une URL inconnue, messages d'échec de connexion.
+
 ## 7. Checklist des features à valider
 
-Rien de cette liste n'est commencé : chaque point attend ta validation.
+Les cases cochées sont livrées ; les autres attendent ta validation.
 
 ### Entrée et identité
 
@@ -312,32 +336,36 @@ Rien de cette liste n'est commencé : chaque point attend ta validation.
 
 ### Calendar
 
-- [ ] Filtre « Ma liste » (Watching / Planning) visible au premier niveau.
+- [x] Filtre « Ma liste » (Watching / Planning) visible au premier niveau.
 - [ ] Export et abonnement iCal des épisodes de ma liste.
-- [ ] Fuseau horaire et format 12/24 h dans Settings.
+- [x] Fuseau horaire et format 12/24 h dans Settings.
 - [ ] Vue « Saison » : nouveautés de la saison, filtres, ajout à Planning (OAuth).
 
 ### Dashboard et suivi
 
 - [ ] Bouton « +1 épisode » sur les animes en cours (mutation serveur OAuth).
-- [ ] Carte « En retard » : épisodes sortis mais pas encore vus.
+- [x] Carte « En retard » : épisodes sortis mais pas encore vus (carte
+  optionnelle « Behind »).
 - [ ] Carte Timeline compacte.
 - [ ] Recentrer le Dashboard sur l'action et Statistics sur l'analyse (moins de
   cartes en double).
-- [ ] Remplacer le chargeur plein écran par un rendu progressif carte par carte.
+- [x] Remplacer le chargeur plein écran par un rendu progressif carte par carte
+  (un squelette par carte prend le relais du chargeur plein écran dès que la
+  disposition locale est lue et qu'un premier chargement a abouti ou tardé).
 
 ### Partage et social
 
-- [ ] Rewind exportable en story via le moteur Canvas de Create.
+- [ ] Rewind exportable en story via le moteur Canvas de Create (seul un lien
+  « Share this Rewind » vers Create existe aujourd'hui).
 - [ ] Comparaison de deux profils (compatibilité, animes communs, désaccords).
 - [ ] Tier list partageable par lien.
 - [ ] Nouveaux gabarits Create : grille 3×3 de favoris, lineup de saison.
 
 ### Découverte et activité
 
-- [ ] Sélection « Interested » d'Explore conservée localement, avec export.
+- [x] Sélection « Interested » d'Explore conservée localement, avec export.
 - [ ] Filtres de la pile Explore (format, année, genres exclus).
-- [ ] Timeline : regrouper les épisodes consécutifs (« ép. 15 → 18 »).
+- [x] Timeline : regrouper les épisodes consécutifs (« ép. 15 → 18 »).
 - [ ] Podium : fusion éventuelle avec Statistics ou Rewind « All time ».
 
 ### Fondations
