@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Release Year" v-bind="$attrs">
+  <MetricsCard title="Release year" v-bind="$attrs">
     <UTabs
       v-model="selectedTab"
       :items="items"
@@ -27,9 +27,9 @@ const statisticsStore = useStatisticsStore();
 const { releaseYears } = storeToRefs(statisticsStore);
 
 const items = ref<TabsItem[]>([
-  { label: "Titles Released", value: "count", icon: "i-lucide-list-ordered" },
-  { label: "Average Score", value: "meanScore", icon: "i-lucide-bar-chart-4" },
-  { label: "Watch Time", value: "minutesWatched", icon: "i-lucide-clock" },
+  { label: "Titles released", value: "count", icon: "i-lucide-list-ordered" },
+  { label: "Average score", value: "meanScore", icon: "i-lucide-bar-chart-4" },
+  { label: "Watch time", value: "minutesWatched", icon: "i-lucide-clock" },
 ]);
 
 type SelectedMetric = "count" | "meanScore" | "minutesWatched";

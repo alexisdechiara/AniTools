@@ -1,10 +1,12 @@
 import type {
 	AniListAnimeListEntry,
+	AniListMediaListSummary,
 	AniListMediaSummary
 } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
 
 export interface ExploreSeed {
-	media: AniListMediaSummary
+	media: AniListMediaListSummary
 	score: number
 }
 
@@ -134,40 +136,45 @@ export function filterExploreMedia(
 	})
 }
 
-export function getExploreTitle(media: AniListMediaSummary): string {
-	return media.title?.userPreferred
-		?? media.title?.english
-		?? media.title?.romaji
-		?? media.title?.native
-		?? "Untitled anime"
+export function getExploreTitle(media: AniListMediaListSummary): string {
+	return getMediaTitle(media)
 }
 
-export function getExploreRelationBadge(
-	media: AniListMediaSummary
-): ExploreRelationBadge | null {
+export type ExploreRelations = AniListMediaSummary["relations"]
+export type ExploreRelationEdge = NonNullable<ExploreRelations>["edges"][number]
+
+/** The one relation edge the badge describes: the first match in priority order. */
+export function selectExploreRelationEdge(
+	media: { relations?: ExploreRelations }
+): ExploreRelationEdge | null {
 	const edges = media.relations?.edges ?? []
 	for (const relationType of EXPLORE_RELATION_PRIORITY) {
 		const edge = edges.find(item => item.relationType === relationType && item.node)
-		if (!edge?.node) continue
-		const relatedTitle = edge.node.title?.userPreferred
-			?? edge.node.title?.english
-			?? edge.node.title?.romaji
-			?? edge.node.title?.native
-			?? "a related anime"
-		const label = EXPLORE_RELATION_LABELS[relationType] ?? "Related anime"
-
-		if (relationType === "PREQUEL") {
-			return { label, description: `Sequel to ${relatedTitle}` }
-		}
-		if (relationType === "SEQUEL") {
-			return { label, description: `Precedes ${relatedTitle}` }
-		}
-		if (relationType === "ADAPTATION") {
-			return { label, description: `Adapted from ${relatedTitle}` }
-		}
-
-		return { label, description: `${label} · ${relatedTitle}` }
+		if (edge) return edge
 	}
 
 	return null
+}
+
+export function getExploreRelationBadge(
+	media: { relations?: ExploreRelations }
+): ExploreRelationBadge | null {
+	const edge = selectExploreRelationEdge(media)
+	if (!edge?.node || !edge.relationType) return null
+
+	const relationType = edge.relationType
+	const relatedTitle = edge.node.title ? getMediaTitle(edge.node) : "a related anime"
+	const label = EXPLORE_RELATION_LABELS[relationType] ?? "Related anime"
+
+	if (relationType === "PREQUEL") {
+		return { label, description: `Sequel to ${relatedTitle}` }
+	}
+	if (relationType === "SEQUEL") {
+		return { label, description: `Precedes ${relatedTitle}` }
+	}
+	if (relationType === "ADAPTATION") {
+		return { label, description: `Adapted from ${relatedTitle}` }
+	}
+
+	return { label, description: `${label} · ${relatedTitle}` }
 }

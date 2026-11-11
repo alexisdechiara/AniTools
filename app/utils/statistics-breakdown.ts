@@ -1,3 +1,5 @@
+import type { AniListScoreFormat } from "~~/shared/types/anilist"
+import { scoreToPercent } from "~/utils/score-format"
 import { getEntryWatchMinutes, type StatisticMetric } from "~/utils/statistics"
 
 export type StatisticsDimension = "genres" | "tags" | "studios"
@@ -6,6 +8,7 @@ export interface StatisticsBreakdownItem {
 	key: string
 	name: string
 	count: number
+	/** Mean of the scored entries on AniList's 0-100 scale; 0 when nothing is scored. */
 	meanScore: number
 	minutesWatched: number
 	mediaIds: number[]
@@ -13,6 +16,7 @@ export interface StatisticsBreakdownItem {
 
 export interface StatisticsBreakdownEntry {
 	id: number
+	/** Raw list score, expressed in the owning profile's score format. */
 	score?: number | null
 	progress?: number | null
 	repeat?: number | null
@@ -102,10 +106,18 @@ export function getStatisticsCompletionYears(
 		.toSorted((left, right) => right - left)
 }
 
+/**
+ * Aggregates list entries by genre, tag or studio.
+ *
+ * List scores arrive in the profile's own format (`sourceFormat`). They are
+ * converted to a 0-100 percentage here, so the resulting means share the scale
+ * of AniList's own statistics and can be sorted and formatted the same way.
+ */
 export function aggregateEntriesByDimension(
 	entries: readonly StatisticsBreakdownEntry[],
 	dimension: StatisticsDimension,
-	completedYear?: number
+	completedYear?: number,
+	sourceFormat: AniListScoreFormat = "POINT_100"
 ): StatisticsBreakdownItem[] {
 	const aggregated = new Map<string, MutableBreakdownItem>()
 
@@ -114,7 +126,7 @@ export function aggregateEntriesByDimension(
 			continue
 		}
 
-		const score = Math.max(0, entry.score ?? 0)
+		const score = scoreToPercent(entry.score, sourceFormat) ?? 0
 		const watchMinutes = getEntryWatchMinutes(entry)
 		const categories = getEntryCategories(entry, dimension)
 		const seenCategories = new Set<string>()
@@ -168,10 +180,52 @@ export function sortBreakdownItems(
 	})
 }
 
-export function getCountChange(
+export type CountComparisonTone = "positive" | "negative" | "neutral"
+
+export interface CountComparison {
+	text: string
+	tone: CountComparisonTone
+}
+
+/** Below this many titles in the base period, a percentage reads as noise. */
+const SMALL_COMPARISON_BASE = 10
+
+/**
+ * Words the change in title count against a previous period.
+ *
+ * Percentages are whole numbers and only used when the base is large enough to
+ * make them meaningful; otherwise the absolute difference is stated.
+ */
+export function describeCountComparison(
 	currentCount: number,
-	previousCount: number
-): number | null {
-	if (previousCount === 0) return currentCount === 0 ? 0 : null
-	return Number((((currentCount - previousCount) / previousCount) * 100).toFixed(2))
+	previousCount: number,
+	previousLabel: string
+): CountComparison {
+	const current = Math.max(0, Math.round(currentCount))
+	const previous = Math.max(0, Math.round(previousCount))
+	const difference = current - previous
+
+	if (difference === 0) {
+		return { text: `Same as ${previousLabel}`, tone: "neutral" }
+	}
+
+	if (previous === 0) {
+		return { text: `New compared with ${previousLabel}`, tone: "neutral" }
+	}
+
+	const tone: CountComparisonTone = difference > 0 ? "positive" : "negative"
+	const direction = difference > 0 ? "more" : "fewer"
+	const percent = Math.round((Math.abs(difference) / previous) * 100)
+
+	if (previous < SMALL_COMPARISON_BASE || percent === 0) {
+		return {
+			text: `${Math.abs(difference)} ${direction} than ${previousLabel}`,
+			tone
+		}
+	}
+
+	return {
+		text: `${percent}% ${direction} titles than ${previousLabel}`,
+		tone
+	}
 }

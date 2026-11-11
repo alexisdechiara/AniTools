@@ -1,4 +1,19 @@
 <script setup lang="ts">
+import { FEATURE_REGISTRY, type FeatureId } from "#shared/config/features"
+
+const PAGE_DESCRIPTIONS: Partial<Record<FeatureId, string>> = {
+	"statistics-overview": "Watch time, scores and the shape of your whole AniList list.",
+	"statistics-genres": "Which genres you watch most, rate highest and spend the most time on.",
+	"statistics-tags": "The themes and tropes that keep showing up in your list.",
+	"statistics-voice-actors": "The voice actors behind the anime you watch most.",
+	"statistics-studios": "The studios behind your list, ranked by count, score or time.",
+	"statistics-staff": "Directors, writers and other staff across your list."
+}
+
+const route = useRoute()
+const pageTitle = computed(() => route.meta.feature ? FEATURE_REGISTRY[route.meta.feature].label : "Statistics")
+const pageDescription = computed(() => route.meta.feature ? PAGE_DESCRIPTIONS[route.meta.feature] : undefined)
+
 const props = withDefaults(defineProps<{
 	allowPartial?: boolean
 	pageId: string
@@ -57,6 +72,11 @@ onMounted(() => {
 	<UDashboardPanel :id="pageId">
 		<template #body>
 			<div class="space-y-6">
+				<PageHeader
+					eyebrow="Statistics"
+					:title="pageTitle"
+					:description="pageDescription" />
+
 				<UAlert
 					v-if="loadData && pageError"
 					icon="i-lucide-triangle-alert"

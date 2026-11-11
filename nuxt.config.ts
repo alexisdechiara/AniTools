@@ -44,6 +44,23 @@ export default defineNuxtConfig({
 		enabled: process.env.NODE_ENV !== "production"
 	},
 
+	"vite": {
+		optimizeDeps: {
+			// Libraries imported by lazily loaded pages: without this, Vite discovers each one on
+			// the first visit, re-bundles and reloads the page, which breaks the first
+			// interactions on every fresh dev server (and every e2e run).
+			include: [
+				"@vue/devtools-core",
+				"@unovis/ts",
+				"@unovis/vue",
+				"grid-layout-plus",
+				"vue-cal",
+				"vue-draggable-plus",
+				"vue-timeline-chart"
+			]
+		}
+	},
+
 	"eslint": {
 		config: {
 			stylistic: false
@@ -75,28 +92,27 @@ export default defineNuxtConfig({
 		"pinia-plugin-persistedstate/nuxt"
 	],
 
+	"nitro": {
+		// Development only: AniList responses recorded once and replayed (see
+		// server/utils/anilist-request-cache.ts). devStorage never ships in a build.
+		devStorage: {
+			"anilist-dev-cache": {
+				driver: "fs",
+				base: "./.data/anilist-dev-cache"
+			}
+		}
+	},
+
 	"robots": {
 		metaTag: false,
 		sitemap: ["/sitemap.xml"],
-		allow: ["/calendar", "/tierlist"],
-		disallow: ["/create", "/explore", "/login", "/statistics", "/rewind", "/timeline"]
+		allow: ["/calendar", "/tierlist", "/support"],
+		disallow: ["/create", "/explore", "/login", "/statistics", "/rewind", "/timeline", "/podium", "/settings"]
 	},
 
 	"routeRules": {
 		"/**": {
 			headers: securityHeaders
-		},
-		"/api/calendar": {
-			swr: 60,
-			headers: {
-				"Cache-Control": "public, s-maxage=60, stale-while-revalidate=300"
-			}
-		},
-		"/api/search": {
-			swr: 300,
-			headers: {
-				"Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
-			}
 		},
 		"/api/auth/**": {
 			headers: {
@@ -137,6 +153,6 @@ export default defineNuxtConfig({
 			changefreq: "weekly",
 			priority: 0.7
 		},
-		include: ["/calendar", "/tierlist"]
+		include: ["/calendar", "/tierlist", "/support"]
 	}
 })

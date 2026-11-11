@@ -3,6 +3,7 @@ import type { CSSProperties } from "vue"
 import { GridItem, GridLayout, type LayoutItem } from "grid-layout-plus"
 import { FEATURE_REGISTRY } from "#shared/config/features"
 import DashboardDeleteDropTarget from "~/components/dashboard/DeleteDropTarget.vue"
+import DashboardStartHere from "~/components/dashboard/StartHere.vue"
 import {
 	DASHBOARD_CARDS,
 	getDashboardCard,
@@ -10,10 +11,14 @@ import {
 	type DashboardCardId
 } from "~/config/components"
 import type { RecentListUpdate } from "~/types/dashboard"
+import { getMediaCover } from "~/utils/media-display"
 import {
+	DASHBOARD_GRID_COLUMNS,
+	type DashboardGridBreakpoint,
 	getDashboardDeleteAttractionOffset,
 	isDashboardCardId,
-	isDashboardDeleteTargetHit
+	isDashboardDeleteTargetHit,
+	packDashboardLayout
 } from "~/utils/dashboard-layout"
 
 definePageMeta({
@@ -26,15 +31,24 @@ const userStore = useUserStore()
 const entriesStore = useEntriesStore()
 const statisticsStore = useStatisticsStore()
 const { getAllAnimes } = storeToRefs(entriesStore)
+const { title: getAnimeTitle } = useMediaTitle()
 const { load, error } = useAniListOverviewData()
 const {
 	cardIds,
 	isHydrated,
 	add,
 	remove,
+	restore,
 	move,
 	reorder
 } = useDashboardCards()
+const { isReturningVisitor, showStartHere, dismissStartHere } = useDashboardOnboarding()
+const toast = useToast()
+// "Welcome back" would be wrong on a first visit, which is also what the server renders.
+const greeting = computed(() => isReturningVisitor.value
+	? `Welcome back, ${userStore.getUsername}`
+	: `Hello, ${userStore.getUsername}`
+)
 const addCardModalOpen = ref(false)
 const activeDragCardId = ref<DashboardCardId | null>(null)
 const deleteTargetActive = ref(false)
@@ -74,47 +88,42 @@ const cardCatalogueGroups = computed(() => CARD_GROUPS.map(group => ({
 	cards: DASHBOARD_CARDS.filter(card => card.group === group.id)
 })))
 
+function cardSizes(ids: readonly DashboardCardId[]) {
+	return ids.map(id => ({ id, size: getDashboardCard(id).size }))
+}
+
+// The layout handed to the grid must match the active breakpoint: a 12-column layout given to
+// the 2-column phone grid is only clamped, not reflowed, and the cards end up stacked on top
+// of each other.
+const currentBreakpoint = ref<DashboardGridBreakpoint>("lg")
+
 function createDashboardLayout(ids: readonly DashboardCardId[]): DashboardLayoutItem[] {
-	const occupied = new Set<string>()
+	return packDashboardLayout(cardSizes(ids), DASHBOARD_GRID_COLUMNS[currentBreakpoint.value])
+}
 
-	return ids.map((id) => {
-		const size = getDashboardCard(id).size
-		let position = { x: 0, y: 0 }
-		let placed = false
-
-		for (let y = 0; !placed; y += 1) {
-			for (let x = 0; x <= 12 - size.w; x += 1) {
-				let available = true
-				for (let row = y; row < y + size.h && available; row += 1) {
-					for (let column = x; column < x + size.w; column += 1) {
-						if (occupied.has(`${column}:${row}`)) {
-							available = false
-							break
-						}
-					}
-				}
-
-				if (!available) continue
-				position = { x, y }
-				placed = true
-				break
-			}
-		}
-
-		for (let row = position.y; row < position.y + size.h; row += 1) {
-			for (let column = position.x; column < position.x + size.w; column += 1) {
-				occupied.add(`${column}:${row}`)
-			}
-		}
-
-		const item: DashboardLayoutItem = { ...position, ...size, i: id }
-		return item
-	})
+function handleBreakpointChanged(breakpoint: DashboardGridBreakpoint): void {
+	currentBreakpoint.value = breakpoint
 }
 
 const dashboardLayout = ref<DashboardLayoutItem[]>(
 	createDashboardLayout(cardIds.value)
 )
+// Without a layout per breakpoint, grid-layout-plus squeezes the 12-column one and leaves holes.
+const responsiveLayouts = computed(() => {
+	const order = dashboardLayout.value
+		.toSorted((left, right) => left.y - right.y || left.x - right.x)
+		.map(item => item.i)
+	const sizes = cardSizes(order)
+	// Positions always derive from the card order (dragging reorders the list), so each
+	// breakpoint is repacked from it rather than copied from whichever layout is active.
+	return {
+		lg: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.lg),
+		md: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.md),
+		sm: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.sm),
+		xs: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.xs),
+		xxs: packDashboardLayout(sizes, DASHBOARD_GRID_COLUMNS.xxs)
+	}
+})
 const layoutCards = computed(() => dashboardLayout.value.map(item => ({
 	item,
 	card: getDashboardCard(item.i)
@@ -130,7 +139,14 @@ watch(cardIds, (ids) => {
 	dashboardLayout.value = createDashboardLayout(ids)
 })
 
+// grid-layout-plus also emits layout-updated on mount and on every reflow. Only a drag the user
+// made may change the saved card order; a narrow grid packing cards differently must not.
+let reorderOnNextLayoutUpdate = false
+
 function handleLayoutUpdated(nextLayout: LayoutItem[]) {
+	if (!reorderOnNextLayoutUpdate) return
+	reorderOnNextLayoutUpdate = false
+
 	const visibleIds = new Set(cardIds.value)
 	const nextOrder = nextLayout
 		.toSorted((left, right) => left.y - right.y || left.x - right.x)
@@ -179,13 +195,10 @@ const recentUpdates = computed<RecentListUpdate[]>(() =>
 		.slice(0, 8)
 		.map(entry => ({
 			id: entry.id,
-			title: entry.media?.title?.userPreferred
-				?? entry.media?.title?.english
-				?? entry.media?.title?.romaji
-				?? "Untitled anime",
+			title: getAnimeTitle(entry.media),
 			status: entry.status ?? "UNKNOWN",
 			updatedAt: entry.updatedAt ?? 0,
-			coverImage: entry.media?.coverImage?.medium
+			coverImage: getMediaCover(entry.media, "small")
 		}))
 )
 
@@ -207,6 +220,26 @@ function cardProps(cardId: DashboardCardId): Record<string, unknown> {
 
 function isCardAdded(cardId: DashboardCardId): boolean {
 	return cardIds.value.includes(cardId)
+}
+
+/** Removes a card and offers to put it back where it was. */
+function removeCard(cardId: DashboardCardId): void {
+	const index = remove(cardId)
+	if (index < 0) return
+
+	toast.add({
+		title: `${getDashboardCard(cardId).label} removed`,
+		icon: "i-lucide-trash-2",
+		color: "neutral",
+		// Long enough to read the title and reach the action with a keyboard.
+		duration: 10_000,
+		actions: [{
+			label: "Undo",
+			color: "neutral",
+			variant: "outline",
+			onClick: () => restore(cardId, index)
+		}]
+	})
 }
 
 function getDeleteTargetBounds(): DOMRect | null {
@@ -269,13 +302,18 @@ function cleanupDragListeners(): void {
 
 function finishCardDrag(event: PointerEvent): void {
 	if (event.pointerId !== activePointerId) return
+	// The grid reports the dropped layout synchronously during this pointerup; a press on the
+	// handle that moved nothing must not leave the next reflow allowed to reorder.
+	setTimeout(() => {
+		reorderOnNextLayoutUpdate = false
+	})
 	const cardId = activeDragCardId.value
 	const shouldRemove = Boolean(cardId && deleteTargetActive.value)
 	cleanupDragListeners()
 
 	if (cardId && shouldRemove) {
 		deleteConfirmed.value = true
-		remove(cardId)
+		removeCard(cardId)
 		if (deleteConfirmationTimer) clearTimeout(deleteConfirmationTimer)
 		deleteConfirmationTimer = setTimeout(() => {
 			deleteConfirmed.value = false
@@ -291,6 +329,7 @@ function finishCardDrag(event: PointerEvent): void {
 
 function cancelCardDrag(event: PointerEvent): void {
 	if (event.pointerId !== activePointerId) return
+	reorderOnNextLayoutUpdate = false
 	cleanupDragListeners()
 	deleteTargetActive.value = false
 	Object.assign(deleteAttractionOffset, { x: 0, y: 0 })
@@ -302,6 +341,7 @@ function beginCardDrag(cardId: DashboardCardId, event: PointerEvent): void {
 	if (!import.meta.client) return
 
 	cleanupDragListeners()
+	reorderOnNextLayoutUpdate = true
 	activeDragCardId.value = cardId
 	deleteTargetActive.value = false
 	deleteConfirmed.value = false
@@ -312,30 +352,31 @@ function beginCardDrag(cardId: DashboardCardId, event: PointerEvent): void {
 	window.addEventListener("pointercancel", cancelCardDrag)
 }
 
+/** Shared by the visible options button of each card and its right-click menu. */
 function cardActions(cardId: DashboardCardId, index: number) {
-	const card = getDashboardCard(cardId)
-
 	return [
 		[
 			{
 				label: "Move earlier",
 				icon: "i-lucide-arrow-left",
+				kbds: ["alt", "arrowleft"],
 				disabled: index === 0,
 				onClick: () => move(cardId, -1)
 			},
 			{
 				label: "Move later",
 				icon: "i-lucide-arrow-right",
+				kbds: ["alt", "arrowright"],
 				disabled: index === layoutCards.value.length - 1,
 				onClick: () => move(cardId, 1)
 			}
 		],
 		[
 			{
-				label: `Remove ${card.label}`,
+				label: "Remove",
 				icon: "i-lucide-trash",
 				color: "error" as const,
-				onClick: () => remove(cardId)
+				onClick: () => removeCard(cardId)
 			}
 		]
 	]
@@ -359,23 +400,14 @@ onBeforeUnmount(() => {
 	<UDashboardPanel id="home">
 		<template #body>
 			<div class="space-y-6">
-				<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-					<div>
-						<p class="text-sm font-medium text-primary">
-							Personal dashboard
-						</p>
-						<h1 class="text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
-							Welcome back, {{ userStore.getUsername }}
-						</h1>
-						<p class="mt-1 text-base text-muted">
-							Your AniList summary, upcoming episodes and latest list changes.
-						</p>
-					</div>
-					<div class="flex flex-wrap gap-2">
+				<PageHeader
+					:title="greeting"
+					description="Your AniList summary, upcoming episodes and latest list changes.">
+					<template #actions>
 						<UModal
 							v-model:open="addCardModalOpen"
 							title="Dashboard card catalogue"
-							description="Add Dashboard, Statistics and all-time Rewind cards. Choices are saved only in this browser."
+							description="Add Dashboard, Statistics and all-time Rewind cards. To remove one later, open its options menu (the three dots on the card) and choose Remove. Choices are saved only in this browser."
 							:ui="{ content: 'sm:max-w-3xl' }">
 							<UButton
 								icon="i-lucide-plus"
@@ -429,8 +461,10 @@ onBeforeUnmount(() => {
 								</div>
 							</template>
 						</UModal>
-					</div>
-				</header>
+					</template>
+				</PageHeader>
+
+				<DashboardStartHere v-if="showStartHere" @dismiss="dismissStartHere" />
 
 				<UAlert
 					v-if="error"
@@ -453,10 +487,12 @@ onBeforeUnmount(() => {
 						label="Preparing your dashboard"
 						description="Loading your AniList summary and restoring your widget layout." />
 
+					<!-- The grid pads itself by one 16px margin: pull it back so cards align with the header. -->
 					<GridLayout
 					v-else-if="cardIds.length"
 					key="dashboard-grid"
 					v-model:layout="dashboardLayout"
+					class="-mx-4"
 					:col-num="12"
 					:row-height="104"
 					:margin="[16, 16]"
@@ -464,8 +500,10 @@ onBeforeUnmount(() => {
 					:is-resizable="false"
 					:responsive="true"
 					:breakpoints="{ lg: 900, md: 700, sm: 500, xs: 320, xxs: 0 }"
-					:cols="{ lg: 12, md: 8, sm: 4, xs: 2, xxs: 1 }"
+					:cols="DASHBOARD_GRID_COLUMNS"
+					:responsive-layouts="responsiveLayouts"
 					data-dashboard-grid
+					@breakpoint-changed="handleBreakpointChanged"
 					@layout-updated="handleLayoutUpdated">
 					<GridItem
 						v-for="({ item, card }, index) in layoutCards"
@@ -498,6 +536,8 @@ onBeforeUnmount(() => {
 									:is="card.component"
 									v-bind="cardProps(card.id)"
 									draggable
+									:options-items="cardActions(card.id, index)"
+									:options-label="card.label"
 									class="size-full"
 									@move="move(card.id, $event)"/>
 								<template #fallback>

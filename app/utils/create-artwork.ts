@@ -1,6 +1,6 @@
 import type {
 	AniListAnimeListEntry,
-	AniListMediaSummary
+	AniListMediaListSummary
 } from "~~/shared/types/anilist"
 import { getEntryWatchMinutes } from "~/utils/statistics"
 
@@ -11,9 +11,12 @@ export const CREATE_PRESET_IDS = [
 	"banner"
 ] as const
 
+export const CREATE_TEMPLATE_IDS = ["anime", "stats"] as const
+
 export const CREATE_EXPORT_FORMATS = ["png", "jpeg", "webp"] as const
 export const CREATE_CONTENT_IDS = [
 	"anime",
+	"currently-watching",
 	"best-rated",
 	"flop",
 	"most-popular",
@@ -31,6 +34,7 @@ export const CREATE_IMAGE_SOURCE_IDS = ["cover", "banner"] as const
 export const CREATE_FONT_IDS = ["sans", "serif", "display", "mono"] as const
 
 export type CreatePresetId = typeof CREATE_PRESET_IDS[number]
+export type CreateTemplateId = typeof CREATE_TEMPLATE_IDS[number]
 export type CreateExportFormat = typeof CREATE_EXPORT_FORMATS[number]
 export type CreateContentId = typeof CREATE_CONTENT_IDS[number]
 export type CreateTitleLanguage = typeof CREATE_TITLE_LANGUAGE_IDS[number]
@@ -66,12 +70,44 @@ export interface CreateFontOption {
 	family: string
 }
 
+export interface CreateTemplateOption {
+	id: CreateTemplateId
+	label: string
+	description: string
+	icon: string
+}
+
+export const CREATE_TEMPLATES: Readonly<Record<CreateTemplateId, CreateTemplateOption>> = {
+	anime: {
+		id: "anime",
+		label: "Anime card",
+		description: "A poster with your score and a note, for social sharing.",
+		icon: "i-lucide-image"
+	},
+	stats: {
+		id: "stats",
+		label: "Stats card",
+		description: "A shareable summary of your AniList stats.",
+		icon: "i-lucide-bar-chart-3"
+	}
+}
+
+export function getCreateTemplate(id: CreateTemplateId): CreateTemplateOption {
+	return CREATE_TEMPLATES[id]
+}
+
 export const CREATE_CONTENT_OPTIONS: readonly CreateContentOption[] = [
 	{
 		id: "anime",
 		label: "Choose an anime",
 		subtitle: "Created with AniTools",
 		icon: "i-lucide-search"
+	},
+	{
+		id: "currently-watching",
+		label: "Currently watching",
+		subtitle: "Currently watching",
+		icon: "i-lucide-play-circle"
 	},
 	{
 		id: "best-rated",
@@ -189,7 +225,7 @@ export function getCreateFont(id: CreateFontId): CreateFontOption {
 	return CREATE_FONTS[id]
 }
 
-function getFallbackTitle(media: AniListMediaSummary): string {
+function getFallbackTitle(media: AniListMediaListSummary): string {
 	return media.title?.userPreferred
 		?? media.title?.english
 		?? media.title?.romaji
@@ -198,14 +234,14 @@ function getFallbackTitle(media: AniListMediaSummary): string {
 }
 
 export function getCreateMediaTitle(
-	media: AniListMediaSummary,
+	media: AniListMediaListSummary,
 	language: CreateTitleLanguage
 ): string {
 	return media.title?.[language] ?? getFallbackTitle(media)
 }
 
 export function getCreateMediaImage(
-	media: AniListMediaSummary,
+	media: AniListMediaListSummary,
 	source: CreateImageSource
 ): string | null {
 	if (source === "banner") return media.bannerImage
@@ -241,7 +277,7 @@ export function selectCreateContentEntries(
 	limit = 10
 ): AniListAnimeListEntry[] {
 	const withMedia = entries.filter(
-		(entry): entry is AniListAnimeListEntry & { media: AniListMediaSummary } =>
+		(entry): entry is AniListAnimeListEntry & { media: AniListMediaListSummary } =>
 			entry.media != null
 	)
 	const safeLimit = Math.max(0, Math.floor(limit))
@@ -249,6 +285,13 @@ export function selectCreateContentEntries(
 	switch (content) {
 		case "anime":
 			return []
+		case "currently-watching":
+			return withMedia
+				.filter(entry => entry.status === "CURRENT" || entry.status === "REPEATING")
+				.toSorted((left, right) =>
+					(right.updatedAt ?? 0) - (left.updatedAt ?? 0)
+					|| sortByTitleThenId(left, right)
+				).slice(0, safeLimit)
 		case "best-rated":
 			return withMedia.toSorted((left, right) =>
 				(right.score ?? 0) - (left.score ?? 0)

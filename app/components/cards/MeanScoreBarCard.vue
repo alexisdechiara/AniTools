@@ -1,5 +1,5 @@
 <template>
-	<MetricsCard title="Mean Score" :value="meanScore === undefined ? '-' : meanScore.toFixed(2) + ' %'" v-bind="$attrs">
+	<MetricsCard title="Mean score" :value="meanScore === undefined ? '-' : formatPercent(meanScore)" v-bind="$attrs">
 		<UTabs
 v-model="selectedTab"
 :items="items"
@@ -17,7 +17,7 @@ type="x"
 :domain-line="false"
 :tick-line="false"
 tick-text-align="center"
-				:tick-format="(d: ScoringData, i: number) => scoring[i]?.x"
+				:tick-format="formatTick"
 :num-ticks="10" />
 			<VisTooltip :triggers="triggers" />
 		</VisXYContainer>
@@ -28,6 +28,7 @@ tick-text-align="center"
 import { VisXYContainer, VisStackedBar, VisTooltip, VisAxis } from "@unovis/vue";
 import { StackedBar } from "@unovis/ts";
 import type { TabsItem } from "@nuxt/ui";
+import { formatScoreAxisTick } from "~/utils/score-format";
 
 const items = ref<TabsItem[]>([
 	{
@@ -45,6 +46,14 @@ const items = ref<TabsItem[]>([
 const selectedTab = ref("count");
 
 const { scores, meanScore } = storeToRefs(useStatisticsStore());
+const { formatPercent, displayFormat } = usePersonalScore();
+
+// Ticks are bar indexes: each one is labelled with its score in the display format.
+function formatTick(tick: number): string {
+	if (!Number.isInteger(tick)) return "";
+	const score = scoring.value[tick]?.x;
+	return score === undefined ? "" : formatScoreAxisTick(score, displayFormat.value);
+}
 // Computed property pour gérer l'affichage en fonction de l'onglet sélectionné
 const scoring = computed(
 	() =>
@@ -67,7 +76,7 @@ const triggers = {
 	[StackedBar.selectors.bar]: (data: ScoringData) => {
 		return `
       <div class='flex flex-col'>
-        <span class='font-semibold'>${data.label ?? data.x} %</span>
+        <span class='font-semibold'>Scored ${formatPercent(data.x)}</span>
         <span>${formatValue(data.y)}</span>
       </div>
     `;
@@ -75,7 +84,7 @@ const triggers = {
 };
 
 const formatValue = (value: number) => {
-	return selectedTab.value === "count" ? `${value} animes` : formatWatchTime(value);
+	return selectedTab.value === "count" ? `${value} anime` : formatWatchTime(value);
 };
 </script>
 

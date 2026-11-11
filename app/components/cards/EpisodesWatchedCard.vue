@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Episodes Watched" :value="formattedEpisodeCount" />
+  <MetricsCard title="Episodes watched" :value="formattedEpisodeCount" />
 </template>
 
 <script lang="ts" setup>
@@ -8,6 +8,6 @@ const { episodesWatched } = storeToRefs(useStatisticsStore());
 const formattedEpisodeCount = computed(() => {
   return episodesWatched.value === undefined
     ? "-"
-    : episodesWatched.value.toLocaleString();
+    : formatNumber(episodesWatched.value);
 });
 </script>

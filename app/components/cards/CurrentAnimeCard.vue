@@ -1,5 +1,15 @@
 <script setup lang="ts">
-const { getAllAnimes } = storeToRefs(useEntriesStore())
+import { getMediaCover } from "~/utils/media-display"
+
+const entriesStore = useEntriesStore()
+const { getAllAnimes } = storeToRefs(entriesStore)
+
+// An empty card must not claim the list is empty when the list itself is missing or partial.
+const emptyMessage = computed(() => {
+	if (entriesStore.error) return "Your list could not be loaded, so titles in progress cannot be shown."
+	if (entriesStore.truncated) return "No title in progress in the part of your list that was loaded."
+	return "Nothing on this list is marked as watching or rewatching."
+})
 
 const currentAnime = computed(() =>
 	getAllAnimes.value
@@ -10,11 +20,14 @@ const currentAnime = computed(() =>
 		.slice(0, 5)
 )
 
+const { title: getAnimeTitle } = useMediaTitle()
+
 function getTitle(entry: typeof currentAnime.value[number]): string {
-	return entry.media?.title?.userPreferred
-		?? entry.media?.title?.english
-		?? entry.media?.title?.romaji
-		?? "Untitled anime"
+	return getAnimeTitle(entry.media)
+}
+
+function getCover(entry: typeof currentAnime.value[number]): string | null {
+	return getMediaCover(entry.media, "small")
 }
 
 function getProgress(entry: typeof currentAnime.value[number]): string {
@@ -36,8 +49,8 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 				:key="entry.id"
 				class="flex min-w-0 items-center gap-3">
 				<NuxtImg
-					v-if="entry.media?.coverImage?.medium"
-					:src="entry.media.coverImage.medium"
+					v-if="getCover(entry)"
+					:src="getCover(entry) ?? undefined"
 					:alt="`${getTitle(entry)} cover`"
 					class="size-11 shrink-0 rounded-md object-cover"
 					width="44"
@@ -51,7 +64,7 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 						class="size-5 text-muted"/>
 				</div>
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-medium text-highlighted">
+					<p class="truncate text-sm font-medium text-highlighted" :title="getTitle(entry)">
 						{{ getTitle(entry) }}
 					</p>
 					<p class="text-xs text-muted">
@@ -73,7 +86,7 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 					name="i-lucide-circle-pause"
 					class="size-7 text-muted"/>
 				<p class="text-sm text-muted">
-					No anime is currently marked as watching.
+					{{ emptyMessage }}
 				</p>
 			</div>
 		</div>

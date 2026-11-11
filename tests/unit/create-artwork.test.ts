@@ -143,6 +143,24 @@ describe("Create artwork presets", () => {
 			12, 11, 10, 9, 8, 7, 6, 5, 4, 3
 		])
 	})
+
+	it("ranks currently-watching content by most recently updated", () => {
+		const watching = (id: number, status: AniListAnimeListEntry["status"], updatedAt: number) => ({
+			...entry(id, 0, 0, 0, 0),
+			status,
+			updatedAt
+		})
+		const entries = [
+			watching(1, "COMPLETED", 500),
+			watching(2, "CURRENT", 100),
+			watching(3, "REPEATING", 300),
+			watching(4, "CURRENT", 200),
+			watching(5, "DROPPED", 400)
+		]
+
+		expect(selectCreateContentEntries(entries, "currently-watching").map(e => e.id))
+			.toEqual([3, 4, 2])
+	})
 })
 
 describe("Create artwork crop", () => {

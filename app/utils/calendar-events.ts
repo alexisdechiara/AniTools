@@ -5,6 +5,7 @@ import {
 } from "~/models/AnimeCalEvent"
 import type {
 	CalendarAiringSchedule,
+	CalendarApiResponse,
 	CalendarEvent,
 	CalendarMedia,
 	CalendarSimuldubItem
@@ -111,4 +112,64 @@ export function buildCalendarEvents(
 		|| left.media.id - right.media.id
 		|| (left.episode ?? 0) - (right.episode ?? 0)
 	)
+}
+
+/**
+ * Rebuilds what `buildCalendarEvents` reads from the deduplicated `/api/calendar` response:
+ * every airing gets its anime back (the same object for every episode of a title). An airing
+ * whose anime is missing from `media` is dropped.
+ */
+export function expandCalendarResponse(
+	response: Pick<CalendarApiResponse, "airings" | "media">
+): { airingSchedules: CalendarAiringSchedule[], mediaById: Map<number, CalendarMedia> } {
+	const mediaById = new Map<number, CalendarMedia>()
+	for (const media of Object.values(response.media ?? {})) {
+		if (toPositiveInteger(media?.id)) mediaById.set(media.id, media)
+	}
+
+	const airingSchedules = (response.airings ?? []).flatMap((airing) => {
+		const media = mediaById.get(airing.mediaId)
+		return media
+			? [{
+					airingAt: airing.airingAt,
+					episode: airing.episode,
+					timeUntilAiring: airing.timeUntilAiring,
+					media
+				}]
+			: []
+	})
+
+	return { airingSchedules, mediaById }
+}
+
+/** The calendar events of one `/api/calendar` response. */
+export function buildCalendarEventsFromResponse(
+	response: Pick<CalendarApiResponse, "airings" | "media" | "simuldubs">
+) {
+	const { airingSchedules, mediaById } = expandCalendarResponse(response)
+	return buildCalendarEvents(airingSchedules, response.simuldubs ?? [], mediaById)
+}
+
+interface ListFilterableEvent {
+	media?: { id?: number | null } | null
+}
+
+/**
+ * Keeps the events whose media is on the list with one of `statuses`. With no status selected
+ * every event is kept; under an active filter an event without a media id is hidden.
+ */
+export function filterCalendarEventsByListStatus<T extends ListFilterableEvent>(
+	events: readonly T[],
+	statusByMediaId: ReadonlyMap<number, string>,
+	statuses: readonly string[]
+): T[] {
+	if (statuses.length === 0) return [...events]
+
+	const selected = new Set(statuses)
+	return events.filter((event) => {
+		const mediaId = event.media?.id
+		if (mediaId == null) return false
+		const status = statusByMediaId.get(mediaId)
+		return status !== undefined && selected.has(status)
+	})
 }

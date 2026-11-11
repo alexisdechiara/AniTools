@@ -47,10 +47,19 @@ export type CalendarApiWarning =
 	| "simuldub_media_unavailable"
 	| "simuldub_media_truncated"
 
+/** One airing of the `/api/calendar` response; its anime is `media[mediaId]`. */
+export interface CalendarAiringReference {
+	airingAt: number
+	episode: number
+	mediaId: number
+	timeUntilAiring?: number | null
+}
+
 export interface CalendarApiResponse {
-	airingSchedules: CalendarAiringSchedule[]
+	/** Every anime of the range once, keyed by id: airing ones and simuldub-only ones alike. */
+	media: Record<string, CalendarMedia>
+	airings: CalendarAiringReference[]
 	simuldubs: CalendarSimuldubItem[]
-	missingMedia: CalendarMedia[]
 	warnings: CalendarApiWarning[]
 }
 
@@ -69,11 +78,4 @@ export interface CalendarEvent {
 	streaming: string[]
 	timeUntilAiring?: number
 	title: string
-}
-
-export interface CalendarViewRange {
-	extendedEnd?: Date
-	extendedStart?: Date
-	fullRangeEnd?: Date
-	fullRangeStart?: Date
 }

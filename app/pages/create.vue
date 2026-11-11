@@ -3,7 +3,8 @@ import { FEATURE_REGISTRY } from "#shared/config/features"
 import CreateCanvasPreview from "~/components/create/CanvasPreview.vue"
 import CreateGraduatedSlider from "~/components/create/GraduatedSlider.vue"
 import type {
-	AniListMediaSummary
+	AniListAnimeListEntry,
+	AniListMediaListSummary
 } from "~~/shared/types/anilist"
 import type {
 	CreateContentId,
@@ -12,6 +13,7 @@ import type {
 	CreateImageSource,
 	CreatePreset,
 	CreatePresetId,
+	CreateTemplateId,
 	CreateTitleLanguage
 } from "~/utils/create-artwork"
 import {
@@ -22,6 +24,8 @@ import {
 	CREATE_IMAGE_SOURCE_OPTIONS,
 	CREATE_PRESETS,
 	CREATE_PRESET_IDS,
+	CREATE_TEMPLATES,
+	CREATE_TEMPLATE_IDS,
 	CREATE_TITLE_LANGUAGE_OPTIONS,
 	getCreateFont,
 	getCreateMediaImage,
@@ -29,6 +33,7 @@ import {
 	getCreatePreset,
 	selectCreateContentEntries
 } from "~/utils/create-artwork"
+import { buildCreateStatTiles } from "~/utils/create-stats"
 import type { CreateArtworkOptions } from "~/utils/create-canvas.client"
 
 definePageMeta({
@@ -66,12 +71,17 @@ const imagePositionY = ref(0.5)
 const titleScale = ref(1)
 const subtitleScale = ref(1)
 const exportFormat = ref<CreateExportFormat>("png")
-const selectedAnime = ref<AniListMediaSummary | null>(null)
+const selectedEntry = ref<AniListAnimeListEntry | null>(null)
+const selectedAnime = computed(() => selectedEntry.value?.media ?? null)
 const animeSearchOpen = ref(false)
 const animeError = ref<string | null>(null)
 const exporting = ref(false)
+const templateId = ref<CreateTemplateId>("anime")
+const note = ref("")
+const showScoreBadge = ref(true)
 const preset = computed(() => getCreatePreset(selectedPresetId.value))
 const presetItems = CREATE_PRESET_IDS.map(id => CREATE_PRESETS[id])
+const templateItems = CREATE_TEMPLATE_IDS.map(id => CREATE_TEMPLATES[id])
 const fontItems = CREATE_FONT_IDS.map(id => ({
 	label: CREATE_FONTS[id].label,
 	value: id
@@ -106,6 +116,7 @@ const imageSourceItems = computed(() => CREATE_IMAGE_SOURCE_OPTIONS.map(item => 
 	disabled: item.value === "banner" && !hasBanner.value
 })))
 const backgroundImageUrl = computed(() => {
+	if (templateId.value !== "anime") return null
 	const media = selectedAnime.value
 	if (!media) return null
 	return getCreateMediaImage(media, imageSource.value)
@@ -116,23 +127,66 @@ const contentCandidates = computed(() => contentMode.value === "anime"
 	: selectCreateContentEntries(getAllAnimes.value, contentMode.value, 10)
 		.flatMap(entry => entry.media ? [entry.media] : [])
 )
-const artworkOptions = computed<CreateArtworkOptions>(() => ({
-	preset: preset.value,
-	title: title.value.trim().slice(0, 100),
-	subtitle: subtitle.value.trim().slice(0, 160),
-	accentColor: accentColor.value,
-	backgroundColor: backgroundColor.value,
-	overlayOpacity: overlayOpacity.value,
-	imageZoom: imageZoom.value,
-	imagePositionX: imagePositionX.value,
-	imagePositionY: imagePositionY.value,
-	fontFamily: getCreateFont(fontId.value).family,
-	titleScale: titleScale.value,
-	subtitleScale: subtitleScale.value
+
+const { format: formatPersonalScore } = usePersonalScore()
+const scoreLabel = computed(() => {
+	if (!showScoreBadge.value) return null
+	const score = selectedEntry.value?.score
+	if (!score || score <= 0) return null
+	return formatPersonalScore(score)
+})
+const genreTags = computed(() => selectedAnime.value?.genres?.slice(0, 3) ?? [])
+
+const statisticsStore = useStatisticsStore()
+const statsHeading = computed(() =>
+	userStore.isAuthenticated ? `@${userStore.getUsername}` : "My AniList stats"
+)
+const hasStats = computed(() => (statisticsStore.count ?? 0) > 0)
+const statTiles = computed(() => buildCreateStatTiles({
+	count: statisticsStore.count ?? 0,
+	meanScore: statisticsStore.meanScore ?? 0,
+	minutesWatched: statisticsStore.minutesWatched ?? 0,
+	episodesWatched: statisticsStore.episodesWatched ?? 0
 }))
 
-function applySelectedAnime(media: AniListMediaSummary, automaticSubtitle?: string) {
-	selectedAnime.value = media
+const artworkOptions = computed<CreateArtworkOptions>(() => {
+	if (templateId.value === "stats") {
+		return {
+			templateId: "stats",
+			preset: preset.value,
+			accentColor: accentColor.value,
+			backgroundColor: backgroundColor.value,
+			fontFamily: getCreateFont(fontId.value).family,
+			heading: statsHeading.value,
+			tiles: statTiles.value,
+			footnote: "Generated with AniTools"
+		}
+	}
+
+	return {
+		templateId: "anime",
+		preset: preset.value,
+		accentColor: accentColor.value,
+		backgroundColor: backgroundColor.value,
+		fontFamily: getCreateFont(fontId.value).family,
+		title: title.value.trim().slice(0, 100),
+		subtitle: subtitle.value.trim().slice(0, 160),
+		overlayOpacity: overlayOpacity.value,
+		imageZoom: imageZoom.value,
+		imagePositionX: imagePositionX.value,
+		imagePositionY: imagePositionY.value,
+		titleScale: titleScale.value,
+		subtitleScale: subtitleScale.value,
+		scoreLabel: scoreLabel.value,
+		note: note.value.trim().slice(0, 80),
+		genres: genreTags.value
+	}
+})
+
+function applySelectedEntry(entry: AniListAnimeListEntry, automaticSubtitle?: string) {
+	selectedEntry.value = entry
+	const media = entry.media
+	if (!media) return
 	if (imageSource.value === "banner" && !media.bannerImage) {
 		imageSource.value = "cover"
 	}
@@ -150,13 +204,16 @@ watch([contentMode, getAllAnimes], ([mode]) => {
 	if (mode === "anime") return
 	const entry = selectCreateContentEntries(getAllAnimes.value, mode, 10)[0]
 	if (!entry?.media) return
-	applySelectedAnime(entry.media, selectedContentOption.value.subtitle)
+	applySelectedEntry(entry, selectedContentOption.value?.subtitle)
 })
 
 watch(() => userStore.isAuthenticated, async (authenticated) => {
-	if (!authenticated || entriesStore.isInitialized) return
+	if (!authenticated) return
 	try {
-		await entriesStore.fetchAllAnimes()
+		await Promise.all([
+			entriesStore.isInitialized ? Promise.resolve() : entriesStore.fetchAllAnimes(),
+			statisticsStore.isInitialized ? Promise.resolve() : statisticsStore.fetchStatistics()
+		])
 	} catch {
 		toast.add({
 			title: "Automatic content unavailable",
@@ -167,7 +224,7 @@ watch(() => userStore.isAuthenticated, async (authenticated) => {
 	}
 }, { immediate: true })
 
-function selectAnime(media: AniListMediaSummary) {
+function selectAnime(media: AniListMediaListSummary) {
 	animeError.value = null
 	const image = media.coverImage?.extraLarge
 		?? media.coverImage?.large
@@ -179,11 +236,25 @@ function selectAnime(media: AniListMediaSummary) {
 		return
 	}
 
-	applySelectedAnime(
-		media,
+	const ownedEntry = getAllAnimes.value.find(entry => entry.media?.id === media.id)
+	const entry: AniListAnimeListEntry = ownedEntry ?? {
+		id: media.id,
+		status: null,
+		score: null,
+		progress: null,
+		repeat: null,
+		priority: null,
+		updatedAt: null,
+		startedAt: null,
+		completedAt: null,
+		media
+	}
+
+	applySelectedEntry(
+		entry,
 		contentMode.value === "anime"
-			? CREATE_CONTENT_OPTIONS[0].subtitle
-			: selectedContentOption.value.subtitle
+			? CREATE_CONTENT_OPTIONS[0]?.subtitle
+			: selectedContentOption.value?.subtitle
 	)
 	animeSearchOpen.value = false
 }
@@ -193,7 +264,8 @@ async function download() {
 	exporting.value = true
 
 	try {
-		await preview.value.download(exportFormat.value, title.value, preset.value)
+		const fileTitle = templateId.value === "stats" ? "AniList stats" : title.value
+		await preview.value.download(exportFormat.value, fileTitle, preset.value)
 		toast.add({
 			title: "Artwork exported",
 			description: `${preset.value.width} × ${preset.value.height} ${exportFormat.value.toLocaleUpperCase("en")}`,
@@ -215,7 +287,7 @@ async function download() {
 
 useSeoMeta({
 	title: "Create anime artwork",
-	description: "Create and export anime stories, square posts, AniList thumbnails and banners locally in your browser.",
+	description: "Design shareable anime cards and AniList stats cards for social media, locally in your browser.",
 	robots: "noindex, nofollow"
 })
 </script>
@@ -226,9 +298,32 @@ useSeoMeta({
 		class="xl:h-dvh xl:min-h-0 xl:overflow-hidden"
 		:ui="{ body: 'p-2 pt-2 sm:p-3 sm:pt-3 xl:min-h-0 xl:overflow-hidden' }">
 		<template #body>
+			<PageHeader title="Create" visually-hidden />
 			<UContainer class="h-full max-w-none px-0 sm:px-0 lg:px-0">
 				<div class="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(34rem,0.9fr)_minmax(0,1.1fr)]">
 					<aside class="grid gap-3 xl:grid-cols-2 xl:content-start">
+						<UPageCard
+							title="Card type"
+							description="What this card is for."
+							class="xl:col-span-2"
+							:ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+							<div class="grid grid-cols-2 gap-1.5">
+								<UButton
+									v-for="item in templateItems"
+									:key="item.id"
+									:icon="item.icon"
+									:label="item.label"
+									:color="templateId === item.id ? 'primary' : 'neutral'"
+									:variant="templateId === item.id ? 'soft' : 'ghost'"
+									:aria-pressed="templateId === item.id"
+									class="justify-start px-2"
+									@click="templateId = item.id" />
+							</div>
+							<p class="mt-1 text-xs text-muted">
+								{{ CREATE_TEMPLATES[templateId].description }}
+							</p>
+						</UPageCard>
+
 						<UPageCard
 							title="Format"
 							description="Exact export dimensions."
@@ -251,7 +346,7 @@ useSeoMeta({
 							</p>
 						</UPageCard>
 
-						<UPageCard title="Content" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+						<UPageCard v-if="templateId === 'anime'" title="Content" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
 							<div class="space-y-2">
 								<UFormField label="Content">
 									<USelect
@@ -293,7 +388,7 @@ useSeoMeta({
 									<UFormField label="Title language">
 										<USelect
 											v-model="titleLanguage"
-											:items="CREATE_TITLE_LANGUAGE_OPTIONS"
+											:items="[...CREATE_TITLE_LANGUAGE_OPTIONS]"
 											value-key="value"
 											class="w-full"
 											aria-label="Anime title language" />
@@ -311,7 +406,7 @@ useSeoMeta({
 									v-if="selectedAnime && (backgroundImageUrl || selectedAnimeCover)"
 									class="flex items-center gap-2 rounded-lg bg-elevated/60 p-2">
 									<NuxtImg
-										:src="backgroundImageUrl || selectedAnimeCover"
+										:src="backgroundImageUrl || selectedAnimeCover || undefined"
 										:alt="selectedAnimeTitle || 'Selected anime cover'"
 										class="h-14 w-10 shrink-0 rounded-md object-cover" />
 									<div class="min-w-0">
@@ -342,7 +437,63 @@ useSeoMeta({
 										class="w-full"
 										placeholder="Optional subtitle" />
 								</UFormField>
+								<UFormField label="Personal note">
+									<UInput
+										v-model="note"
+										maxlength="80"
+										class="w-full"
+										placeholder="e.g. note by you" />
+								</UFormField>
+								<UFormField
+									v-if="selectedEntry?.score"
+									label="Score badge"
+									orientation="horizontal">
+									<USwitch v-model="showScoreBadge" />
+								</UFormField>
 							</div>
+						</UPageCard>
+
+						<UPageCard v-if="templateId === 'stats'" title="Stats" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
+							<div
+								v-if="statisticsStore.loading"
+								class="flex items-center gap-2 text-sm text-muted">
+								<UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+								Loading your AniList stats...
+							</div>
+							<UAlert
+								v-else-if="statisticsStore.error"
+								color="error"
+								variant="soft"
+								title="Stats could not be loaded"
+								:description="statisticsStore.error"
+								:actions="[{
+									label: 'Try again',
+									color: 'error',
+									variant: 'subtle',
+									onClick: () => { void statisticsStore.fetchStatistics(true) }
+								}]" />
+							<UEmpty
+								v-else-if="!hasStats"
+								icon="i-lucide-bar-chart-3"
+								title="No stats to show yet"
+								:description="userStore.isAuthenticated
+									? 'This AniList profile has no anime statistics yet.'
+									: 'Sign in with AniList, or enter a public username, to fill this card.'"
+								:actions="userStore.isAuthenticated ? [] : [{ label: 'Load a profile', to: '/login', color: 'neutral', variant: 'subtle' }]"
+								size="sm" />
+							<ul v-else class="grid grid-cols-2 gap-1.5">
+								<li
+									v-for="tile in statTiles"
+									:key="tile.label"
+									class="rounded-md bg-elevated/60 p-2">
+									<p class="text-[11px] text-muted">
+										{{ tile.label }}
+									</p>
+									<p class="text-sm font-semibold text-highlighted">
+										{{ tile.value }}
+									</p>
+								</li>
+							</ul>
 						</UPageCard>
 
 						<UPageCard title="Style" :ui="{ container: 'gap-y-2 p-3 sm:p-3' }">
@@ -360,38 +511,42 @@ useSeoMeta({
 										<input
 											v-model="accentColor"
 											type="color"
+											aria-label="Accent color"
 											class="h-10 w-full cursor-pointer rounded-md border border-default bg-default p-1">
 									</UFormField>
 									<UFormField label="Background">
 										<input
 											v-model="backgroundColor"
 											type="color"
+											aria-label="Background color"
 											class="h-10 w-full cursor-pointer rounded-md border border-default bg-default p-1">
 									</UFormField>
 								</div>
-								<CreateGraduatedSlider
-									v-model="overlayOpacity"
-									label="Overlay"
-									:min="0"
-									:max="95"
-									:step="1"
-									unit="%" />
-								<CreateGraduatedSlider
-									v-model="titleScale"
-									label="Title size"
-									:min="0.6"
-									:max="1.6"
-									:step="0.05"
-									:decimals="2"
-									unit="×" />
-								<CreateGraduatedSlider
-									v-model="subtitleScale"
-									label="Subtitle size"
-									:min="0.6"
-									:max="1.6"
-									:step="0.05"
-									:decimals="2"
-									unit="×" />
+								<template v-if="templateId === 'anime'">
+									<CreateGraduatedSlider
+										v-model="overlayOpacity"
+										label="Overlay"
+										:min="0"
+										:max="95"
+										:step="1"
+										unit="%" />
+									<CreateGraduatedSlider
+										v-model="titleScale"
+										label="Title size"
+										:min="0.6"
+										:max="1.6"
+										:step="0.05"
+										:decimals="2"
+										unit="×" />
+									<CreateGraduatedSlider
+										v-model="subtitleScale"
+										label="Subtitle size"
+										:min="0.6"
+										:max="1.6"
+										:step="0.05"
+										:decimals="2"
+										unit="×" />
+								</template>
 								<template v-if="backgroundImageUrl">
 									<CreateGraduatedSlider
 										v-model="imageZoom"
@@ -441,6 +596,7 @@ useSeoMeta({
 											icon="i-lucide-download"
 											class="justify-center"
 											:loading="exporting"
+											:disabled="templateId === 'stats' && !hasStats"
 											@click="download" />
 									</div>
 								</template>

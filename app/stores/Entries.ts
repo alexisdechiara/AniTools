@@ -1,25 +1,27 @@
 import { defineStore } from "pinia"
 import type {
+	AniListAnimeCollectionResponse,
 	AniListAnimeListEntry,
-	AniListAnimeListResponse,
 	AniListSource
 } from "~~/shared/types/anilist"
 import {
-	collectAniListAnimeEntries,
 	groupAnimeEntries,
 	sortAnimeEntriesByScore,
 	type AnimeListGroup
 } from "~/utils/anilist-list"
+import { getProfileIdentityKey } from "~/utils/explore-picks"
 
 export type AnimeListEntry = AniListAnimeListEntry
-
-export type AnimesType = AnimeListGroup[]
 
 function take<T>(items: T[], limit?: number): T[] {
 	return limit === undefined ? items : items.slice(0, Math.max(0, limit))
 }
 
 export const useEntriesStore = defineStore("Entries", () => {
+	// Resolved once while the store is created: on the server, useRequestFetch() needs the
+	// Nuxt context, which is gone after the first await inside an action.
+	const requestFetch = import.meta.server ? useRequestFetch() : $fetch
+
 	const user = useUserStore()
 	const entries = ref<AnimeListEntry[]>([])
 	const source = ref<AniListSource | null>(null)
@@ -27,12 +29,28 @@ export const useEntriesStore = defineStore("Entries", () => {
 	const loading = ref(false)
 	const error = ref<string | null>(null)
 	const loadedIdentity = ref<string | null>(null)
+	const stale = ref(false)
+	// True when the server could not return the whole list (it exceeds the chunk ceiling).
+	const truncated = ref(false)
 	let pendingRequest: Promise<AnimeListEntry[]> | null = null
+	let pendingIdentity: string | null = null
+	// Bumped by $reset() and by a request for another identity: a request only writes
+	// the state while the generation it started with is still the current one.
+	let generation = 0
 
-	const identity = computed(() => {
-		if (!user.isAuthenticated || !user.getUsername) return null
-		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
-	})
+	const identity = computed(() => getProfileIdentityKey({
+		isAuthenticated: user.isAuthenticated,
+		authMode: user.authMode,
+		username: user.getUsername
+	}))
+
+	// A different identity must never see the previous one's list, even before a refetch.
+	// Synchronous so the reset always lands before a caller can start the next identity's request.
+	watch(identity, (nextIdentity) => {
+		if (loadedIdentity.value !== null && loadedIdentity.value !== nextIdentity) {
+			$reset()
+		}
+	}, { flush: "sync" })
 
 	const lists = computed<AnimeListGroup[]>(() => groupAnimeEntries(entries.value))
 
@@ -42,11 +60,17 @@ export const useEntriesStore = defineStore("Entries", () => {
 			$reset()
 			return []
 		}
-		if (!force && isInitialized.value && loadedIdentity.value === currentIdentity) {
+		if (!force && !stale.value && isInitialized.value && loadedIdentity.value === currentIdentity) {
 			return entries.value
 		}
-		if (pendingRequest) return pendingRequest
+		if (pendingRequest && pendingIdentity === currentIdentity) return pendingRequest
+		if (pendingRequest) {
+			// The running request belongs to another identity: it may no longer write.
+			generation += 1
+		}
 
+		const requestGeneration = generation
+		pendingIdentity = currentIdentity
 		pendingRequest = (async () => {
 			loading.value = true
 			error.value = null
@@ -56,40 +80,47 @@ export const useEntriesStore = defineStore("Entries", () => {
 			}
 
 			try {
-				const fetcher = import.meta.server ? useRequestFetch() : $fetch
+				const fetcher = requestFetch
 				const username = user.authMode === "public" ? user.getUsername : undefined
-				const collected = await collectAniListAnimeEntries(page =>
-					fetcher<AniListAnimeListResponse>("/api/anilist/anime-list", {
-						query: {
-							...(username ? { username } : {}),
-							page,
-							perPage: 50,
-							sort: "score"
-						}
-					})
-				)
+				// The collection endpoint returns the whole list in one or two AniList requests,
+				// where paging 50 at a time cost one request per 50 entries.
+				const collected = await fetcher<AniListAnimeCollectionResponse>("/api/anilist/anime-collection", {
+					query: username ? { username } : undefined
+				})
+
+				if (requestGeneration !== generation) return entries.value
 
 				source.value = collected.source
 				entries.value = collected.entries
+				truncated.value = collected.truncated
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = true
+				stale.value = false
 				return entries.value
 			} catch (caughtError) {
+				if (requestGeneration !== generation) throw caughtError
+
 				entries.value = []
 				source.value = null
+				truncated.value = false
 				loadedIdentity.value = currentIdentity
 				isInitialized.value = false
-				error.value = caughtError instanceof Error
-					? caughtError.message
-					: "Unable to load the AniList anime list."
+				error.value = getApiErrorMessage(caughtError, "Unable to load the AniList anime list.")
 				throw caughtError
 			} finally {
-				loading.value = false
-				pendingRequest = null
+				if (requestGeneration === generation) {
+					loading.value = false
+					pendingRequest = null
+					pendingIdentity = null
+				}
 			}
 		})()
 
 		return pendingRequest
+	}
+
+	function invalidate() {
+		stale.value = true
 	}
 
 	const getNextAiringAnimesEpisodes = computed(() =>
@@ -143,7 +174,11 @@ export const useEntriesStore = defineStore("Entries", () => {
 		loading.value = false
 		error.value = null
 		loadedIdentity.value = null
+		stale.value = false
+		truncated.value = false
 		pendingRequest = null
+		pendingIdentity = null
+		generation += 1
 	}
 
 	return {
@@ -153,7 +188,9 @@ export const useEntriesStore = defineStore("Entries", () => {
 		isInitialized,
 		loading,
 		error,
+		truncated,
 		fetchAllAnimes,
+		invalidate,
 		getAllAnimes,
 		getNextAiringAnimesEpisodes,
 		getAnimesByStatus,

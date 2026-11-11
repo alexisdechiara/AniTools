@@ -15,19 +15,19 @@
       <div class="p-6 space-y-3">
         <div class="flex gap-x-6 justify-between">
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Count</span>
+            <span class="text-xs text-toned font-medium">Count</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis">{{
               count
             }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Mean Score</span>
+            <span class="text-xs text-toned font-medium">Mean score</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis"
-              >{{ meanScore }} %</span
+              >{{ meanScoreLabel ?? "—" }}</span
             >
           </div>
           <div class="flex flex-col">
-            <span class="text-xs capitalize text-toned font-medium">Watch Time</span>
+            <span class="text-xs text-toned font-medium">Watch time</span>
             <span class="text-xl font-semibold text-highlighted text-ellipsis">{{
               formatWatchTime(minutesWatched)
             }}</span>
@@ -51,8 +51,8 @@
           }"
         >
           <NuxtImg
-            :src="item.coverImage?.large || item.coverImage?.medium || ''"
-            :alt="item.title?.english || item.title?.romaji || ''"
+            :src="getMediaCover(item, 'medium') ?? ''"
+            :alt="getAnimeTitle(item)"
             class="h-24 rounded-sm object-cover"
           />
         </UCarousel>
@@ -63,8 +63,11 @@
 
 <script lang="ts" setup>
 import type { listType } from "./cards/ListCard.vue";
+import { getMediaCover } from "~/utils/media-display";
 
-const props = defineProps<listType>();
+const { title: getAnimeTitle } = useMediaTitle();
+
+const props = defineProps<listType & { meanScoreLabel?: string }>();
 
 const items = computed(() => {
   return props.entries

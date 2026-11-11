@@ -1,7 +1,8 @@
 export type FeatureAccessMode = "public" | "optional" | "oauth"
 export type FeatureIdentity = "anonymous" | "public-profile" | "oauth"
 export type FeatureStatus = "available" | "beta" | "planned"
-export type FeatureNavigationPlacement = "primary" | "child" | "hidden"
+export type FeatureNavigationPlacement = "primary" | "secondary" | "child" | "hidden"
+export type FeatureNavigationGroupId = "your-list" | "tools" | "app"
 
 export interface FeatureAccessPolicy {
 	readonly mode: FeatureAccessMode
@@ -38,7 +39,10 @@ export const FEATURE_IDS = [
 	"calendar",
 	"create",
 	"explore",
+	"podium",
 	"timeline",
+	"settings",
+	"support",
 	"login"
 ] as const
 
@@ -53,6 +57,42 @@ export interface FeatureDefinition {
 	readonly status: FeatureStatus
 	readonly navigation: FeatureNavigationPlacement
 	readonly parent?: FeatureId
+}
+
+export interface FeatureNavigationGroup {
+	readonly id: FeatureNavigationGroupId
+	readonly label: string
+	readonly features: readonly FeatureId[]
+}
+
+/**
+ * Sidebar order. "Your list" needs an AniList profile, "Tools" work without one and the last
+ * group holds the pages about the app itself.
+ */
+export const FEATURE_NAVIGATION_GROUPS: readonly FeatureNavigationGroup[] = [
+	{
+		id: "your-list",
+		label: "Your list",
+		features: ["dashboard", "statistics", "rewind", "timeline", "podium", "explore"]
+	},
+	{
+		id: "tools",
+		label: "Tools",
+		features: ["calendar", "tierlist", "create"]
+	},
+	{
+		id: "app",
+		label: "AniTools",
+		features: ["settings", "support"]
+	}
+]
+
+/** Document title for a feature page: child pages carry their parent, e.g. "Genres · Statistics". */
+export function getFeaturePageTitle(featureId: FeatureId): string {
+	const feature = FEATURE_REGISTRY[featureId]
+	return feature.parent
+		? `${feature.label} · ${FEATURE_REGISTRY[feature.parent].label}`
+		: feature.label
 }
 
 export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = {
@@ -144,7 +184,7 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		navigation: "primary"
 	},
 	tierlist: {
-		label: "Tierlist",
+		label: "Tier list",
 		icon: "i-lucide-rows-3",
 		path: "/tierlist",
 		access: FEATURE_ACCESS.optional,
@@ -179,6 +219,15 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		status: "beta",
 		navigation: "primary"
 	},
+	podium: {
+		label: "Podium",
+		icon: "i-lucide-trophy",
+		path: "/podium",
+		access: FEATURE_ACCESS.oauthWithPublicProfile,
+		indexable: false,
+		status: "beta",
+		navigation: "primary"
+	},
 	timeline: {
 		label: "Timeline",
 		icon: "i-lucide-chart-no-axes-gantt",
@@ -187,6 +236,24 @@ export const FEATURE_REGISTRY: Readonly<Record<FeatureId, FeatureDefinition>> = 
 		indexable: false,
 		status: "beta",
 		navigation: "primary"
+	},
+	settings: {
+		label: "Settings",
+		icon: "i-lucide-settings",
+		path: "/settings",
+		access: FEATURE_ACCESS.public,
+		indexable: false,
+		status: "available",
+		navigation: "secondary"
+	},
+	support: {
+		label: "Support",
+		icon: "i-lucide-circle-help",
+		path: "/support",
+		access: FEATURE_ACCESS.public,
+		indexable: true,
+		status: "available",
+		navigation: "secondary"
 	},
 	login: {
 		label: "Sign in",
@@ -227,4 +294,50 @@ export function resolveFeaturePath(
 
 		return encodeURIComponent(String(value))
 	})
+}
+
+/** True when a guest is sent to the login page instead of the feature. */
+export function featureNeedsProfile(featureId: FeatureId): boolean {
+	return !canAccessFeature(FEATURE_REGISTRY[featureId].access, "anonymous")
+}
+
+function matchesFeaturePath(pattern: string, pathname: string): boolean {
+	const patternSegments = pattern.split("/")
+	const pathSegments = pathname.split("/")
+
+	return patternSegments.length === pathSegments.length
+		&& patternSegments.every((segment, index) => {
+			const candidate = pathSegments[index] ?? ""
+			return segment.startsWith(":") ? candidate !== "" : segment === candidate
+		})
+}
+
+/**
+ * Finds the top-level feature an internal path belongs to, ignoring its query and hash:
+ * "/statistics/genres?sort=count" is Statistics. Unknown paths and the login page return null.
+ */
+export function findFeatureByPath(path: string): FeatureId | null {
+	const pathname = (path.split(/[?#]/)[0] ?? "").replace(/(?!^)\/+$/, "")
+	if (!pathname.startsWith("/")) return null
+
+	const match = FEATURE_IDS.find(featureId =>
+		FEATURE_REGISTRY[featureId].navigation !== "hidden"
+		&& FEATURE_REGISTRY[featureId].navigation !== "child"
+		&& matchesFeaturePath(FEATURE_REGISTRY[featureId].path, pathname)
+	) ?? FEATURE_IDS.find(featureId =>
+		FEATURE_REGISTRY[featureId].navigation === "child"
+		&& matchesFeaturePath(FEATURE_REGISTRY[featureId].path, pathname)
+	)
+	if (!match) return null
+
+	return FEATURE_REGISTRY[match].parent ?? match
+}
+
+/**
+ * The year a bare "Rewind" link opens: a recap of the running year is mostly empty until it
+ * ends, so the last completed year is shown until December.
+ */
+export function getDefaultRewindYear(now: Date): number {
+	const year = now.getUTCFullYear()
+	return now.getUTCMonth() === 11 ? year : year - 1
 }

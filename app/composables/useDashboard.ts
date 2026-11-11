@@ -1,4 +1,5 @@
 import { createSharedComposable } from "@vueuse/core"
+import { getDefaultRewindYear } from "#shared/config/features"
 
 const _useDashboard = () => {
 	const router = useRouter()
@@ -8,7 +9,7 @@ const _useDashboard = () => {
 		"g-c": () => router.push("/calendar"),
 		"g-s": () => router.push("/statistics"),
 		"g-t": () => router.push("/tierlist"),
-		"g-r": () => router.push(`/rewind/${new Date().getFullYear()}`)
+		"g-r": () => router.push(`/rewind/${getDefaultRewindYear(new Date())}`)
 	})
 }
 

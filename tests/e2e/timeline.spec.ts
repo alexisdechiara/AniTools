@@ -83,8 +83,12 @@ test("the Gantt timeline stacks simultaneous anime inside a scrollable period", 
 
 	await page.goto("/login?redirect=/timeline")
 	await page.getByLabel("AniList username").fill(username)
-	await page.getByRole("button", { name: "Load public AniList profile" }).click()
-	await expect(page).toHaveURL(/\/timeline$/)
+	await page.getByRole("button", { name: "View profile" }).click()
+	await page.waitForURL(url => url.pathname === "/timeline")
+	// The public username is mirrored in a cookie so a reload can restore it during SSR.
+	const profileCookie = (await page.context().cookies())
+		.find(cookie => cookie.name === "anitools-public-profile")
+	expect(profileCookie?.value).toBe(username)
 	await expect(page.locator('[data-timeline-month="month-2026-08"]')).toBeVisible()
 	await expect(page.locator("[data-timeline-activity]")).toHaveCount(8)
 

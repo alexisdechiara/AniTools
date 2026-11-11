@@ -26,39 +26,41 @@ export interface RateLimitResult {
 
 const MAX_BUCKETS = 5_000
 const buckets = new Map<string, RateLimitBucket>()
+const upstreamBudgets = new Map<string, RateLimitBucket>()
 
-function removeExpiredBuckets(now: number) {
-	for (const [key, bucket] of buckets) {
+function removeExpiredBuckets(now: number, store: Map<string, RateLimitBucket>) {
+	for (const [key, bucket] of store) {
 		if (bucket.resetAt <= now) {
-			buckets.delete(key)
+			store.delete(key)
 		}
 	}
 
-	while (buckets.size > MAX_BUCKETS) {
-		const oldestKey = buckets.keys().next().value
+	while (store.size > MAX_BUCKETS) {
+		const oldestKey = store.keys().next().value
 		if (typeof oldestKey !== "string") break
-		buckets.delete(oldestKey)
+		store.delete(oldestKey)
 	}
 }
 
 export function checkRateLimit(
 	key: string,
 	options: RateLimitOptions,
-	now = Date.now()
+	now = Date.now(),
+	store: Map<string, RateLimitBucket> = buckets
 ): RateLimitResult {
-	if (buckets.size >= MAX_BUCKETS) {
-		removeExpiredBuckets(now)
+	if (store.size >= MAX_BUCKETS) {
+		removeExpiredBuckets(now, store)
 	}
 
 	const bucketKey = `${options.namespace}:${key}`
-	const current = buckets.get(bucketKey)
+	const current = store.get(bucketKey)
 	const bucket = !current || current.resetAt <= now
 		? { count: 0, resetAt: now + options.windowMs }
 		: current
 
 	bucket.count += 1
-	buckets.delete(bucketKey)
-	buckets.set(bucketKey, bucket)
+	store.delete(bucketKey)
+	store.set(bucketKey, bucket)
 
 	const allowed = bucket.count <= options.limit
 	const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1_000))
@@ -70,6 +72,14 @@ export function checkRateLimit(
 		resetAt: bucket.resetAt,
 		retryAfter
 	}
+}
+
+/**
+ * The AniList budget lives apart from per-visitor buckets: a flood of client addresses must
+ * never be able to evict it. Its keys are one per signed-in user plus "public".
+ */
+export function checkUpstreamBudget(key: string, options: RateLimitOptions, now = Date.now()) {
+	return checkRateLimit(key, options, now, upstreamBudgets)
 }
 
 export function enforceRateLimit(event: H3Event, options: RateLimitOptions) {
@@ -93,4 +103,5 @@ export function enforceRateLimit(event: H3Event, options: RateLimitOptions) {
 
 export function resetRateLimitBuckets() {
 	buckets.clear()
+	upstreamBudgets.clear()
 }

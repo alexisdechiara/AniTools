@@ -181,6 +181,44 @@ export interface AniListMediaSummary {
 	} | null
 }
 
+/** Fields only a details view renders; list queries do not select them. The description is
+ * not one of them: previews show it from list media. */
+export type AniListMediaDetailField =
+	| "idMal"
+	| "rankings"
+	| "externalLinks"
+	| "trailer"
+
+type AniListMediaTag = AniListMediaSummary["tags"][number]
+type AniListMediaTagFlag = "isAdult" | "isGeneralSpoiler" | "isMediaSpoiler"
+type AniListMediaRelationNode = NonNullable<
+	NonNullable<AniListMediaSummary["relations"]>["edges"][number]["node"]
+>
+
+/**
+ * Media as list, collection and airing-schedule responses carry it: the details-view fields,
+ * the tag flags and the relation titles and formats are absent (`undefined`, meaning "not
+ * fetched") until a details request fills them. A full `AniListMediaSummary` is assignable to it.
+ */
+export type AniListMediaListSummary =
+	Omit<AniListMediaSummary, AniListMediaDetailField | "tags" | "relations">
+	& Partial<Pick<AniListMediaSummary, AniListMediaDetailField>>
+	& {
+		tags: Array<
+			Omit<AniListMediaTag, AniListMediaTagFlag>
+			& Partial<Pick<AniListMediaTag, AniListMediaTagFlag>>
+		>
+		relations: {
+			edges: Array<{
+				relationType: string | null
+				node: (
+					Pick<AniListMediaRelationNode, "id">
+					& Partial<Omit<AniListMediaRelationNode, "id">>
+				) | null
+			}>
+		} | null
+	}
+
 export interface AniListAnimeListEntry {
 	id: number
 	status: AniListListStatus | null
@@ -191,7 +229,7 @@ export interface AniListAnimeListEntry {
 	updatedAt: number | null
 	startedAt: AniListFuzzyDate | null
 	completedAt: AniListFuzzyDate | null
-	media: AniListMediaSummary | null
+	media: AniListMediaListSummary | null
 }
 
 export interface AniListProfileResponse {
@@ -218,7 +256,7 @@ export interface AniListAiringSchedule {
 	airingAt: number
 	episode: number
 	timeUntilAiring: number | null
-	media: AniListMediaSummary | null
+	media: AniListMediaListSummary | null
 }
 
 export interface AniListAiringSchedulesPage {
@@ -230,6 +268,13 @@ export interface AniListAnimeListResponse {
 	source: AniListSource
 	pageInfo: AniListPageInfo
 	entries: AniListAnimeListEntry[]
+}
+
+export interface AniListAnimeCollectionResponse {
+	source: AniListSource
+	entries: AniListAnimeListEntry[]
+	/** True when the list is longer than the server's chunk ceiling. */
+	truncated: boolean
 }
 
 export interface AniListAnimeListIdsResponse {

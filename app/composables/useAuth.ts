@@ -4,6 +4,7 @@ export const useAuth = () => {
 	const entriesStore = useEntriesStore()
 	const userStore = useUserStore()
 	const statisticsStore = useStatisticsStore()
+	const calendarStore = useCalendarStore()
 
 	const route = useRoute()
 
@@ -22,6 +23,8 @@ export const useAuth = () => {
 			userStore.$reset()
 			entriesStore.$reset()
 			statisticsStore.$reset()
+			// The status filter reads the list that was just dropped: a guest must not keep it.
+			calendarStore.setStatuses([])
 		}
 
 		return navigateTo({

@@ -1,23 +1,32 @@
-import { describe, expect, it, vi } from "vitest"
+import { IncomingMessage, ServerResponse } from "node:http"
+import { Socket } from "node:net"
+import { createError, createEvent } from "h3"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
 	ANILIST_ALLOWED_OPERATIONS,
 	fetchAniListProfile,
 	getAniListActivitiesResponse,
+	getAniListAiringIds,
 	getAniListAiringSchedulesPage,
+	getAniListAnimeCollectionResponse,
 	getAniListAnimeListIdsResponse,
 	getAniListAnimeListResponse,
 	getAniListMediaByIds,
+	getAniListMediaByIdsBatch,
 	getAniListMediaResponse,
 	getAniListSearchResponse,
 	getAniListStatisticsResponse,
+	handleAniListRouteError,
 	parseAniListActivitiesQuery,
 	parseAniListAnimeListQuery,
 	parseAniListMediaQuery,
 	parseAniListProfileQuery,
 	parseAniListSaveMediaListEntryBody,
 	resolveAniListAccess,
-	saveAniListMediaListEntry
+	saveAniListMediaListEntry,
+	setAniListResponseCache
 } from "../../server/utils/anilist-client"
+import { hasMediaDetails } from "../../app/utils/media-details"
 
 const publicAccess = {
 	mode: "public" as const,
@@ -107,6 +116,26 @@ const media = {
 	relations: null
 }
 
+const MEDIA_DETAIL_FIELDS = ["idMal", "rankings", "externalLinks", "trailer"]
+
+// The slim shape list, collection and airing queries select: the description but no
+// details-view fields, no tag flags, relation nodes reduced to their id.
+const listMedia: Record<string, unknown> = {
+	...Object.fromEntries(Object.entries(media)
+		.filter(([field]) => !MEDIA_DETAIL_FIELDS.includes(field))),
+	tags: [{ id: 3, name: "Alchemy", category: "Theme-Fantasy", rank: 95 }],
+	relations: {
+		edges: [{ relationType: "PREQUEL", node: { id: 121 } }]
+	}
+}
+
+function expectListMediaFieldSet(query: string | undefined) {
+	expect(query).toContain("description")
+	for (const field of [...MEDIA_DETAIL_FIELDS, "isMediaSpoiler"]) {
+		expect(query).not.toContain(field)
+	}
+}
+
 function jsonResponse(
 	body: unknown,
 	status = 200,
@@ -140,7 +169,10 @@ describe("AniList endpoint query validation", () => {
 			"search",
 			"media",
 			"airing-schedules",
+			"airing-ids",
 			"media-by-ids",
+			"media-by-ids-batch",
+			"media-list-entry",
 			"save-media-list-entry"
 		])
 	})
@@ -280,6 +312,10 @@ describe("AniList allowlisted client", () => {
 			variables: Record<string, unknown>
 		}
 		expect(body.query).toContain("query AniToolsMedia")
+		// The details view keeps the full field set.
+		expect(body.query).toContain("description")
+		expect(body.query).toContain("externalLinks")
+		expect(body.query).toContain("isMediaSpoiler")
 		expect(body.variables).toEqual({ mediaId: 7 })
 		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
 	})
@@ -305,15 +341,23 @@ describe("AniList allowlisted client", () => {
 	})
 
 	it("adds an anime to planning through the fixed authenticated mutation", async () => {
-		const requester = fetchMock(async () => jsonResponse({
-			data: {
-				SaveMediaListEntry: {
-					id: 99,
-					mediaId: 7,
-					status: "PLANNING"
+		const requester = fetchMock(vi.fn()
+			.mockResolvedValueOnce(jsonResponse(
+				{
+					data: { MediaList: null },
+					errors: [{ message: "Not Found", status: 404 }]
+				},
+				404
+			))
+			.mockResolvedValueOnce(jsonResponse({
+				data: {
+					SaveMediaListEntry: {
+						id: 99,
+						mediaId: 7,
+						status: "PLANNING"
+					}
 				}
-			}
-		}))
+			})))
 
 		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
 			fetch: requester
@@ -321,17 +365,67 @@ describe("AniList allowlisted client", () => {
 			entry: { id: 99, mediaId: 7, status: "PLANNING" }
 		})
 
-		const [, request] = requester.mock.calls[0]!
-		const body = JSON.parse(String(request?.body)) as {
-			query: string
-			variables: Record<string, unknown>
-		}
-		expect(body.query).toContain("mutation AniToolsSaveMediaListEntry")
-		expect(body.query).toContain("status: PLANNING")
-		expect(body.variables).toEqual({ mediaId: 7 })
-		expect(new Headers(request?.headers).get("Authorization")).toBe(
-			"Bearer secret-access-token"
-		)
+		expect(requester).toHaveBeenCalledTimes(2)
+		const [lookupBody, mutationBody] = requester.mock.calls.map(([, request]) => {
+			expect(new Headers(request?.headers).get("Authorization")).toBe(
+				"Bearer secret-access-token"
+			)
+			return JSON.parse(String(request?.body)) as {
+				query: string
+				variables: Record<string, unknown>
+			}
+		})
+		expect(lookupBody?.query).toContain("query AniToolsMediaListEntry")
+		expect(lookupBody?.variables).toEqual({ userId: 42, mediaId: 7 })
+		expect(mutationBody?.query).toContain("mutation AniToolsSaveMediaListEntry")
+		expect(mutationBody?.query).toContain("status: PLANNING")
+		expect(mutationBody?.variables).toEqual({ mediaId: 7 })
+	})
+
+	it("also adds an anime when AniList answers the lookup with a null entry", async () => {
+		const requester = fetchMock(vi.fn()
+			.mockResolvedValueOnce(jsonResponse({ data: { MediaList: null } }))
+			.mockResolvedValueOnce(jsonResponse({
+				data: {
+					SaveMediaListEntry: { id: 99, mediaId: 7, status: "PLANNING" }
+				}
+			})))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).resolves.toEqual({
+			entry: { id: 99, mediaId: 7, status: "PLANNING" }
+		})
+		expect(requester).toHaveBeenCalledTimes(2)
+	})
+
+	it("refuses to overwrite an anime that is already in the list", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: { MediaList: { id: 5, status: "COMPLETED" } }
+		}))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 409,
+			data: { code: "ANILIST_ENTRY_EXISTS", status: "COMPLETED" }
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
+	})
+
+	it("does not treat a failed lookup as a missing entry", async () => {
+		const requester = fetchMock(async () => new Response("", {
+			status: 429,
+			headers: { "retry-after": "17" }
+		}))
+
+		await expect(saveAniListMediaListEntry(oauthAccess, { mediaId: 7 }, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 429,
+			data: { code: "ANILIST_RATE_LIMITED" }
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
 	})
 
 	it("rejects media-list mutations for public profiles", async () => {
@@ -348,7 +442,7 @@ describe("AniList allowlisted client", () => {
 						airingAt: 1_800_000_000,
 						episode: 12,
 						timeUntilAiring: 600,
-						media
+						media: listMedia
 					}]
 				}
 			}
@@ -367,10 +461,17 @@ describe("AniList allowlisted client", () => {
 				episode: 12,
 				media: {
 					id: 7,
-					genres: ["Action"]
+					genres: ["Action"],
+					tags: [{ id: 3, name: "Alchemy" }],
+					relations: { edges: [{ relationType: "PREQUEL", node: { id: 121 } }] }
 				}
 			}]
 		})
+		const airingMedia = result.airingSchedules[0]?.media
+		expect(airingMedia?.description).toBe(media.description)
+		expect(airingMedia && "trailer" in airingMedia).toBe(false)
+		expect(airingMedia && "rankings" in airingMedia).toBe(false)
+		expect(airingMedia && "externalLinks" in airingMedia).toBe(false)
 
 		const [, request] = requester.mock.calls[0]!
 		const body = JSON.parse(String(request?.body)) as {
@@ -378,10 +479,12 @@ describe("AniList allowlisted client", () => {
 			variables: Record<string, unknown>
 		}
 		expect(body.query).toContain("query AniToolsAiringSchedules")
+		expectListMediaFieldSet(body.query)
 		expect(body.variables).toEqual({
 			page: 2,
 			perPage: 50,
-			airingAtGreater: 1_799_000_000,
+			// AniList's bound is exclusive, so the inclusive range start is sent one second earlier.
+			airingAtGreater: 1_798_999_999,
 			airingAtLesser: 1_801_000_000
 		})
 		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
@@ -415,6 +518,148 @@ describe("AniList allowlisted client", () => {
 			mediaIds: [7, 8],
 			perPage: 2
 		})
+	})
+
+	function airingIdsResponse(
+		pages: Record<number, unknown[]>,
+		lastHasNextPage = false
+	) {
+		return {
+			data: Object.fromEntries(Array.from({ length: 32 }, (_, index) => [`p${index}`, {
+				pageInfo: { hasNextPage: index === 31 ? lastHasNextPage : Boolean(pages[index + 1]) },
+				airingSchedules: pages[index] ?? []
+			}]))
+		}
+	}
+
+	function airingRow(mediaId: number, airingAt: number) {
+		return { airingAt, episode: 1, timeUntilAiring: 600, mediaId }
+	}
+
+	it("loads airing ids of many pages in one fixed anonymous request", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({
+			0: [airingRow(1, 1_800_000_001), airingRow(2, 1_800_000_002)],
+			1: [airingRow(3, 1_800_000_003), null],
+			2: [airingRow(1, 1_800_000_004)]
+		})))
+
+		const result = await getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })
+
+		expect(result).toEqual({
+			airings: [
+				airingRow(1, 1_800_000_001),
+				airingRow(2, 1_800_000_002),
+				airingRow(3, 1_800_000_003),
+				airingRow(1, 1_800_000_004)
+			],
+			hasNextPage: false,
+			nextPage: 33
+		})
+		expect(requester).toHaveBeenCalledTimes(1)
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, unknown>
+		}
+		expect(body.query).toContain("query AniToolsAiringIds")
+		expect(body.query).toContain("mediaId")
+		expect(body.query).toContain("p0:")
+		expect(body.query).toContain("p31:")
+		expect(body.query).not.toContain("p32:")
+		expect(body.query).not.toContain("description")
+		expect(body.variables).toEqual({
+			// AniList's bound is exclusive, so the inclusive range start is sent one second earlier.
+			airingAtGreater: 1_798_999_999,
+			airingAtLesser: 1_801_000_000
+		})
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("reports the next airing-id page when the last page has more", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({
+			31: [airingRow(5, 1_800_000_010)]
+		}, true)))
+
+		const result = await getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })
+
+		expect(result.hasNextPage).toBe(true)
+		expect(result.nextPage).toBe(33)
+		expect(result.airings).toEqual([airingRow(5, 1_800_000_010)])
+	})
+
+	it("rejects an invalid airing-id range or first page before calling AniList", async () => {
+		const requester = fetchMock(async () => jsonResponse(airingIdsResponse({})))
+
+		await expect(getAniListAiringIds({
+			airingAtGreater: 1_801_000_000,
+			airingAtLesser: 1_801_000_000
+		}, { fetch: requester })).rejects.toMatchObject({ statusCode: 400 })
+		await expect(getAniListAiringIds({
+			airingAtGreater: 1_799_000_000,
+			airingAtLesser: 1_801_000_000,
+			firstPage: 0
+		}, { fetch: requester })).rejects.toMatchObject({ statusCode: 400 })
+		expect(requester).not.toHaveBeenCalled()
+	})
+
+	it("loads up to 200 media in one request with one alias per non-empty chunk", async () => {
+		const ids = Array.from({ length: 120 }, (_, index) => index + 1)
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				m0: { media: ids.slice(0, 50).map(id => ({ ...media, id })) },
+				m1: {
+					media: [
+						...ids.slice(50, 98).map(id => ({ ...media, id })),
+						{ ...media, id: 99, isAdult: true },
+						{ ...media, id: 100, type: "MANGA" }
+					]
+				},
+				m2: { media: [...ids.slice(100).map(id => ({ ...media, id })), null] }
+			}
+		}))
+
+		const result = await getAniListMediaByIdsBatch([...ids].reverse(), {
+			fetch: requester
+		})
+
+		expect(requester).toHaveBeenCalledTimes(1)
+		expect(result.map(item => item.id)).toEqual(ids.filter(id => id !== 99 && id !== 100))
+		expect(result[0]).toMatchObject({ genres: ["Action"], rankings: [], externalLinks: [] })
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			query: string
+			variables: Record<string, number[]>
+		}
+		expect(body.query).toContain("query AniToolsMediaByIdsBatch")
+		expect(body.query).toContain("m0:")
+		expect(body.query).toContain("m1:")
+		expect(body.query).toContain("m2:")
+		expect(body.query).not.toContain("m3:")
+		expect(body.query).toContain("externalLinks")
+		expect(Object.keys(body.variables)).toEqual(["ids0", "ids1", "ids2"])
+		expect(body.variables.ids0).toEqual(ids.slice(0, 50))
+		expect(body.variables.ids1).toEqual(ids.slice(50, 100))
+		expect(body.variables.ids2).toEqual(ids.slice(100))
+		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
+	})
+
+	it("never calls AniList for an empty media batch and rejects more than 200 ids", async () => {
+		const requester = fetchMock(async () => jsonResponse({ data: {} }))
+
+		await expect(getAniListMediaByIdsBatch([], { fetch: requester })).resolves.toEqual([])
+		await expect(getAniListMediaByIdsBatch(
+			Array.from({ length: 201 }, (_, index) => index + 1),
+			{ fetch: requester }
+		)).rejects.toMatchObject({ statusCode: 400 })
+		await expect(getAniListMediaByIdsBatch([0], { fetch: requester }))
+			.rejects.toMatchObject({ statusCode: 400 })
+		expect(requester).not.toHaveBeenCalled()
 	})
 
 	it("sends public usernames only as GraphQL variables", async () => {
@@ -496,6 +741,7 @@ describe("AniList allowlisted client", () => {
 			total: 11
 		})
 		expect(body.query).toContain("query AniToolsAnimeList")
+		expectListMediaFieldSet(body.query)
 		expect(body.variables).toMatchObject({
 			username: "Alexis",
 			page: 2,
@@ -541,6 +787,72 @@ describe("AniList allowlisted client", () => {
 			username: "Alexis",
 			perChunk: 500
 		})
+	})
+
+	it("loads the whole list in 500-entry chunks and keeps one row per entry", async () => {
+		const listEntry = (id: number, status: string) => ({
+			id,
+			status,
+			score: 80,
+			progress: 3,
+			repeat: 0,
+			priority: 0,
+			updatedAt: 1_800_000_000,
+			startedAt: { year: null, month: null, day: null },
+			completedAt: { year: null, month: null, day: null },
+			media: id === 1 ? listMedia : null
+		})
+		let requestIndex = 0
+		const requester = fetchMock(async () => {
+			requestIndex += 1
+			return jsonResponse({
+				data: {
+					MediaListCollection: {
+						hasNextChunk: requestIndex === 1,
+						lists: requestIndex === 1
+							// A custom list repeats entry 2 from its status list.
+							? [{ entries: [listEntry(1, "CURRENT"), listEntry(2, "COMPLETED")] }, { entries: [listEntry(2, "COMPLETED")] }]
+							: [{ entries: [listEntry(3, "PLANNING")] }]
+					}
+				}
+			})
+		})
+
+		const result = await getAniListAnimeCollectionResponse(publicAccess, { fetch: requester })
+		const requestBodies = requester.mock.calls.map(([, request]) =>
+			JSON.parse(String(request?.body)) as { query: string, variables: Record<string, unknown> }
+		)
+
+		expect(result.entries.map(entry => entry.id)).toEqual([1, 2, 3])
+		expect(result.truncated).toBe(false)
+		expect(result.source).toEqual({ mode: "public", username: "Alexis" })
+		expect(requestBodies).toHaveLength(2)
+		expect(requestBodies[0]?.query).toContain("query AniToolsAnimeCollection")
+		expectListMediaFieldSet(requestBodies[0]?.query)
+		expect(requestBodies.map(body => body.variables.chunk)).toEqual([1, 2])
+		// Absent details stay undefined, so hasMediaDetails reads them as "not fetched yet".
+		const collectionMedia = result.entries[0]?.media
+		expect(collectionMedia).toMatchObject({
+			id: 7,
+			genres: ["Action"],
+			relations: { edges: [{ relationType: "PREQUEL", node: { id: 121 } }] }
+		})
+		expect(collectionMedia?.description).toBe(media.description)
+		expect(collectionMedia?.rankings).toBeUndefined()
+		expect(collectionMedia?.externalLinks).toBeUndefined()
+		expect(collectionMedia?.trailer).toBeUndefined()
+		expect(hasMediaDetails(collectionMedia)).toBe(false)
+		expect(collectionMedia?.tags).toEqual([
+			{ id: 3, name: "Alchemy", category: "Theme-Fantasy", rank: 95 }
+		])
+		expect(requestBodies[0]?.variables).toMatchObject({ username: "Alexis", perChunk: 500 })
+	})
+
+	it("reports an unknown user while loading the full list", async () => {
+		const requester = fetchMock(async () => jsonResponse({ data: { MediaListCollection: null } }))
+
+		await expect(getAniListAnimeCollectionResponse(publicAccess, { fetch: requester }))
+			.rejects.toMatchObject({ statusCode: 404 })
 	})
 
 	it("normalizes the fixed statistics response into bounded arrays", async () => {
@@ -806,6 +1118,25 @@ describe("AniList allowlisted client", () => {
 		})
 	})
 
+	it("maps an HTTP 404 carrying a GraphQL error envelope to the same 404", async () => {
+		const requester = fetchMock(async () => jsonResponse(
+			{
+				data: { User: null },
+				errors: [{ message: "Not Found", status: 404 }]
+			},
+			404
+		))
+
+		await expect(fetchAniListProfile(publicAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 404,
+			data: {
+				code: "ANILIST_USER_NOT_FOUND"
+			}
+		})
+	})
+
 	it("aborts slow upstream requests and reports a timeout", async () => {
 		const requester = fetchMock((_url, request) => new Promise((_resolve, reject) => {
 			request?.signal?.addEventListener("abort", () => {
@@ -842,5 +1173,138 @@ describe("AniList allowlisted client", () => {
 				code: "ANILIST_INVALID_DATA"
 			}
 		})
+	})
+})
+
+function createTestEvent() {
+	const request = new IncomingMessage(new Socket())
+	const response = new ServerResponse(request)
+	return { event: createEvent(request, response), response }
+}
+
+describe("AniList upstream error paths", () => {
+	afterEach(() => {
+		vi.useRealTimers()
+		vi.unstubAllGlobals()
+	})
+
+	it("keeps the meaning of a non-JSON 429 from AniList's edge", async () => {
+		const requester = fetchMock(async () => new Response("<html>slow down</html>", {
+			status: 429,
+			headers: { "retry-after": "17" }
+		}))
+
+		await expect(fetchAniListProfile(publicAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 429,
+			data: {
+				code: "ANILIST_RATE_LIMITED",
+				retryAfter: 17
+			}
+		})
+	})
+
+	it("maps an empty 401 to an unauthorized error", async () => {
+		const requester = fetchMock(async () => new Response("", { status: 401 }))
+
+		await expect(fetchAniListProfile(oauthAccess, {
+			fetch: requester
+		})).rejects.toMatchObject({
+			statusCode: 401,
+			data: {
+				code: "ANILIST_UNAUTHORIZED"
+			}
+		})
+	})
+
+	it("keeps the timeout armed while a stalled body is read", async () => {
+		const requester = fetchMock(async (_url, request) => ({
+			status: 200,
+			ok: true,
+			headers: new Headers(),
+			json: () => new Promise((_resolve, reject) => {
+				request?.signal?.addEventListener("abort", () => {
+					reject(new DOMException("Aborted", "AbortError"))
+				})
+			})
+		}) as unknown as Response)
+
+		await expect(fetchAniListProfile(oauthAccess, {
+			fetch: requester,
+			timeoutMs: 20
+		})).rejects.toMatchObject({
+			statusCode: 504,
+			data: {
+				code: "ANILIST_TIMEOUT"
+			}
+		})
+	})
+
+	it("reads the clock when the activities year bound is checked", () => {
+		vi.useFakeTimers()
+		vi.setSystemTime(new Date("2027-01-02T00:00:00Z"))
+
+		expect(parseAniListActivitiesQuery({ year: "2027" })).toMatchObject({ year: 2027 })
+		expect(() => parseAniListActivitiesQuery({ year: "2028" })).toThrow()
+	})
+
+	it("sends an inclusive airing range start to AniList", async () => {
+		const requester = fetchMock(async () => jsonResponse({
+			data: {
+				Page: {
+					pageInfo: { hasNextPage: false },
+					airingSchedules: []
+				}
+			}
+		}))
+
+		await getAniListAiringSchedulesPage({
+			page: 1,
+			perPage: 50,
+			airingAtGreater: 1000,
+			airingAtLesser: 2000
+		}, { fetch: requester })
+
+		const [, request] = requester.mock.calls[0]!
+		const body = JSON.parse(String(request?.body)) as {
+			variables: Record<string, unknown>
+		}
+		expect(body.variables.airingAtGreater).toBe(999)
+		expect(body.variables.airingAtLesser).toBe(2000)
+	})
+
+	it("drops the public cache header and forwards Retry-After on a route error", async () => {
+		const { event, response } = createTestEvent()
+		setAniListResponseCache(event, "public", 300)
+		const error429 = createError({
+			statusCode: 429,
+			statusMessage: "AniList rate limit reached",
+			data: { code: "ANILIST_RATE_LIMITED", retryAfter: 17 }
+		})
+
+		await handleAniListRouteError(event, error429)
+
+		expect(response.getHeader("cache-control")).toBe("private, no-store")
+		expect(response.getHeader("retry-after")).toBe(17)
+	})
+
+	it("clears the session only when AniList rejects an OAuth token", async () => {
+		const deleteCookieMock = vi.fn()
+		vi.stubGlobal("deleteCookie", deleteCookieMock)
+		vi.stubGlobal("getRequestURL", vi.fn(() => new URL("https://anitools.example/api/anilist/profile")))
+		const unauthorized = createError({
+			statusCode: 401,
+			statusMessage: "AniList authorization is no longer valid",
+			data: { code: "ANILIST_UNAUTHORIZED" }
+		})
+
+		await handleAniListRouteError(createTestEvent().event, unauthorized, publicAccess)
+		expect(deleteCookieMock).not.toHaveBeenCalled()
+
+		const { event, response } = createTestEvent()
+		await handleAniListRouteError(event, unauthorized, oauthAccess)
+		expect(deleteCookieMock).toHaveBeenCalled()
+		expect(response.getHeader("cache-control")).toBe("private, no-store")
 	})
 })

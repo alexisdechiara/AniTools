@@ -1,7 +1,8 @@
 import { createError } from "h3"
 import * as z from "zod"
 
-const MAX_CALENDAR_RANGE_SECONDS = 42 * 24 * 60 * 60
+// The month view spans six full weeks; a daylight-saving change inside them adds one hour.
+const MAX_CALENDAR_RANGE_SECONDS = 42 * 24 * 60 * 60 + 60 * 60
 const MAX_SEARCH_LENGTH = 100
 const GRAPHQL_INT_MAX = 2_147_483_647
 
@@ -10,7 +11,7 @@ const calendarQuerySchema = z.object({
 	airingAtLesser: z.coerce.number().int().nonnegative().max(GRAPHQL_INT_MAX),
 	rangeStart: z.string().datetime({ offset: true }),
 	rangeEnd: z.string().datetime({ offset: true })
-}).superRefine((query, context) => {
+}).strict().superRefine((query, context) => {
 	if (query.airingAtLesser <= query.airingAtGreater) {
 		context.addIssue({
 			code: "custom",
@@ -85,7 +86,7 @@ const calendarQuerySchema = z.object({
 
 const searchQuerySchema = z.object({
 	q: z.string().trim().max(MAX_SEARCH_LENGTH).optional().default("")
-})
+}).strict()
 
 function invalidQuery(message: string) {
 	return createError({

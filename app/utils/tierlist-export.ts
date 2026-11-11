@@ -4,9 +4,11 @@ import type {
 	TierlistSnapshot,
 	TierlistTier
 } from "~/types/tierlist"
+import { getMediaCover } from "~/utils/media-display"
 import {
 	createTierlistExportDocument,
-	getTierlistEntryTitle
+	getTierlistEntryTitle,
+	TIER_COLOR_HEX_BY_CLASS
 } from "~/utils/tierlist-model"
 
 export type TierlistImageFormat = "png" | "jpeg" | "webp"
@@ -47,44 +49,17 @@ const CARD_GAP = 8
 const LANE_PADDING = 12
 const LANE_GAP = 12
 
-const colorMap: Record<string, string> = {
-	"bg-transparent": "transparent",
-	"bg-white": "#ffffff",
-	"bg-black": "#000000",
-	"bg-neutral-50": "#fafafa",
-	"bg-neutral-100": "#f5f5f5",
-	"bg-neutral-200": "#e5e5e5",
-	"bg-neutral-300": "#d4d4d4",
-	"bg-neutral-400": "#a3a3a3",
-	"bg-neutral-500": "#737373",
-	"bg-neutral-600": "#525252",
-	"bg-neutral-700": "#404040",
-	"bg-neutral-800": "#262626",
-	"bg-neutral-900": "#171717",
-	"bg-neutral-950": "#0a0a0a",
-	"bg-red-400": "#f87171",
-	"bg-orange-400": "#fb923c",
-	"bg-yellow-400": "#facc15",
-	"bg-green-500": "#22c55e",
-	"bg-blue-400": "#60a5fa",
-	"bg-indigo-400": "#818cf8",
-	"bg-violet-500": "#8b5cf6"
-}
-
 function clampColumns(columns: number): number {
 	return Math.min(12, Math.max(1, Math.round(columns)))
 }
 
 function resolveCanvasColor(value: string, fallback: string): string {
 	if (/^#[0-9a-f]{3,8}$/i.test(value)) return value
-	return colorMap[value] ?? fallback
+	return TIER_COLOR_HEX_BY_CLASS[value] ?? fallback
 }
 
 function getCoverUrl(entry: TierlistEntry): string | null {
-	return entry.media.coverImage?.extraLarge
-		?? entry.media.coverImage?.large
-		?? entry.media.coverImage?.medium
-		?? null
+	return getMediaCover(entry.media)
 }
 
 function roundRect(

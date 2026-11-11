@@ -9,7 +9,7 @@
 					:delay="0">
 					<button
 						type="button"
-						class="flex size-6 w-full cursor-pointer items-center justify-center transition-all first:rounded-l-xs last:rounded-r-full hover:scale-110 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-primary"
+						class="flex size-6 w-full cursor-pointer items-center justify-center transition-[scale,box-shadow] first:rounded-l-xs last:rounded-r-full hover:scale-110 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-primary"
 						:class="[bg, selectedBackground === bg ? 'z-50 ring-2 ring-primary ring-offset-2' : '']"
 						:aria-label="`Use ${bg.replace('bg-', '').replace('-', ' ')} background`"
 						:aria-pressed="selectedBackground === bg"

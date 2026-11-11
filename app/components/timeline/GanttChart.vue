@@ -14,6 +14,7 @@ import "vue-timeline-chart/style.css"
 import type { AniListActivity } from "~~/shared/types/anilist"
 import {
 	buildTimelineGanttChartData,
+	type TimelineGanttItem,
 	type TimelineGanttRow,
 	type TimelineGanttSection,
 	TIMELINE_GANTT_STACKING
@@ -78,19 +79,22 @@ const chartItems = computed(() => chartData.value.items.map((item) => {
 		}
 	}
 }))
-const timestampFormatters: Partial<Record<TimelineBaseUnits, Intl.DateTimeFormat>> = {
-	years: new Intl.DateTimeFormat(undefined, { year: "numeric" }),
-	months: new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" }),
-	weeks: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }),
-	days: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }),
-	hours: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" })
-}
+const { activeDisplay, createFormatter } = useTimeDisplay()
+// Computed, not built once: the axis follows the time zone and clock chosen in Settings.
+const timestampFormatters = computed<Partial<Record<TimelineBaseUnits, Intl.DateTimeFormat>>>(() => ({
+	years: createFormatter({ year: "numeric" }),
+	months: createFormatter({ month: "short", year: "numeric" }),
+	weeks: createFormatter({ day: "numeric", month: "short" }),
+	days: createFormatter({ day: "numeric", month: "short" }),
+	hours: createFormatter(clockTimeOptions(activeDisplay.value))
+}))
 function renderTimestampLabel(
 	timestamp: number,
 	scale: { unit: string, step: number }
 ): string {
-	const formatter = timestampFormatters[scale.unit as TimelineBaseUnits]
-	return (formatter ?? timestampFormatters.days)!.format(new Date(-timestamp))
+	const formatters = timestampFormatters.value
+	const formatter = formatters[scale.unit as TimelineBaseUnits]
+	return (formatter ?? formatters.days)!.format(new Date(-timestamp))
 }
 
 function handleViewportChange(nextViewport: { start: number, end: number }): void {
@@ -107,6 +111,14 @@ function groupIcon(section: TimelineGanttSection): string {
 	return "i-lucide-message-square-text"
 }
 
+// Each lane of the chart holds one kind of activity; its label says what is counted in it.
+function groupCountLabel(section: TimelineGanttSection, count: number): string {
+	const one = count === 1
+	if (section === "movies" || section === "series") return `${count} ${one ? "title" : "titles"}`
+	if (section === "text") return `${count} ${one ? "post" : "posts"}`
+	return `${count} ${one ? "message" : "messages"}`
+}
+
 function detailData(row: TimelineGanttRow) {
 	return { media: row.media, score: null }
 }
@@ -120,6 +132,15 @@ function episodeActivities(row: TimelineGanttRow) {
 function episodeLabel(activity: AniListActivity): string {
 	if (activity.kind !== "anime" || !activity.progress?.trim()) return "Anime update"
 	return `Episode ${activity.progress.trim()}`
+}
+
+function itemTitle(item: TimelineGanttItem): string | undefined {
+	return "title" in item ? item.title : undefined
+}
+
+function latestEpisode(row: TimelineGanttRow): string {
+	const latest = row.activities.at(-1)
+	return latest?.kind === "anime" ? latest.progress ?? "" : ""
 }
 
 function episodeMarkerStyle(activity: AniListActivity, row: TimelineGanttRow) {
@@ -147,6 +168,10 @@ watch(initialDuration, duration => {
 				Newest on the left · older activity to the right
 			</p>
 			<p class="flex items-center gap-1.5">
+				<UIcon name="i-lucide-rows-3" class="size-4" />
+				One row per kind of activity
+			</p>
+			<p class="flex items-center gap-1.5">
 				<UIcon name="i-lucide-move-horizontal" class="size-4" />
 				Scroll to explore · pinch or wheel to zoom
 			</p>
@@ -159,7 +184,7 @@ watch(initialDuration, duration => {
 			<ScrollAreaViewport
 				class="size-full focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
 				aria-label="Scrollable timeline period">
-				<div class="min-w-320 py-3 pr-5 pb-5">
+				<div class="min-w-320 py-3 pr-5 pb-5 xl:min-w-[130vw]">
 					<Timeline
 						class="min-h-96"
 						data-gantt-timeline-chart
@@ -187,8 +212,8 @@ watch(initialDuration, duration => {
 									<span class="block truncate text-xs font-semibold text-highlighted">
 										{{ group.label }}
 									</span>
-									<span class="block text-[10px] text-muted">
-										{{ group.count }} {{ group.count === 1 ? "item" : "items" }}
+									<span class="block text-[11px] text-muted">
+										{{ groupCountLabel(group.section, group.count) }}
 									</span>
 								</span>
 							</div>
@@ -268,14 +293,14 @@ watch(initialDuration, duration => {
 									class="absolute inset-[18%] flex rotate-45 items-center justify-center rounded-[3px] border border-black/20 text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
 									:style="{ backgroundColor: item.row.color || 'var(--ui-primary)' }"
 									:aria-label="`Open details for ${item.row.label}, ${episodeLabel(item.row.activities.at(-1)!)}`"
-									:title="item.title">
+									:title="itemTitle(item)">
 									<span class="-rotate-45 text-[8px] font-bold">
-										{{ item.row.activities.at(-1)?.kind === 'anime' ? item.row.activities.at(-1)?.progress : '' }}
+										{{ latestEpisode(item.row) }}
 									</span>
 								</button>
 							</AnimeDetailsPopover>
 
-							<UTooltip v-else :text="item.title">
+							<UTooltip v-else :text="itemTitle(item)">
 								<div class="absolute inset-0 flex items-center justify-center rounded-full bg-primary text-white">
 									<UIcon :name="groupIcon(item.row.section)" class="size-4" />
 								</div>

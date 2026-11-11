@@ -6,7 +6,7 @@ import type {
 } from "~~/shared/types/anilist"
 import ExploreInterestedDeck from "~/components/explore/InterestedDeck.vue"
 import ExploreSwipeDeck from "~/components/explore/SwipeDeck.vue"
-import { getExploreTitle } from "~/utils/explore"
+import type { ExplorePickMedia } from "~/utils/explore-picks"
 
 definePageMeta({
 	feature: "explore",
@@ -27,6 +27,7 @@ interface SwipeDecision {
 }
 
 const userStore = useUserStore()
+const { title: getAnimeTitle } = useMediaTitle()
 const toast = useToast()
 const {
 	existingMediaIds,
@@ -51,8 +52,13 @@ const {
 	loadStudio
 } = useExplore()
 
-const decidedMediaIds = ref<Set<number>>(new Set())
-const interestedMedia = ref<AniListMediaSummary[]>([])
+// Picks and passes are saved per profile on this device. The undo history stays in memory.
+const picksStore = useExplorePicksStore()
+const {
+	decidedIds: decidedMediaIds,
+	interested: interestedMedia,
+	passed: passedMediaIds
+} = storeToRefs(picksStore)
 const decisionHistory = ref<SwipeDecision[]>([])
 const addedMediaIds = ref<Set<number>>(new Set())
 const addingMediaIds = ref<Set<number>>(new Set())
@@ -91,7 +97,7 @@ const currentReason = computed(() => {
 	if (!currentMedia.value) return "Recommended for you"
 	if (recommendationIds.value.has(currentMedia.value.id)) {
 		return selectedSeed.value
-			? `Because you liked ${getExploreTitle(selectedSeed.value.media)}`
+			? `Because you liked ${getAnimeTitle(selectedSeed.value.media)}`
 			: "Recommended for you"
 	}
 	return selectedStudio.value
@@ -133,29 +139,25 @@ async function loadMoreCandidates(): Promise<void> {
 }
 
 function handleDecision(payload: SwipeDecision): void {
-	decidedMediaIds.value = new Set([...decidedMediaIds.value, payload.media.id])
 	decisionHistory.value = [...decisionHistory.value, payload]
 
-	if (payload.direction === "right") {
-		interestedMedia.value = [
-			...interestedMedia.value.filter(media => media.id !== payload.media.id),
-			payload.media
-		]
-	}
+	if (payload.direction === "right") picksStore.pick(payload.media)
+	else picksStore.pass(payload.media.id)
 
 	if (swipeQueue.value.length <= 5 && hasMorePages.value) {
 		void loadMoreCandidates()
 	}
 }
 
-function restoreDecision(media: AniListMediaSummary): void {
-	const nextDecidedIds = new Set(decidedMediaIds.value)
-	nextDecidedIds.delete(media.id)
-	decidedMediaIds.value = nextDecidedIds
-	interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+function forgetDecisionHistory(mediaId: number): void {
 	decisionHistory.value = decisionHistory.value.filter(
-		decision => decision.media.id !== media.id
+		decision => decision.media.id !== mediaId
 	)
+}
+
+function restoreDecision(media: ExplorePickMedia): void {
+	picksStore.restore(media.id)
+	forgetDecisionHistory(media.id)
 }
 
 function undoLastDecision(): void {
@@ -163,24 +165,22 @@ function undoLastDecision(): void {
 	if (!previous) return
 
 	decisionHistory.value = decisionHistory.value.slice(0, -1)
-	const nextDecidedIds = new Set(decidedMediaIds.value)
-	nextDecidedIds.delete(previous.media.id)
-	decidedMediaIds.value = nextDecidedIds
-	if (previous.direction === "right") {
-		interestedMedia.value = interestedMedia.value.filter(
-			media => media.id !== previous.media.id
-		)
-	}
+	picksStore.restore(previous.media.id)
 }
 
+// "Start over" brings the passed titles back. Saved picks only go through "Clear picks".
 function resetDecisions(): void {
-	decidedMediaIds.value = new Set()
-	interestedMedia.value = []
+	picksStore.clearPassed()
+	decisionHistory.value = decisionHistory.value.filter(decision => decision.direction === "right")
+}
+
+function clearPicks(): void {
+	picksStore.clear()
 	decisionHistory.value = []
 }
 
 async function saveToPlanning(
-	media: AniListMediaSummary,
+	media: ExplorePickMedia,
 	notify = true
 ): Promise<boolean> {
 	if (!userStore.isOAuthAuthenticated || addingMediaIds.value.has(media.id)) return false
@@ -192,12 +192,17 @@ async function saveToPlanning(
 			body: { mediaId: media.id }
 		})
 		addedMediaIds.value = new Set([...addedMediaIds.value, media.id])
-		interestedMedia.value = interestedMedia.value.filter(item => item.id !== media.id)
+		// The title is now excluded through the list, so it is no longer a pending pick.
+		picksStore.restore(media.id)
+		forgetDecisionHistory(media.id)
+		// The list changed on AniList: other pages must refetch instead of trusting their copy.
+		useEntriesStore().invalidate()
+		useStatisticsStore().invalidate()
 		if (notify) {
 			toast.add({
 				title: "Added to Plan to Watch",
-				description: `${getExploreTitle(media)} is now in your AniList planning list.`,
-				color: "warning",
+				description: `${getAnimeTitle(media)} is now in your AniList planning list.`,
+				color: "success",
 				icon: "i-lucide-bookmark-check"
 			})
 		}
@@ -206,7 +211,7 @@ async function saveToPlanning(
 		if (notify) {
 			toast.add({
 				title: "Could not update AniList",
-				description: error instanceof Error ? error.message : "Try again in a moment.",
+				description: getApiErrorMessage(error, "Try again in a moment."),
 				color: "error",
 				icon: "i-lucide-triangle-alert"
 			})
@@ -219,7 +224,7 @@ async function saveToPlanning(
 	}
 }
 
-async function addToPlanning(media: AniListMediaSummary): Promise<void> {
+async function addToPlanning(media: ExplorePickMedia): Promise<void> {
 	await saveToPlanning(media)
 }
 
@@ -249,15 +254,26 @@ async function addAllToPlanning(): Promise<void> {
 	}
 }
 
-onMounted(() => {
-	void initialize()
+onMounted(async () => {
+	// Read the saved picks first: the identity is known here and nothing is written before.
+	picksStore.load()
+	await initialize()
+	// A title added on anilist.co since the last visit is no longer a pick. A failed or
+	// truncated list leaves `existingMediaIds` empty, so nothing is dropped by mistake.
+	picksStore.removeListed(existingMediaIds.value)
 })
 </script>
 
 <template>
 	<UDashboardPanel id="explore" :ui="{ body: 'pt-3 sm:pt-4' }">
 		<template #body>
-			<div class="mx-auto w-full max-w-304 space-y-4">
+			<!-- On phones the deck's action bar is fixed to the viewport: keep the page end clear of it. -->
+			<div class="mx-auto w-full max-w-304 space-y-4" :class="currentMedia ? 'pb-20 sm:pb-0' : ''">
+				<PageHeader
+					eyebrow="Discover"
+					title="Explore"
+					description="Suggestions from the anime you rated highest and the studios you love. Swipe, or use the buttons and arrow keys." />
+
 				<UAlert
 					v-if="!showPageLoader && listError"
 					icon="i-lucide-triangle-alert"
@@ -287,7 +303,7 @@ onMounted(() => {
 				<div
 					v-else-if="seeds.length"
 					class="mx-auto grid w-full items-start justify-center gap-5 lg:grid-cols-[minmax(0,52rem)_22rem]">
-					<main class="w-full min-w-0 self-start justify-self-center">
+					<section aria-label="Suggestion deck" class="w-full min-w-0 self-start justify-self-center">
 						<ExploreSwipeDeck
 							v-if="currentMedia"
 							:media="currentMedia"
@@ -322,17 +338,19 @@ onMounted(() => {
 									onClick: resetDecisions
 								}
 							]" />
-					</main>
+					</section>
 
 					<ExploreInterestedDeck
 						class="self-start lg:sticky lg:top-4"
 						:media="interestedMedia"
+						:passed-count="passedMediaIds.length"
 						:can-add-to-planning="userStore.isOAuthAuthenticated"
 						:adding-media-ids="addingMediaIdList"
 						:adding-all="addingAllToPlanning"
 						:undo-disabled="!decisionHistory.length || addingAllToPlanning"
 						@add-to-planning="addToPlanning"
 						@add-all-to-planning="addAllToPlanning"
+						@clear="clearPicks"
 						@undo="restoreDecision"
 						@undo-last="undoLastDecision" />
 				</div>

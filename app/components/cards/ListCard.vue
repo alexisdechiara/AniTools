@@ -7,37 +7,34 @@
       variant="soft"
       class="absolute top-6 right-6 z-10 cursor-pointer"
       :ui="{ content: 'min-w-fit', item: 'px-2 cursor-pointer' }"
-      aria-label="Sort"
+      aria-label="Rank by"
     />
     <ol class="flex flex-col group mt-2">
       <template v-for="(item, index) in list" :key="item.name">
-        <GenresAndTagsPopover v-if="Number(index) < 5" v-bind="item">
+        <GenresAndTagsPopover
+          v-if="Number(index) < 5"
+          v-bind="item"
+          :mean-score-label="formatMeanScore(item.meanScore)"
+        >
           <li
             class="flex items-center gap-2 cursor-pointer transition duration-200 py-1.5 hover:scale-101"
             @mouseover="handleMouseOver(item.name)"
             @mouseleave="handleMouseLeave()"
           >
             <NuxtImg
-              v-if="item.entries && item.entries.length > 0"
-              :src="
-                item.entries[0]?.media
-                  ?.coverImage?.large ||
-                item.entries[0]?.media
-                  ?.coverImage?.medium ||
-                ''
-              "
-              :alt="
-                item.entries[0]?.media?.title
-                  ?.english ||
-                item.entries[0]?.media?.title
-                  ?.romaji ||
-                ''
-              "
-              class="size-10 rounded-sm aspect-square object-cover"
+              v-if="thumbnail(item)"
+              :src="thumbnail(item)!"
+              :alt="`${getAnimeTitle(item.entries?.[0]?.media)} cover`"
+              width="40"
+              height="40"
+              fit="cover"
+              format="webp"
+              loading="lazy"
+              class="size-10 shrink-0 rounded-sm aspect-square object-cover"
             />
             <div
               v-else
-              class="size-10 bg-elevated rounded-sm aspect-square relative overflow-hidden"
+              class="size-10 shrink-0 bg-elevated rounded-sm aspect-square relative overflow-hidden"
             >
               <Icon
                 :name="item.icon || 'i-lucide-help-circle'"
@@ -45,8 +42,9 @@
               />
             </div>
             <div class="flex flex-col w-full gap-y-1">
-              <div class="flex justify-between w-full">
-                <span class="text-xs font-medium">{{ item.name }}</span>
+              <div class="flex justify-between gap-2 w-full min-w-0">
+                <span class="truncate text-xs font-medium">{{ item.name }}</span>
+                <span class="shrink-0 text-xs text-muted tabular-nums">{{ formatMetric(item) }}</span>
               </div>
               <UProgress
                 v-model="progressValues[item.name]"
@@ -71,18 +69,37 @@
 <script lang="ts" setup>
 import type { AnimeListEntry } from "../../stores/Entries";
 import type { MetricSort } from "../../stores/Statistics";
+import { getMediaCover } from "~/utils/media-display";
+const { title: getAnimeTitle } = useMediaTitle();
 const hoveredItem = ref<string | null>(null);
 
 const sortItems = [
   { value: "count", label: "Count" },
-  { value: "meanScore", label: "Mean Score" },
-  { value: "minutesWatched", label: "Watch Time" },
+  { value: "meanScore", label: "Mean score" },
+  { value: "minutesWatched", label: "Watch time" },
 ];
 
 const selectedSort = defineModel<MetricSort>("sort", {
   default: "count",
   required: true,
 });
+
+const { format, formatPercent } = usePersonalScore();
+
+function formatMeanScore(value: number | undefined): string {
+  return props.scoreScale === "raw" ? format(value) : formatPercent(value);
+}
+
+function formatMetric(item: listType): string {
+  if (selectedSort.value === "meanScore") return formatMeanScore(item.meanScore);
+  if (selectedSort.value === "minutesWatched") return formatWatchTime(item.minutesWatched ?? 0);
+  return formatNumber(item.count ?? 0);
+}
+
+// A 40px thumbnail: AniList's smallest cover (100px wide) already covers 2x screens.
+function thumbnail(item: listType): string | null {
+  return getMediaCover(item.entries?.[0]?.media, "small");
+}
 
 const handleMouseOver = (name: string) => {
   hoveredItem.value = name;
@@ -101,7 +118,7 @@ export type listType = {
   icon?: string;
 };
 
-const props = defineProps<{ title: string; list: listType[] }>();
+const props = defineProps<{ title: string; list: listType[]; scoreScale?: "percent" | "raw" }>();
 
 const maxValue = computed(() => {
   if (!props.list.length) return 0;

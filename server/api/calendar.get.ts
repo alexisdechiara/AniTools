@@ -6,13 +6,18 @@ import type {
 } from "~~/shared/types/anilist"
 import {
 	forwardAniListRateLimit,
-	getAniListAiringSchedulesPage,
-	getAniListMediaByIds
+	getAniListAiringIds,
+	getAniListMediaByIdsBatch
 } from "~~/server/utils/anilist-client"
+import {
+	createCalendarAiringLoader,
+	toCalendarMediaPayload
+} from "~~/server/utils/calendar-airing"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import { parseCalendarQuery } from "~~/server/utils/request-validation"
 import { withTimeout } from "~~/server/utils/with-timeout"
 import {
+	isRetryableAniListError,
 	parseSimuldubItems,
 	type ValidatedSimuldubItem
 } from "~~/server/utils/calendar-data"
@@ -20,14 +25,33 @@ import {
 const AIRING_CACHE_TTL_MS = 5 * 60 * 1000
 const SIMULDUB_CACHE_TTL_MS = 5 * 60 * 1000
 const MAX_CACHE_ENTRIES = 100
-const MAX_ANILIST_PAGES = 24
 const MAX_MISSING_MEDIA_IDS = 100
-const MEDIA_BATCH_SIZE = 50
 const MAX_RETRIES = 3
+const AIRING_DEADLINE_MS = 25_000
 const DEFAULT_DIRECTUS_URL = "https://api.anitools.geekly.blog"
 
 const airingCache = new Map<string, { data: AniListAiringSchedule[], expiresAt: number }>()
 const simuldubCache = new Map<string, { data: ValidatedSimuldubItem[], expiresAt: number }>()
+// Two AniList requests per cold range (airing ids, then the anime not cached yet), one when warm.
+const airingLoader = createCalendarAiringLoader({
+	fetchAiringIds: getAniListAiringIds,
+	fetchMediaByIds: getAniListMediaByIdsBatch
+})
+
+function buildDirectusClient(directusUrl: string) {
+	return createDirectus(directusUrl).with(rest())
+}
+
+const directusClients = new Map<string, ReturnType<typeof buildDirectusClient>>()
+
+function getDirectusClient(directusUrl: string) {
+	let client = directusClients.get(directusUrl)
+	if (!client) {
+		client = buildDirectusClient(directusUrl)
+		directusClients.set(directusUrl, client)
+	}
+	return client
+}
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -57,29 +81,26 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 		return cached.data
 	}
 
-	let allSchedules: AniListAiringSchedule[] = []
-	let hasNextPage = true
-	let page = 1
+	let allSchedules: AniListAiringSchedule[] | undefined
 	let retryCount = 0
+	const startedAt = Date.now()
 
-	while (hasNextPage && page <= MAX_ANILIST_PAGES && retryCount < MAX_RETRIES) {
+	while (!allSchedules) {
+		if (Date.now() - startedAt > AIRING_DEADLINE_MS) {
+			throw createError({
+				statusCode: 504,
+				statusMessage: "AniList calendar took too long"
+			})
+		}
+
 		try {
-			const response = await getAniListAiringSchedulesPage(
-				{
-					page,
-					perPage: 50,
-					airingAtGreater,
-					airingAtLesser
-				},
+			allSchedules = await airingLoader.loadAiringSchedules(
+				airingAtGreater,
+				airingAtLesser,
 				{ timeoutMs: 12_000 }
 			)
-
-			allSchedules = [...allSchedules, ...response.airingSchedules]
-			hasNextPage = response.hasNextPage
-			page++
-			retryCount = 0
 		} catch (error) {
-			if (isError(error) && error.statusCode === 429) {
+			if (!isRetryableAniListError(error)) {
 				throw error
 			}
 
@@ -89,13 +110,6 @@ async function fetchAiringSchedules(airingAtGreater: number, airingAtLesser: num
 			}
 			await wait(1000 * retryCount)
 		}
-	}
-
-	if (hasNextPage) {
-		throw createError({
-			statusCode: 502,
-			statusMessage: "AniList calendar response exceeded the page limit"
-		})
 	}
 
 	cacheResult(airingCache, cacheKey, allSchedules, AIRING_CACHE_TTL_MS)
@@ -110,7 +124,7 @@ async function fetchSimuldubs(rangeStart: string, rangeEnd: string, directusUrl:
 		return cached.data
 	}
 
-	const directus = createDirectus(directusUrl).with(rest())
+	const directus = getDirectusClient(directusUrl)
 	const simuldubs = await withTimeout(
 		directus.request(
 			readItems("simuldub", {
@@ -165,22 +179,16 @@ async function fetchMissingSimuldubMedia(
 			: []
 	}))].sort((left, right) => left - right)
 	const requestedIds = allMissingIds.slice(0, MAX_MISSING_MEDIA_IDS)
-	const batches: number[][] = []
-
-	for (let index = 0; index < requestedIds.length; index += MEDIA_BATCH_SIZE) {
-		batches.push(requestedIds.slice(index, index + MEDIA_BATCH_SIZE))
-	}
 
 	const media: AniListMediaSummary[] = []
 	const errors: unknown[] = []
-	for (const mediaIds of batches) {
-		try {
-			media.push(...await getAniListMediaByIds(mediaIds, {
-				timeoutMs: 12_000
-			}))
-		} catch (error) {
-			errors.push(error)
-		}
+	try {
+		// Shares the per-anime cache with the airing schedules.
+		media.push(...await airingLoader.loadMediaByIds(requestedIds, {
+			timeoutMs: 12_000
+		}))
+	} catch (error) {
+		errors.push(error)
 	}
 
 	return {
@@ -212,6 +220,7 @@ export default defineEventHandler(async (event) => {
 	])
 
 	if (airingResult.status === "rejected") {
+		setResponseHeader(event, "Cache-Control", "private, no-store")
 		forwardAniListRateLimit(event, airingResult.reason)
 		if (isError(airingResult.reason) && airingResult.reason.statusCode === 504) {
 			throw airingResult.reason
@@ -231,9 +240,6 @@ export default defineEventHandler(async (event) => {
 		airingResult.value,
 		simuldubs
 	)
-	for (const error of missingMediaResult.errors) {
-		forwardAniListRateLimit(event, error)
-	}
 
 	const warnings = [
 		...(simuldubResult.status === "rejected"
@@ -247,10 +253,11 @@ export default defineEventHandler(async (event) => {
 			: [])
 	]
 
+	setResponseHeader(event, "Cache-Control", "public, max-age=30, s-maxage=60, stale-while-revalidate=300")
+	// Each anime is sent once (`media`) and referenced by `mediaId`; see toCalendarMediaPayload.
 	return {
-		airingSchedules: airingResult.value,
+		...toCalendarMediaPayload(airingResult.value, missingMediaResult.media),
 		simuldubs,
-		missingMedia: missingMediaResult.media,
 		warnings
 	}
 })

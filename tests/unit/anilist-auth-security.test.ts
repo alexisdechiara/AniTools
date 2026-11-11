@@ -19,6 +19,11 @@ import {
 	parseAuthorizationCode,
 	setAniListSession
 } from "../../server/utils/anilist-auth"
+import { enforceRateLimit } from "../../server/utils/rate-limit"
+
+vi.mock("../../server/utils/rate-limit", () => ({
+	enforceRateLimit: vi.fn()
+}))
 
 const EVENT = {} as H3Event
 const CURRENT_PASSWORD = "c".repeat(48)
@@ -145,6 +150,75 @@ describe("OAuth payload protection", () => {
 		expect(parseAuthorizationCode("code with whitespace")).toBeNull()
 		expect(parseAuthorizationCode("a".repeat(2049))).toBeNull()
 		expect(parseAuthorizationCode("valid-code-1234")).toBe("valid-code-1234")
+	})
+})
+
+describe("OAuth configuration", () => {
+	it.each([
+		["empty", ""],
+		["not a URL", "not a url"],
+		["a non-http scheme", "ftp://anitools.example/callback"]
+	])("answers 503 instead of throwing when the redirect URI is %s", (_label, redirectUri) => {
+		runtimeConfig.anilist.redirectUri = redirectUri
+		vi.spyOn(console, "error").mockImplementation(() => {})
+
+		expect(() => createOAuthTransaction(EVENT, "/")).toThrowError(
+			expect.objectContaining({
+				statusCode: 503
+			})
+		)
+	})
+})
+
+describe("sign-in route failures", () => {
+	async function callSignInRoute(returnTo: string | undefined = "/") {
+		const sendRedirectMock = vi.fn((_event: unknown, location: string, code: number) => ({ location, code }))
+		vi.stubGlobal("defineEventHandler", (handler: unknown) => handler)
+		vi.stubGlobal("getQuery", vi.fn(() => ({ returnTo })))
+		vi.stubGlobal("sendRedirect", sendRedirectMock)
+
+		const route = await import("../../server/routes/auth/anilist.get")
+		const handler = route.default as unknown as (event: H3Event) => unknown
+		return { result: handler(EVENT), sendRedirectMock }
+	}
+
+	beforeEach(() => {
+		vi.spyOn(console, "error").mockImplementation(() => {})
+		vi.mocked(enforceRateLimit).mockImplementation(() => ({
+			allowed: true,
+			limit: 20,
+			remaining: 19,
+			resetAt: 0,
+			retryAfter: 1
+		}))
+	})
+
+	it("redirects to AniList when the configuration is valid", async () => {
+		const { result } = await callSignInRoute("/calendar")
+
+		expect(result).toMatchObject({ code: 302 })
+		const location = new URL((result as { location: string }).location)
+		expect(location.origin + location.pathname).toBe("https://anilist.co/api/v2/oauth/authorize")
+		expect(location.searchParams.get("client_id")).toBe("1234")
+		expect(location.searchParams.get("redirect_uri")).toBe(runtimeConfig.anilist.redirectUri)
+	})
+
+	it("sends the visitor back to the login page when the configuration is invalid", async () => {
+		runtimeConfig.anilist.redirectUri = ""
+
+		const { result } = await callSignInRoute()
+
+		expect(result).toEqual({ code: 302, location: "/login?authError=unavailable" })
+	})
+
+	it("sends the visitor back to the login page when the rate limit is exceeded", async () => {
+		vi.mocked(enforceRateLimit).mockImplementation(() => {
+			throw createH3Error({ statusCode: 429, statusMessage: "Too many requests" })
+		})
+
+		const { result } = await callSignInRoute()
+
+		expect(result).toEqual({ code: 302, location: "/login?authError=rate_limited" })
 	})
 })
 

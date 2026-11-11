@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="group relative z-20 aspect-3/4 h-fit w-full transition-all duration-100 ease-out focus-within:z-50 hover:z-50 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+		class="group relative z-20 aspect-3/4 h-fit w-full transition-[scale,box-shadow] duration-100 ease-out focus-within:z-50 hover:z-50 focus-visible:z-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
 		:class="[
 			!item.locked && !isInspectorEnabled ? 'hover:scale-102' : '',
 			hoveredTarget?.id === mediaId && hoveredTarget?.type === 'anime'
@@ -15,6 +15,8 @@
 		@click.stop="selectItem"
 		@mouseover.stop="setHovered(mediaId, 'anime', 'Anime')"
 		@mouseleave="clearHovered"
+		@focus="setHovered(mediaId, 'anime', 'Anime')"
+		@blur="clearHovered"
 		@keydown="handleKeydown">
 		<UContextMenu :items="actions" size="sm">
 			<NuxtImg
@@ -24,9 +26,13 @@
 				:src="coverUrl"
 				:alt="title"
 				class="size-full rounded-lg object-cover" />
+			<!-- Touch: a single "Actions" button with a 44px hit area opens the menu (Details and
+				Remove live in it), always visible because there is no hover. Fine pointers keep the
+				three small buttons. -->
 			<div
 				v-if="!isInspectorEnabled"
-				class="visible absolute top-0 -right-4 z-60 flex h-fit flex-col gap-0.5 opacity-100 transition-opacity duration-250 ease-in md:invisible md:opacity-0 md:group-focus-within:visible md:group-focus-within:opacity-100 md:group-hover:visible md:group-hover:opacity-100">
+				data-entry-actions
+				class="visible absolute top-0 -right-4 z-60 flex h-fit flex-col gap-0.5 opacity-100 transition-opacity duration-250 ease-in md:invisible md:opacity-0 md:group-focus-within:visible md:group-focus-within:opacity-100 md:group-hover:visible md:group-hover:opacity-100 pointer-coarse:visible! pointer-coarse:top-1 pointer-coarse:right-1 pointer-coarse:opacity-100!">
 				<UDropdownMenu
 					:items="actions"
 					size="sm"
@@ -37,7 +43,8 @@
 						variant="solid"
 						size="xs"
 						:aria-label="`Actions for ${title}`"
-						class="cursor-pointer rounded-full" />
+						class="relative cursor-pointer rounded-full pointer-coarse:size-8 pointer-coarse:justify-center pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5 pointer-coarse:after:content-['']"
+						:ui="{ leadingIcon: 'pointer-coarse:size-5' }" />
 				</UDropdownMenu>
 				<AnimeDetailsPopover
 					v-model:open="showDetails"
@@ -49,7 +56,7 @@
 						variant="solid"
 						size="xs"
 						:aria-label="`Show details for ${title}`"
-						class="cursor-pointer rounded-full" />
+						class="cursor-pointer rounded-full pointer-coarse:pointer-events-none pointer-coarse:invisible! pointer-coarse:absolute pointer-coarse:top-0 pointer-coarse:right-0" />
 				</AnimeDetailsPopover>
 				<UButton
 					icon="i-lucide-trash"
@@ -57,13 +64,13 @@
 					variant="solid"
 					size="xs"
 					:aria-label="`Remove ${title}`"
-					class="cursor-pointer rounded-full"
+					class="cursor-pointer rounded-full pointer-coarse:hidden"
 					@click.stop="removeAnime" />
 			</div>
 		</UContextMenu>
 		<div
 			v-if="!isInspectorEnabled"
-			class="pointer-events-none absolute inset-0 z-40 rounded-lg bg-linear-to-t from-neutral-950/60 from-0% via-neutral-950/40 via-10% to-neutral-950/10 to-25% opacity-0 transition-all duration-100 ease-in-out group-focus-within:opacity-100 group-hover:opacity-100"
+			class="pointer-events-none absolute inset-0 z-40 rounded-lg bg-linear-to-t from-neutral-950/60 from-0% via-neutral-950/40 via-10% to-neutral-950/10 to-25% opacity-0 transition-opacity duration-100 ease-in-out group-focus-within:opacity-100 group-hover:opacity-100"
 			:class="item.locked ? 'cursor-not-allowed' : 'cursor-move'" />
 		<span
 			class="pointer-events-none invisible absolute inset-x-2 bottom-2 z-50 text-[10px] font-medium text-white group-focus-within:visible group-hover:visible"
@@ -79,7 +86,7 @@ import type {
 	TierlistLaneId,
 	TierlistMoveTarget
 } from "~/types/tierlist"
-import { getTierlistEntryTitle } from "~/utils/tierlist-model"
+import { getMediaCover } from "~/utils/media-display"
 
 const props = defineProps<{
 	item: TierlistEntry
@@ -105,19 +112,21 @@ const emit = defineEmits<{
 const { isInspectorEnabled, setHovered, clearHovered, selectItem, hoveredTarget } = useInspector()
 const showDetails = ref(false)
 const mediaId = computed(() => String(props.item.media.id))
-const title = computed(() => getTierlistEntryTitle(props.item))
-const coverUrl = computed(() =>
-	props.item.media.coverImage?.extraLarge
-	?? props.item.media.coverImage?.large
-	?? props.item.media.coverImage?.medium
-	?? ""
-)
+const { title: getAnimeTitle } = useMediaTitle()
+const title = computed(() => getAnimeTitle(props.item.media))
+const coverUrl = computed(() => getMediaCover(props.item.media) ?? "")
 
 function removeAnime(): void {
 	emit("remove", props.item)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+	if (isInspectorEnabled.value && (event.key === "Enter" || event.key === " ")) {
+		setHovered(mediaId.value, "anime", "Anime")
+		selectItem(event)
+		return
+	}
+
 	switch (event.key) {
 		case "ArrowLeft":
 			if (!props.item.locked && props.canMoveEarlier) {
@@ -205,7 +214,7 @@ const actions = computed(() => [
 	],
 	[
 		{
-			label: "Delete",
+			label: "Remove",
 			color: "error" as const,
 			icon: "i-lucide-trash",
 			onClick: removeAnime

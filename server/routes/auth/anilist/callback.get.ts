@@ -5,8 +5,15 @@ import {
 	parseAuthorizationCode,
 	setAniListSession
 } from "~~/server/utils/anilist-auth"
+import { enforceRateLimit } from "~~/server/utils/rate-limit"
 
 export default defineEventHandler(async (event) => {
+	try {
+		enforceRateLimit(event, { namespace: "auth-callback", limit: 10, windowMs: 60_000 })
+	} catch {
+		return sendRedirect(event, "/login?authError=rate_limited", 302)
+	}
+
 	const query = getQuery(event)
 	const transaction = consumeOAuthTransaction(event, query.state)
 	const code = parseAuthorizationCode(query.code)

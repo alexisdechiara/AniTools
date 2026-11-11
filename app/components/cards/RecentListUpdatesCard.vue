@@ -56,7 +56,10 @@ function formatStatus(status: string): string {
 					:alt="`${item.title} cover`"
 					class="z-1 size-10 shrink-0 rounded-full border-2 border-default object-cover"
 					width="40"
-					height="40"/>
+					height="40"
+					fit="cover"
+					format="webp"
+					loading="lazy"/>
 				<div
 					v-else
 					class="z-1 flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-default bg-elevated"
@@ -66,7 +69,7 @@ function formatStatus(status: string): string {
 						class="size-4 text-muted"/>
 				</div>
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-medium text-highlighted">
+					<p class="truncate text-sm font-medium text-highlighted" :title="item.title">
 						{{ item.title }}
 					</p>
 					<p class="text-xs text-muted">
@@ -84,7 +87,8 @@ function formatStatus(status: string): string {
 				class="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
 				<UIcon
 					name="i-lucide-history"
-					class="size-7 text-muted"/>
+					class="size-7 text-muted"
+					aria-hidden="true"/>
 				<p class="text-sm text-muted">
 					No recent list updates are available.
 				</p>

@@ -1,4 +1,7 @@
 import * as z from "zod"
+import type { AniListScoreFormat } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
+import { scoreToPercent } from "~/utils/score-format"
 import type {
 	TierlistEntry,
 	TierlistExportDocument,
@@ -47,7 +50,8 @@ const backgroundSchema = z.enum([
 	"bg-neutral-900",
 	"bg-neutral-950"
 ])
-const legacyTierColors: Readonly<Record<string, string>> = {
+export const TIER_COLOR_HEX_BY_CLASS: Readonly<Record<string, string>> = {
+	"bg-transparent": "transparent",
 	"bg-black": "#000000",
 	"bg-white": "#ffffff",
 	"bg-neutral-50": "#fafafa",
@@ -233,16 +237,29 @@ export function getTierlistEntryId(entry: TierlistEntry): number {
 }
 
 export function getTierlistEntryTitle(entry: TierlistEntry): string {
-	return entry.media.title?.userPreferred
-		?? entry.media.title?.english
-		?? entry.media.title?.romaji
-		?? entry.media.title?.native
-		?? `Anime ${entry.media.id}`
+	return getMediaTitle(entry.media)
 }
 
 export function sanitizeTierlistEntry(input: unknown): TierlistEntry | null {
 	const result = tierlistEntrySchema.safeParse(input)
 	return result.success ? result.data : null
+}
+
+/**
+ * AniList returns list scores in the owner's own format (10 points, 5 stars, …) while tier
+ * ranges and filters work on the 100-point scale. Convert once, where a list entry becomes a
+ * tier-list entry, so everything downstream compares like with like.
+ */
+export function toTierlistEntryFromListEntry(
+	input: unknown,
+	sourceFormat: AniListScoreFormat
+): TierlistEntry | null {
+	if (!isRecord(input)) return null
+	const rawScore = typeof input.score === "number" ? input.score : null
+	return sanitizeTierlistEntry({
+		...input,
+		score: scoreToPercent(rawScore, sourceFormat) ?? 0
+	})
 }
 
 export function formatMediaResultToTierlistEntry(input: unknown): TierlistEntry | null {
@@ -290,7 +307,7 @@ function normalizeTier(input: unknown, index: number, scope: string): TierlistTi
 		...input,
 		id: typeof input.id === "string" && input.id.trim() ? input.id : fallbackId,
 		color: typeof input.color === "string"
-			? legacyTierColors[input.color] ?? input.color
+			? TIER_COLOR_HEX_BY_CLASS[input.color] ?? input.color
 			: input.color,
 		entries: Array.isArray(input.entries)
 			? input.entries

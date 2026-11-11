@@ -15,5 +15,25 @@ export function getSafeInternalPath(value: unknown, fallback = "/") {
 		return fallback
 	}
 
-	return candidate
+	try {
+		const parsed = new URL(candidate, "https://anitools.local")
+		if (parsed.origin !== "https://anitools.local") return fallback
+		const normalized = `${parsed.pathname}${parsed.search}${parsed.hash}`
+		if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.includes("\\")) {
+			return fallback
+		}
+		// A return path that points at the sign-in machinery itself can only loop.
+		const { pathname } = parsed
+		if (
+			pathname === "/login"
+			|| pathname.startsWith("/login/")
+			|| pathname === "/auth"
+			|| pathname.startsWith("/auth/")
+		) {
+			return fallback
+		}
+		return normalized
+	} catch {
+		return fallback
+	}
 }

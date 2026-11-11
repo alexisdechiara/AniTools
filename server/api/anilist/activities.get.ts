@@ -1,27 +1,13 @@
-import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
-	forwardAniListRateLimit,
 	getAniListActivitiesResponse,
-	parseAniListActivitiesQuery,
-	resolveAniListAccess,
-	setAniListResponseCache
+	parseAniListActivitiesQuery
 } from "~~/server/utils/anilist-client"
+import { defineAniListRoute } from "~~/server/utils/anilist/route"
 
-export default defineEventHandler(async (event) => {
-	enforceRateLimit(event, {
-		namespace: "anilist-activities",
-		limit: 30,
-		windowMs: 60_000
-	})
-
-	const query = parseAniListActivitiesQuery(getQuery(event))
-	const access = await resolveAniListAccess(event, query.username)
-	setAniListResponseCache(event, access.mode, 30)
-
-	try {
-		return await getAniListActivitiesResponse(access, query)
-	} catch (error) {
-		forwardAniListRateLimit(event, error)
-		throw error
-	}
+export default defineAniListRoute({
+	namespace: "anilist-activities",
+	limit: 30,
+	publicMaxAge: 30,
+	parse: parseAniListActivitiesQuery,
+	run: (access, query) => getAniListActivitiesResponse(access, query)
 })

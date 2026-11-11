@@ -7,6 +7,7 @@
 :model-value="currentTemplate"
 :items="templateItems"
 value-key="value"
+aria-label="Tier list template"
 								@update:model-value="(value) => changeTemplate(value as number)" />
 					<div class="flex gap-2">
 						<UButton label="Auto Rank" color="neutral" variant="solid" @click="handleAutoRank" />
@@ -21,20 +22,27 @@ value-key="value"
 								</div> -->
 							<div class="size-full">
 								<div class="mb-2 flex gap-2">
-									<UInput v-model="tier.name" size="sm" class="flex-1" />
+									<UInput v-model="tier.name" size="sm" class="flex-1" :aria-label="`Tier ${index + 1} name`" />
 									<UPopover>
 										<UButton
 color="neutral"
 variant="outline"
 icon="i-lucide-swatch-book"
 class="cursor-pointer"
+:aria-label="`Choose a color for ${tierLabel(tier, index)}`"
 											size="sm" />
 										<template #content>
 											<UColorPicker v-model="tier.color" class="p-2" />
 										</template>
 									</UPopover>
 								</div>
-								<USlider v-model="tier.range" :min="0" :max="100" size="sm" tooltip />
+								<USlider
+v-model="tier.range"
+:min="0"
+:max="100"
+size="sm"
+tooltip
+									:aria-label="`Score range for ${tierLabel(tier, index)}`" />
 							</div>
 							<UButton
 icon="i-lucide-trash"
@@ -42,6 +50,7 @@ size="sm"
 color="error"
 variant="solid"
 class="ms-2 cursor-pointer"
+:aria-label="`Delete ${tierLabel(tier, index)}`"
 								@click="removeTier(index)" />
 						</div>
 					</div>
@@ -68,8 +77,13 @@ v-model:open="showOverlappingWarning"
 
 <script setup lang="ts">
 import { computed } from "vue"
+import type { TierlistTier } from "~/types/tierlist"
 
 const tierlistStore = useTierlistStore()
+
+function tierLabel(tier: TierlistTier, index: number): string {
+	return tier.name.trim() || `tier ${index + 1}`
+}
 
 const {
 	templates,

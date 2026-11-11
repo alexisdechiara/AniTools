@@ -1,5 +1,5 @@
 <template>
-  <MetricsCard title="Watch Year" v-bind="$attrs">
+  <MetricsCard title="Watch year" v-bind="$attrs">
     <UTabs
       :items="items"
       class="w-fit absolute top-6 right-6"
@@ -29,17 +29,17 @@ const { startYears } = storeToRefs(statisticsStore);
 
 const items = ref<TabsItem[]>([
   {
-    label: "Titles Watched",
+    label: "Titles watched",
     value: "count",
     icon: "i-lucide-list-ordered",
   },
   {
-    label: "Average Score",
+    label: "Average score",
     value: "meanScore",
     icon: "i-lucide-bar-chart-4",
   },
   {
-    label: "Watch Time",
+    label: "Watch time",
     value: "minutesWatched",
     icon: "i-lucide-clock",
   },

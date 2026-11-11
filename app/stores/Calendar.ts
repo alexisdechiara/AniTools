@@ -1,24 +1,26 @@
 import { defineStore } from "pinia"
-import { getTime } from "date-fns"
 import type { DropdownMenuItem } from "@nuxt/ui"
+import { getAudioLanguageLabel } from "~/utils/calendar-audio"
 import {
+	getCalendarRange,
 	getCalendarViewRange,
 	type CalendarViewRangeInput
 } from "~/utils/calendarRange"
 
 type CalendarView = "day" | "week" | "month"
 
-const DUBBING_LABELS: Readonly<Record<string, string>> = {
-	cn: "Chinese",
-	en: "English",
-	fr: "French",
-	jp: "Japanese",
-	kr: "Korean"
+/** Kept for existing call sites; the labels live with the audio helper. */
+export function getDubbingLabel(code: string): string {
+	return getAudioLanguageLabel(code)
 }
+
+/** The list statuses the header "My list" toggle stands for. */
+export const MY_LIST_STATUSES = ["CURRENT", "PLANNING"] as const
 
 export const useCalendarStore = defineStore("Calendar", () => {
 	const userStore = useUserStore()
 	const entriesStore = useEntriesStore()
+	const preferences = usePreferencesStore()
 
 	// ========== Refs UI ==========
 	const currentView = ref<CalendarView>("week")
@@ -27,24 +29,45 @@ export const useCalendarStore = defineStore("Calendar", () => {
 	// ========== Date Range ==========
 	const calendarRange = getCalendarRange()
 
-	const dateRange = reactive<{ start: Date, end: Date }>({ start: new Date(calendarRange.start), end: new Date(calendarRange.end) })
-	const airingAtGreater = computed(() => Math.floor(getTime(dateRange.start) / 1000))
-	const airingAtLesser = computed(() => Math.floor(getTime(dateRange.end) / 1000))
+	// Replaced as a whole: assigning `start` then `end` exposed a half-updated range (new start,
+	// old end) to the calendar request, which fired once for it and once for the real range.
+	// The end is the last millisecond of Sunday, like the range vue-cal reports for a week: an
+	// exclusive end (next Monday) differed by one second and made the mounted calendar refetch.
+	const dateRange = ref<{ start: Date, end: Date }>({
+		start: new Date(calendarRange.start),
+		end: new Date(calendarRange.end.getTime() - 1)
+	})
+	const airingAtGreater = computed(() => Math.floor(dateRange.value.start.getTime() / 1000))
+	const airingAtLesser = computed(() => Math.floor(dateRange.value.end.getTime() / 1000))
 
 	// ========== Filtres ==========
 	const currentFormat = ref<string[]>(["TV", "ONA", "MOVIE"])
 	const currentStatus = ref<string[]>([])
 	const dubbing = ref<string[]>(["jp", "cn", "en", "fr"])
+	// Languages the user explicitly unticked; they stay unticked across date ranges.
+	const excludedDubbing = ref<string[]>([])
+	// True when the list behind the status filter could not be loaded.
+	const listError = ref(false)
+	// Only the latest list request may report a failure.
+	let listRequest = 0
 
 	// ========== Getters ==========
 	const isMonthView = computed(() => currentView.value === "month")
 	const isDayView = computed(() => currentView.value === "day")
 	const isWeekView = computed(() => currentView.value === "week")
+	const hasStatusFilter = computed(() => currentStatus.value.length > 0)
+	const isMyListActive = computed(() =>
+		currentStatus.value.length === MY_LIST_STATUSES.length
+		&& MY_LIST_STATUSES.every(status => currentStatus.value.includes(status))
+	)
 
 	// ========== Actions Date Range ==========
 	const updateDateRange = (start: Date, end: Date) => {
-		dateRange.start = start
-		dateRange.end = end
+		if (
+			dateRange.value.start.getTime() === start.getTime()
+			&& dateRange.value.end.getTime() === end.getTime()
+		) return
+		dateRange.value = { start, end }
 	}
 
 	const setDateRangeFromView = (view: CalendarViewRangeInput) => {
@@ -83,25 +106,70 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		} else {
 			currentStatus.value.push(format)
 		}
+		// Editing the selection by hand decides whether "My list" is what gets remembered.
+		preferences.setCalendarMyList(isMyListActive.value)
+		syncList()
+	}
+
+	/**
+	 * The list only serves the status filter: load it on first use (no-op once loaded).
+	 * Resolves to false, and raises `listError`, when the list could not be loaded.
+	 */
+	const loadList = async (): Promise<boolean> => {
+		const request = ++listRequest
+		listError.value = false
+		if (!userStore.isAuthenticated) return false
+
+		try {
+			await entriesStore.fetchAllAnimes()
+			return true
+		} catch {
+			if (request === listRequest && currentStatus.value.length > 0) listError.value = true
+			return false
+		}
+	}
+
+	const syncList = () => {
+		if (currentStatus.value.length > 0) {
+			void loadList()
+			return
+		}
+		listRequest += 1
+		listError.value = false
+	}
+
+	const setStatuses = (statuses: readonly string[]) => {
+		currentStatus.value = [...new Set(statuses)]
+		syncList()
+	}
+
+	/** The header toggle: Watching + Planning replace any selection, off clears every status. */
+	const setMyList = (active: boolean) => {
+		preferences.setCalendarMyList(active)
+		setStatuses(active ? MY_LIST_STATUSES : [])
+	}
+
+	/** Refetches the list for the current identity while a status filter is active. */
+	const refreshList = () => {
+		if (currentStatus.value.length > 0) void loadList()
 	}
 
 	const toggleDubbing = (lang: string) => {
 		const index = dubbing.value.indexOf(lang)
 		if (index > -1) {
 			dubbing.value.splice(index, 1)
+			if (!excludedDubbing.value.includes(lang)) {
+				excludedDubbing.value.push(lang)
+			}
 		} else {
 			dubbing.value.push(lang)
+			excludedDubbing.value = excludedDubbing.value.filter(excluded => excluded !== lang)
 		}
 	}
 
 	const setAvailableDubbingOptions = (availableLanguages: string[]) => {
 		const normalizedLanguages = [...new Set(availableLanguages)]
-		dubbing.value = dubbing.value.filter(lang => normalizedLanguages.includes(lang))
-		normalizedLanguages.forEach((lang) => {
-			if (!dubbing.value.includes(lang)) {
-				dubbing.value.push(lang)
-			}
-		})
+		dubbing.value = normalizedLanguages.filter(lang => !excludedDubbing.value.includes(lang))
 	}
 
 	// ========== Dropdown Menu Items ==========
@@ -157,7 +225,7 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		]
 
 		let statusItems: DropdownMenuItem[] = []
-		if (userStore.isAuthenticated && entriesStore.isInitialized) {
+		if (userStore.isAuthenticated) {
 			statusItems = [
 				{
 					label: "Status", children: [
@@ -189,10 +257,10 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 		const dubbingItems: DropdownMenuItem[] = [...new Set(availableLanguages)]
 			.sort((left, right) =>
-				(DUBBING_LABELS[left] ?? left).localeCompare(DUBBING_LABELS[right] ?? right)
+				getDubbingLabel(left).localeCompare(getDubbingLabel(right))
 			)
 			.map(language => ({
-				label: DUBBING_LABELS[language] ?? language.toUpperCase(),
+				label: getDubbingLabel(language),
 				type: "checkbox" as const,
 				checked: dubbing.value.includes(language),
 				onUpdateChecked: (_checked: boolean) => toggleDubbing(language),
@@ -201,7 +269,9 @@ export const useCalendarStore = defineStore("Calendar", () => {
 
 		const dubbingLabel: DropdownMenuItem[] = [
 			{
-				label: "Dubbing", children: [
+				label: "Audio language", children: [
+					// The legend of the flag dots printed on the events.
+					{ type: "label", label: "Flags on an event: original audio, then dubs" },
 					...dubbingItems
 				]
 			}
@@ -217,6 +287,9 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentFormat.value = ["TV", "ONA", "MOVIE"]
 		currentStatus.value = []
 		dubbing.value = ["jp", "cn", "en", "fr"]
+		excludedDubbing.value = []
+		listRequest += 1
+		listError.value = false
 	}
 
 	return {
@@ -233,17 +306,24 @@ export const useCalendarStore = defineStore("Calendar", () => {
 		currentFormat,
 		currentStatus,
 		dubbing,
+		listError,
 
 		// Getters
 		isMonthView,
 		isDayView,
 		isWeekView,
+		hasStatusFilter,
+		isMyListActive,
 
 		// Actions
 		updateDateRange,
 		setDateRangeFromView,
 		handleWheel,
 		toggleFormat,
+		toggleStatus,
+		setStatuses,
+		setMyList,
+		refreshList,
 		toggleDubbing,
 		setAvailableDubbingOptions,
 		getFilterMenuItems,

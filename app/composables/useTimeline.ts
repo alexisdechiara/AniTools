@@ -15,9 +15,7 @@ const TIMELINE_ACTIVITY_KIND = "anime" as const
 const timelinePageCache = new Map<string, TimelineCacheEntry>()
 
 function errorMessage(error: unknown) {
-	return error instanceof Error && error.message
-		? error.message
-		: "Unable to load AniList activity."
+	return getApiErrorMessage(error, "Unable to load AniList activity.")
 }
 
 export function useTimeline() {
@@ -93,23 +91,34 @@ export function useTimeline() {
 		)
 	}
 
+	let activeRequest = 0
+	let activeLoadMoreRequest = 0
+
 	async function load(force = false) {
+		const requestId = ++activeRequest
+		// A reload supersedes any pending "load more" and releases its flag.
+		activeLoadMoreRequest++
+		loadingMore.value = false
 		loading.value = true
 		error.value = null
 
 		try {
 			const response = await fetchPage(1, force)
+			if (requestId !== activeRequest) return
 			activities.value = []
 			mergeActivities(response.activities.filter(
 				(activity): activity is AniListAnimeActivity => activity.kind === "anime"
 			))
 			pageInfo.value = response.pageInfo
 		} catch (caughtError) {
+			if (requestId !== activeRequest) return
 			activities.value = []
 			error.value = errorMessage(caughtError)
 		} finally {
-			loading.value = false
-			initialized.value = true
+			if (requestId === activeRequest) {
+				loading.value = false
+				initialized.value = true
+			}
 		}
 	}
 
@@ -120,19 +129,24 @@ export function useTimeline() {
 			|| safetyLimitReached.value
 		) return
 
+		const requestId = ++activeLoadMoreRequest
 		loadingMore.value = true
 		error.value = null
 
 		try {
 			const response = await fetchPage(pageInfo.value.currentPage + 1)
+			if (requestId !== activeLoadMoreRequest) return
 			mergeActivities(response.activities.filter(
 				(activity): activity is AniListAnimeActivity => activity.kind === "anime"
 			))
 			pageInfo.value = response.pageInfo
 		} catch (caughtError) {
+			if (requestId !== activeLoadMoreRequest) return
 			error.value = errorMessage(caughtError)
 		} finally {
-			loadingMore.value = false
+			if (requestId === activeLoadMoreRequest) {
+				loadingMore.value = false
+			}
 		}
 	}
 

@@ -1,16 +1,15 @@
 <template>
   <div
     class="flex gap-6"
-    :class="orientation === 'horizontal' ? 'flex-col sm:flex-row' : 'flex-col'"
-    role="img"
-    :aria-label="chartAriaLabel">
+    :class="orientation === 'horizontal' ? 'flex-col sm:flex-row' : 'flex-col'">
     <VisSingleContainer
       v-if="chartDataForDonut.length"
       :data="chartDataForDonut"
       :width="width"
       :height="height"
       :style="{ '--chart-width': width, '--chart-height': height }"
-      aria-hidden="true">
+      role="img"
+      :aria-label="chartAriaLabel">
       <VisDonut
         :value="sliceValue"
         :pad-angle="0.05"
@@ -221,7 +220,7 @@ function legendRawValue(item: DonutDataItem): string {
     return formatDuration(getMinutes(item));
   }
 
-  return getCount(item).toLocaleString();
+  return formatNumber(getCount(item));
 }
 
 function escapeHtml(value: string): string {
@@ -302,7 +301,13 @@ const events = {
   transform: scale(1);
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  transition: transform 250ms ease, opacity 250ms ease, fill 250ms ease !important;
+  /*
+   * No `fill` here on purpose. Segment fills are CSS variables (`var(--color-completed)`…),
+   * and a fill transition left them on the previous theme's colour after a light/dark
+   * switch; without it the repaint is immediate. This also overrides the inline
+   * `transition: fill` Unovis sets on each segment.
+   */
+  transition: transform 250ms ease, opacity 250ms ease !important;
 }
 
 .unovis-single-container :deep(path[class*="segment"]:hover) {

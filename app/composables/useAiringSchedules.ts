@@ -65,9 +65,13 @@ export const useAiringSchedules = () => {
 		showPeriod: boolean
 		titleLines: number
 		periodClass: string
-		badgeSize: "xs" | "sm" | "md"
+		badgeSize: "sm" | "md"
 		fontScale: number
 	}
+
+	// No text of a chip goes under 11px: a row that does not fit at that size is dropped instead.
+	const MIN_TEXT_PX = 11
+	const TITLE_LINE_HEIGHT = 1.25
 
 	const getEventLayout = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): EventLayout => {
 		const width = getMeasuredEventWidth(event)
@@ -78,15 +82,11 @@ export const useAiringSchedules = () => {
 		const titleDensity = clamp(titleLength / 28, 0.8, 2.8)
 
 		// Taille typo période.
-		const periodClass = scale < 0.35 ? "text-[10px] leading-none" : scale < 0.72 ? "text-[11px] leading-tight" : "text-xs leading-tight"
+		const periodClass = scale < 0.72 ? "text-[11px] leading-tight" : "text-xs leading-tight"
 
 		// Taille badge dynamique via prop size, plus sensible aux contraintes réelles.
-		let badgeSize: "xs" | "sm" | "md" = "md"
-		if (width < 160 || height < 56 || scale < 0.62) {
-			badgeSize = "xs"
-		} else if (width < 220 || height < 74 || scale < 0.9) {
-			badgeSize = "sm"
-		}
+		// "sm" is drawn at 11px by the page (Nuxt UI's own sm and xs badges are 10px and 8px).
+		const badgeSize: "sm" | "md" = width < 220 || height < 74 || scale < 0.9 ? "sm" : "md"
 
 		// Facteur de taille titre.
 		const fontScale = clamp(ratio / titleDensity, 0.7, 2.2)
@@ -111,12 +111,14 @@ export const useAiringSchedules = () => {
 		let showPeriod = true
 		let showBadges = width > 76
 
-		// Budget vertical estimé en px.
-		const verticalPadding = 8 // py-1
+		// Budget vertical estimé en px. Les mesures viennent du contentRect du ResizeObserver :
+		// le padding (py-1) en est déjà exclu.
+		const verticalPadding = 0
 		const rowGap = 2 // gap-0.5
-		const titleLinePx = clamp(9.4 + (fontScale * 2.3), 10, 14.5)
-		const periodRowPx = periodClass.includes("10px") ? 10 : periodClass.includes("11px") ? 11.5 : 13
-		const badgeRowPx = badgeSize === "xs" ? 8 : badgeSize === "sm" ? 10 : 12
+		// Mirrors `.calendar-event-title` in calendar.vue: 0.58rem + scale × 0.12rem, floored at 11px.
+		const titleLinePx = clamp(9.28 + (fontScale * 1.92), MIN_TEXT_PX, 16) * TITLE_LINE_HEIGHT
+		const periodRowPx = (periodClass.includes("11px") ? MIN_TEXT_PX : 12) * 1.25
+		const badgeRowPx = badgeSize === "sm" ? 20 : 24
 		const available = Math.max(12, height - verticalPadding)
 
 		// Garde-fous explicites basés sur la hauteur réelle.
@@ -173,7 +175,7 @@ export const useAiringSchedules = () => {
 	const shouldShowBadges = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).showBadges
 	const shouldShowPeriod = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).showPeriod
 	const getPeriodTextClass = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number) => getEventLayout(event, timeStep).periodClass
-	const getBadgeSize = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): "xs" | "sm" | "md" => getEventLayout(event, timeStep).badgeSize
+	const getBadgeSize = (event: { start: Date | string, end: Date | string, media?: { id?: number }, id?: number, title?: string }, timeStep: number): "sm" | "md" => getEventLayout(event, timeStep).badgeSize
 	const hasValidEpisode = (event: { episode?: number }) => {
 		const episode = Number(event.episode)
 		return Number.isFinite(episode) && episode > 0

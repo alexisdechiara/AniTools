@@ -1,46 +1,136 @@
 <script setup lang="ts">
-import type { AniListMediaSummary } from "~~/shared/types/anilist"
-import { getExploreRelationBadge, getExploreTitle } from "~/utils/explore"
+import type { DropdownMenuItem } from "@nuxt/ui"
+import { getExploreRelationBadge } from "~/utils/explore"
+import {
+	buildExplorePicksExport,
+	buildExplorePicksLinks,
+	getExplorePickUrl,
+	getExplorePicksExportFilename,
+	type ExplorePickMedia
+} from "~/utils/explore-picks"
+import { getMediaCover } from "~/utils/media-display"
 
 const props = withDefaults(defineProps<{
 	addingAll?: boolean
 	addingMediaIds?: readonly number[]
 	canAddToPlanning?: boolean
-	media?: readonly AniListMediaSummary[]
+	media?: readonly ExplorePickMedia[]
+	passedCount?: number
 	undoDisabled?: boolean
 }>(), {
 	addingAll: false,
 	addingMediaIds: () => [],
 	canAddToPlanning: false,
 	media: () => [],
+	passedCount: 0,
 	undoDisabled: true
 })
 
 const emit = defineEmits<{
 	addAllToPlanning: []
-	addToPlanning: [media: AniListMediaSummary]
-	undo: [media: AniListMediaSummary]
+	addToPlanning: [media: ExplorePickMedia]
+	clear: []
+	undo: [media: ExplorePickMedia]
 	undoLast: []
 }>()
 
+// Saving to AniList needs an OAuth session. The login page sends the visitor back here.
+const signInLink = { path: "/login", query: { redirect: "/explore" } }
+const UNDO_HINT ="Undo is not kept across reloads. Each pick has its own undo."
+
 const deckMedia = computed(() => [...props.media].reverse())
 const addingIds = computed(() => new Set(props.addingMediaIds))
+const clearOpen = ref(false)
+const undoHintId = useId()
+// Saved picks without an undo history: the page was reloaded since they were made.
+const showUndoHint = computed(() =>
+	props.undoDisabled && !props.addingAll && props.media.length > 0
+)
+const canClear = computed(() => props.media.length > 0 || props.passedCount > 0)
+const clearDescription = computed(() =>
+	`This forgets ${countLabel(props.media.length, "interested title")} and ${countLabel(props.passedCount, "passed title")} for this profile on this device. Passed titles can then be suggested again.`
+)
 
-function cover(media: AniListMediaSummary): string | null {
-	return media.coverImage?.extraLarge
-		?? media.coverImage?.large
-		?? media.coverImage?.medium
-		?? null
+const { title: getAnimeTitle } = useMediaTitle()
+const toast = useToast()
+
+const exportItems = computed<DropdownMenuItem[]>(() => [
+	{
+		label: "Download JSON",
+		icon: "i-lucide-file-json",
+		onSelect: downloadJson
+	},
+	{
+		label: "Copy AniList links",
+		icon: "i-lucide-link",
+		onSelect: () => void copyLinks()
+	}
+])
+
+function countLabel(count: number, noun: string): string {
+	return `${count} ${noun}${count === 1 ? "" : "s"}`
 }
 
-function aniListUrl(media: AniListMediaSummary): string {
-	return media.siteUrl ?? `https://anilist.co/anime/${media.id}`
+function cover(media: ExplorePickMedia): string | null {
+	// A 64px-wide thumbnail: the mid-size AniList cover is enough, even at 2x.
+	return getMediaCover(media, "medium")
 }
 
-function relationBadge(media: AniListMediaSummary) {
+function relationBadge(media: ExplorePickMedia) {
 	return getExploreRelationBadge(media)
 }
 
+// Both exports are built in the browser from the saved picks: nothing is sent anywhere.
+function downloadJson(): void {
+	if (!props.media.length) return
+
+	try {
+		const exportedAt = new Date()
+		const payload = buildExplorePicksExport(deckMedia.value, exportedAt, getAnimeTitle)
+		const url = URL.createObjectURL(new Blob(
+			[JSON.stringify(payload, null, 2)],
+			{ type: "application/json" }
+		))
+		const anchor = document.createElement("a")
+		anchor.href = url
+		anchor.download = getExplorePicksExportFilename(exportedAt)
+		anchor.click()
+		URL.revokeObjectURL(url)
+	} catch {
+		toast.add({
+			title: "Could not download your picks",
+			description: "Your browser blocked the download. Try again.",
+			color: "error",
+			icon: "i-lucide-triangle-alert"
+		})
+	}
+}
+
+async function copyLinks(): Promise<void> {
+	if (!props.media.length) return
+
+	try {
+		await navigator.clipboard.writeText(buildExplorePicksLinks(deckMedia.value))
+		toast.add({
+			title: "AniList links copied",
+			description: `${countLabel(props.media.length, "link")} copied to your clipboard.`,
+			color: "success",
+			icon: "i-lucide-clipboard-check"
+		})
+	} catch {
+		toast.add({
+			title: "Could not copy the links",
+			description: "Your browser blocked clipboard access. Use Download JSON instead.",
+			color: "error",
+			icon: "i-lucide-triangle-alert"
+		})
+	}
+}
+
+function confirmClear(): void {
+	clearOpen.value = false
+	emit("clear")
+}
 </script>
 
 <template>
@@ -55,20 +145,28 @@ function relationBadge(media: AniListMediaSummary) {
 						<h2 class="truncate text-sm font-semibold text-highlighted">Interested</h2>
 						<UBadge :label="String(media.length)" color="neutral" variant="soft" size="sm" />
 					</div>
-					<p class="mt-0.5 text-xs text-muted">Your picks from this session</p>
+					<p class="mt-0.5 text-xs text-muted">Saved on this device</p>
 				</div>
-				<UButton
-					icon="i-lucide-undo-2"
-					label="Undo"
-					color="error"
-					variant="soft"
-					size="sm"
-					class="rounded-full"
-					:disabled="undoDisabled"
-					@click="emit('undoLast')" />
+				<UTooltip :text="UNDO_HINT" :disabled="!showUndoHint">
+					<!-- A disabled button fires no pointer events: the wrapper carries the tooltip. -->
+					<span class="inline-flex shrink-0 rounded-full">
+						<UButton
+							icon="i-lucide-undo-2"
+							label="Undo"
+							color="neutral"
+							variant="soft"
+							size="sm"
+							class="rounded-full"
+							:disabled="undoDisabled"
+							:aria-describedby="showUndoHint ? undoHintId : undefined"
+							@click="emit('undoLast')" />
+					</span>
+				</UTooltip>
+				<span v-if="showUndoHint" :id="undoHintId" class="sr-only">{{ UNDO_HINT }}</span>
 			</div>
 
 			<UButton
+				v-if="canAddToPlanning"
 				icon="i-lucide-list-plus"
 				label="Add all to Plan to Watch"
 				color="warning"
@@ -77,9 +175,56 @@ function relationBadge(media: AniListMediaSummary) {
 				block
 				class="rounded-full"
 				:loading="addingAll"
-				:disabled="!canAddToPlanning || !media.length || addingAll"
+				:disabled="!media.length || addingAll"
 				@click="emit('addAllToPlanning')" />
+			<!-- A public profile is read-only: say why nothing can be saved and what works instead. -->
+			<p v-else class="text-sm text-pretty text-muted" data-planning-sign-in>
+				This public profile is read-only.
+				<NuxtLink
+					:to="signInLink"
+					class="font-medium text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Sign in with AniList to save these to Plan to Watch</NuxtLink>,
+				or export your picks.
+			</p>
+
+			<div class="grid grid-cols-2 gap-2">
+				<UDropdownMenu :items="exportItems" :content="{ align: 'start' }" :disabled="!media.length">
+					<UButton
+						icon="i-lucide-download"
+						:label="canAddToPlanning ? 'Export' : 'Export picks'"
+						:color="canAddToPlanning ? 'neutral' : 'primary'"
+						:variant="canAddToPlanning ? 'soft' : 'solid'"
+						size="sm"
+						block
+						class="rounded-full"
+						:disabled="!media.length" />
+				</UDropdownMenu>
+				<UButton
+					icon="i-lucide-trash-2"
+					label="Clear picks"
+					color="neutral"
+					variant="soft"
+					size="sm"
+					block
+					class="rounded-full"
+					:disabled="!canClear || addingAll"
+					@click="clearOpen = true" />
+			</div>
 		</header>
+
+		<UModal
+			v-model:open="clearOpen"
+			title="Clear your picks?"
+			:description="clearDescription">
+			<template #footer>
+				<UButton
+					label="Cancel"
+					color="neutral"
+					variant="outline"
+					class="ms-auto rounded-full"
+					@click="clearOpen = false" />
+				<UButton label="Clear picks" color="error" class="rounded-full" @click="confirmClear" />
+			</template>
+		</UModal>
 
 		<div class="max-h-[calc(100svh-12rem)] overflow-y-auto p-3">
 			<div
@@ -104,18 +249,20 @@ function relationBadge(media: AniListMediaSummary) {
 					data-interested-card
 					class="group relative isolate flex min-h-20 overflow-hidden rounded-2xl border border-default bg-elevated/60 shadow-sm">
 					<a
-						:href="aniListUrl(item)"
+						:href="getExplorePickUrl(item)"
 						target="_blank"
 						rel="noopener noreferrer"
 						data-interested-image-link
 						class="group/image relative w-16 shrink-0 overflow-hidden bg-muted"
-						:aria-label="`Open ${getExploreTitle(item)} on AniList`">
+						:aria-label="`Open ${getAnimeTitle(item)} on AniList`">
 						<NuxtImg
 							v-if="cover(item)"
 							:src="cover(item)!"
-							:alt="`${getExploreTitle(item)} cover`"
-							width="160"
-							height="224"
+							:alt="`${getAnimeTitle(item)} cover`"
+							width="64"
+							height="96"
+							fit="cover"
+							format="webp"
 							loading="lazy"
 							class="size-full object-cover transition duration-200 group-hover/image:scale-105" />
 						<span v-else class="flex size-full items-center justify-center">
@@ -131,7 +278,7 @@ function relationBadge(media: AniListMediaSummary) {
 					<div class="flex min-w-0 flex-1 items-center gap-2 p-2.5">
 						<div class="min-w-0 flex-1">
 							<p class="line-clamp-2 text-sm leading-tight font-semibold text-highlighted">
-								{{ getExploreTitle(item) }}
+								{{ getAnimeTitle(item) }}
 							</p>
 							<p class="mt-1 truncate text-[11px] text-muted">
 								{{ item.format?.replaceAll("_", " ") || "Anime" }}

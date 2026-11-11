@@ -4,6 +4,7 @@ import type {
 	AniListAnimeListEntry,
 	AniListSource
 } from "~~/shared/types/anilist"
+import { getMediaTitle } from "~/utils/media-display"
 
 export const MIN_REWIND_YEAR = 2000
 export const MAX_REWIND_ACTIVITY_PAGES = 20
@@ -145,10 +146,7 @@ function isWatchRelatedActivity(activity: AniListAnimeActivity): boolean {
 }
 
 function getTitle(entry: AniListAnimeListEntry): string {
-	return entry.media?.title?.userPreferred
-		|| entry.media?.title?.english
-		|| entry.media?.title?.romaji
-		|| `Anime #${entry.media?.id ?? entry.id}`
+	return getMediaTitle(entry.media ?? { id: entry.id })
 }
 
 function getMeanScore(entries: readonly AniListAnimeListEntry[]): number {

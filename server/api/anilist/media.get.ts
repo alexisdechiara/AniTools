@@ -1,7 +1,7 @@
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
-	forwardAniListRateLimit,
 	getAniListMediaResponse,
+	handleAniListRouteError,
 	parseAniListMediaQuery,
 	setAniListResponseCache
 } from "~~/server/utils/anilist-client"
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
 	try {
 		return await getAniListMediaResponse(query)
 	} catch (error) {
-		forwardAniListRateLimit(event, error)
+		await handleAniListRouteError(event, error)
 		throw error
 	}
 })

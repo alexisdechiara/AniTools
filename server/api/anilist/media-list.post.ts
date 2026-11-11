@@ -1,7 +1,7 @@
 import { assertSameOriginRequest } from "~~/server/utils/anilist-auth"
 import { enforceRateLimit } from "~~/server/utils/rate-limit"
 import {
-	forwardAniListRateLimit,
+	handleAniListRouteError,
 	parseAniListSaveMediaListEntryBody,
 	resolveAniListAccess,
 	saveAniListMediaListEntry,
@@ -16,6 +16,11 @@ export default defineEventHandler(async (event) => {
 		windowMs: 60_000
 	})
 
+	const contentLength = Number(getHeader(event, "content-length") ?? 0)
+	if (!Number.isFinite(contentLength) || contentLength > 1_024) {
+		throw createError({ statusCode: 413, statusMessage: "Request body is too large" })
+	}
+
 	const body = parseAniListSaveMediaListEntryBody(await readBody(event))
 	const access = await resolveAniListAccess(event)
 	setAniListResponseCache(event, access.mode)
@@ -23,7 +28,7 @@ export default defineEventHandler(async (event) => {
 	try {
 		return await saveAniListMediaListEntry(access, body)
 	} catch (error) {
-		forwardAniListRateLimit(event, error)
+		await handleAniListRouteError(event, error, access)
 		throw error
 	}
 })

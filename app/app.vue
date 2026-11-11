@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getFeaturePageTitle } from "#shared/config/features"
 import {
 	normalizeSiteUrl,
 	serializeJsonLd
@@ -16,6 +17,8 @@ const seo = {
 	title: "AniTools",
 	description: "Explore anime releases and turn AniList data into calendars, statistics, rewinds and tier lists."
 }
+// Pages that set their own title override this; the rest are named after their feature.
+const featureTitle = computed(() => route.meta.feature ? getFeaturePageTitle(route.meta.feature) : null)
 const websiteSchema = computed(() =>
 	serializeJsonLd({
 		"@context": "https://schema.org",
@@ -56,12 +59,12 @@ useHead(() => ({
 }))
 
 useSeoMeta({
-	title: seo.title,
+	title: () => featureTitle.value ?? "",
 	description: seo.description,
 	ogSiteName: "AniTools",
 	ogType: "website",
 	ogUrl: () => canonicalUrl.value,
-	ogTitle: seo.title,
+	ogTitle: () => featureTitle.value ?? seo.title,
 	ogDescription: seo.description,
 	ogImage: () => ogImageUrl.value,
 	twitterCard: "summary_large_image",

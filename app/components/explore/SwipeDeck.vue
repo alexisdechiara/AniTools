@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AniListMediaSummary } from "~~/shared/types/anilist"
-import { getExploreRelationBadge, getExploreTitle } from "~/utils/explore"
+import { getExploreRelationBadge } from "~/utils/explore"
+import { getMediaCover, sanitizeMediaDescription } from "~/utils/media-display"
 
 type SwipeDirection = "left" | "right"
 
@@ -32,12 +33,9 @@ const drag = reactive({
 })
 let decisionTimer: ReturnType<typeof setTimeout> | null = null
 
-const title = computed(() => props.media ? getExploreTitle(props.media) : "")
-const cover = computed(() => props.media?.coverImage?.extraLarge
-	?? props.media?.coverImage?.large
-	?? props.media?.coverImage?.medium
-	?? null
-)
+const { title: getAnimeTitle } = useMediaTitle()
+const title = computed(() => props.media ? getAnimeTitle(props.media) : "")
+const cover = computed(() => getMediaCover(props.media))
 const score = computed(() => props.media?.averageScore ?? props.media?.meanScore)
 const themeColor = computed(() => props.media?.coverImage?.color
 	?? "var(--ui-color-primary-400)"
@@ -53,12 +51,7 @@ const mediaTags = computed(() => {
 const aniListUrl = computed(() => props.media?.siteUrl
 	?? (props.media ? `https://anilist.co/anime/${props.media.id}` : "")
 )
-const description = computed(() => (props.media?.description ?? "")
-	.replace(/<br\s*\/?>/gi, " ")
-	.replace(/<[^>]*>/g, "")
-	.replace(/\s+/g, " ")
-	.trim()
-)
+const description = computed(() => sanitizeMediaDescription(props.media?.description))
 const relationBadge = computed(() => props.media
 	? getExploreRelationBadge(props.media)
 	: null
@@ -78,10 +71,7 @@ const cardStyle = computed(() => ({
 }))
 
 function mediaCover(media: AniListMediaSummary): string | null {
-	return media.coverImage?.extraLarge
-		?? media.coverImage?.large
-		?? media.coverImage?.medium
-		?? null
+	return getMediaCover(media)
 }
 
 function resetDrag(): void {
@@ -169,7 +159,9 @@ onBeforeUnmount(() => {
 					alt=""
 					width="420"
 					height="560"
-					loading="eager"
+					fit="cover"
+					format="webp"
+					loading="lazy"
 					class="size-full object-cover opacity-30" />
 			</div>
 
@@ -195,6 +187,8 @@ onBeforeUnmount(() => {
 							:alt="`${title} cover`"
 							width="720"
 							height="960"
+							fit="cover"
+							format="webp"
 							loading="eager"
 							data-cover-image
 							class="size-full object-cover"
@@ -210,7 +204,7 @@ onBeforeUnmount(() => {
 							:label="`${score}% match`"
 							variant="subtle"
 							data-theme-badge
-							class="rounded-full text-white shadow-sm" />
+							class="rounded-full font-semibold text-white shadow-sm" />
 						<UBadge
 							v-if="media.status === 'RELEASING'"
 							label="Airing"
@@ -228,8 +222,8 @@ onBeforeUnmount(() => {
 				</div>
 
 				<div class="flex min-h-0 flex-1 flex-col p-5 sm:p-6 lg:p-8">
-					<p class="text-xs font-semibold tracking-wide text-(--anime-theme-color) uppercase">{{ reason }}</p>
-					<h2 class="mt-2 line-clamp-2 text-2xl font-bold tracking-tight text-highlighted sm:text-3xl">
+					<p class="text-xs font-semibold tracking-wide text-anime-theme uppercase">{{ reason }}</p>
+					<h2 class="mt-2 line-clamp-2 shrink-0 text-2xl font-bold tracking-tight text-highlighted sm:text-3xl">
 						{{ title }}
 					</h2>
 					<div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -248,11 +242,11 @@ onBeforeUnmount(() => {
 							:key="item"
 							:label="item"
 							variant="subtle"
-							class="rounded-full bg-(--anime-theme-color)/10 text-(--anime-theme-color) ring-(--anime-theme-color)/25" />
+							class="rounded-full bg-(--anime-theme-color)/10 text-anime-theme ring-(--anime-theme-color)/25" />
 					</div>
-					<p class="mt-4 hidden items-center gap-2 text-xs text-dimmed lg:flex">
-						<UIcon name="i-lucide-mouse-pointer-2" class="size-4" />
-						Drag the card or use the arrow keys
+					<p class="mt-4 hidden items-center gap-2 text-sm text-muted lg:flex">
+						<UIcon name="i-lucide-mouse-pointer-2" class="size-4 shrink-0" aria-hidden="true" />
+						<span>Drag the card<span class="pointer-coarse:hidden"> or use the arrow keys</span></span>
 					</p>
 				</div>
 
@@ -269,14 +263,26 @@ onBeforeUnmount(() => {
 			</article>
 		</div>
 
-		<div v-if="media" class="flex w-full flex-wrap items-center justify-center gap-3">
+		<p v-if="media" class="text-center text-sm text-muted lg:hidden">
+			Swipe left to pass, right if you are interested<span class="pointer-coarse:hidden">, or use the arrow keys</span>
+		</p>
+		<!--
+			One row on every screen. On phones the bar is fixed to the bottom of the viewport so
+			the three actions never fall below the fold (the page reserves the room for it);
+			from `sm` it sits under the card. The layout scrolls `main`, not the panel body, so
+			`position: sticky` has nothing to stick to here.
+		-->
+		<div
+			v-if="media"
+			data-swipe-actions
+			class="fixed inset-x-0 bottom-0 z-20 flex items-stretch justify-center gap-2 border-t border-default bg-default px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:w-full sm:items-center sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0">
 			<UButton
 				icon="i-lucide-x"
 				label="Pass"
 				color="error"
 				variant="soft"
 				size="xl"
-				class="min-w-40 justify-center rounded-full px-6 py-3 text-base"
+				class="min-h-11 shrink-0 justify-center rounded-full px-4 text-base sm:min-w-36 sm:px-6 sm:py-3"
 				:disabled="disabled || animating"
 				@click="commitDecision('left')" />
 			<UButton
@@ -286,23 +292,22 @@ onBeforeUnmount(() => {
 				rel="noopener noreferrer"
 				icon="i-lucide-info"
 				label="Details"
+				aria-label="Details on AniList"
 				color="neutral"
 				variant="outline"
 				size="xl"
-				class="min-w-40 justify-center rounded-full px-6 py-3 text-base" />
+				:ui="{ label: 'sr-only sm:not-sr-only' }"
+				class="min-h-11 min-w-11 shrink-0 justify-center rounded-full px-0 text-base sm:min-w-36 sm:px-6 sm:py-3" />
 			<UButton
 				icon="i-lucide-heart"
 				label="Interested"
 				color="success"
-				variant="soft"
+				variant="solid"
 				size="xl"
-				class="min-w-40 justify-center rounded-full px-6 py-3 text-base"
+				class="min-h-11 min-w-0 flex-1 justify-center rounded-full px-4 text-base font-semibold sm:min-w-48 sm:flex-none sm:px-8 sm:py-3"
 				:disabled="disabled || animating"
 				@click="commitDecision('right')" />
 		</div>
-		<p v-if="media" class="text-center text-xs text-dimmed lg:hidden">
-			Swipe left to pass · swipe right if you are interested
-		</p>
 	</div>
 </template>
 
@@ -325,10 +330,15 @@ onBeforeUnmount(() => {
 	transform: scale(1.025);
 }
 
+/*
+ * White text on the raw cover colour reached 2.25:1 on pale covers. The badge is now an
+ * opaque dark scrim tinted with that colour: 30% of any sRGB colour mixed into black stays
+ * under 0.08 relative luminance, so white text keeps at least 8:1 whatever the cover is.
+ */
 [data-theme-badge] {
-	background: color-mix(in srgb, var(--anime-theme-color) 82%, transparent);
+	background: color-mix(in srgb, var(--anime-theme-color) 30%, black);
 	box-shadow:
-		0 0 0 1px var(--anime-theme-color),
+		0 0 0 1px color-mix(in srgb, var(--anime-theme-color) 55%, black),
 		0 2px 6px color-mix(in srgb, black 18%, transparent);
 }
 

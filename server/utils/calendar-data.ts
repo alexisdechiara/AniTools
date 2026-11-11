@@ -56,3 +56,18 @@ export function parseSimuldubItems(input: unknown) {
 
 	return parsed
 }
+
+const RETRYABLE_ANILIST_CODES = new Set([
+	"ANILIST_TIMEOUT",
+	"ANILIST_UNAVAILABLE",
+	"ANILIST_UPSTREAM_ERROR"
+])
+
+/** A transient upstream failure is worth one more attempt; a rejected or malformed answer is not. */
+export function isRetryableAniListError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null) return false
+	const data = (error as { data?: unknown }).data
+	if (typeof data !== "object" || data === null) return false
+	const code = (data as { code?: unknown }).code
+	return typeof code === "string" && RETRYABLE_ANILIST_CODES.has(code)
+}
