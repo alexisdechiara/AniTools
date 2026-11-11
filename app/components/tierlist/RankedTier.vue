@@ -1,8 +1,10 @@
 <template>
 	<div
-		class="group/row relative flex min-h-28 w-full flex-col rounded-lg transition-shadow duration-200 sm:grid sm:grid-cols-12"
+		class="group/row relative flex w-full rounded-lg transition-shadow duration-200 sm:grid sm:grid-cols-12"
+		:data-tier-empty-row="isEmpty ? '' : undefined"
 		:class="[
-			selectedBackground,
+			isEmpty ? 'min-h-14 flex-row' : 'min-h-28 flex-col',
+			screenBackground,
 			rowCornerClass,
 			hoveredTarget?.id === `row-${tier.id}` && hoveredTarget?.type === 'row'
 				? 'cursor-pointer ring-2 ring-primary ring-offset-2 ring-offset-default'
@@ -20,8 +22,9 @@
 			@focus="setHovered(`row-${tier.id}`, 'row', 'Tier Row')"
 			@blur="clearHovered" />
 		<div
-			class="group/control relative z-20 flex size-full min-h-20 items-center justify-center text-lg font-semibold transition-[background-color,box-shadow] duration-200"
+			class="group/control relative z-20 flex h-full items-center justify-center text-lg font-semibold transition-[background-color,box-shadow] duration-200"
 			:class="[
+				isEmpty ? 'min-h-14 w-20 shrink-0 sm:w-full' : 'min-h-20 w-full',
 				colWidthClass,
 				headingCorner ? rowCornerClass : 'rounded-none',
 				isHexColor ? 'tier-ink' : 'text-inverted',
@@ -46,10 +49,11 @@
 			<UTextarea
 				v-model.lazy="tierName"
 				autoresize
+				:rows="1"
 				variant="none"
 				:aria-label="`Name of tier ${tier.name}`"
 				:ui="{
-					root: 'size-full',
+					root: 'w-full px-1.5',
 					base: `text-center text-lg font-semibold bg-transparent flex-wrap place-content-center ${isHexColor ? 'tier-ink' : 'text-inverted'}`
 				}" />
 			<div
@@ -59,6 +63,7 @@
 					color="neutral"
 					variant="link"
 					class="cursor-pointer text-highlighted"
+					:class="isEmpty ? 'max-sm:py-1' : ''"
 					:aria-label="`Move ${tier.name} up`"
 					:disabled="isFirst"
 					@click="moveTierUp(index)" />
@@ -68,19 +73,21 @@
 					variant="link"
 					:aria-label="`Drag ${tier.name} tier`"
 					data-tier-handle
-					class="cursor-grab text-highlighted active:cursor-grabbing" />
+					class="cursor-grab text-highlighted active:cursor-grabbing"
+					:class="isEmpty ? 'max-sm:hidden' : ''" />
 				<UButton
 					icon="i-lucide-chevron-down"
 					color="neutral"
 					variant="link"
 					class="cursor-pointer text-highlighted"
+					:class="isEmpty ? 'max-sm:py-1' : ''"
 					:aria-label="`Move ${tier.name} down`"
 					:disabled="isLast"
 					@click="moveTierDown(index)" />
 			</div>
 		</div>
 		<div
-			class="relative z-20 w-full"
+			class="relative z-20 w-full min-w-0"
 			:class="[
 				bodyColWidthClass,
 				hoveredTarget?.id === `content-${tier.id}` && hoveredTarget?.type === 'content'
@@ -101,6 +108,7 @@
 			<DraggableTier
 				v-model="tierEntries"
 				:lane-id="tier.id"
+				compact-when-empty
 				:class="isInspectorEnabled ? 'pointer-events-none' : 'pointer-events-auto'" />
 		</div>
 	</div>
@@ -108,6 +116,7 @@
 
 <script lang="ts" setup>
 import type { TierlistTier } from "~/types/tierlist"
+import { tierlistScreenBackground } from "~/utils/tierlist"
 
 const props = defineProps<{
 	tier: TierlistTier
@@ -129,6 +138,7 @@ const tierEntries = computed({
 	get: () => props.tier.entries,
 	set: value => emit("update:entries", value)
 })
+const isEmpty = computed(() => props.tier.entries.length === 0)
 const isHexColor = computed(() => /^#[0-9a-f]{3,8}$/i.test(props.tier.color))
 
 const tierlistStore = useTierlistStore()
@@ -140,6 +150,8 @@ const {
 	headingCorner
 } = storeToRefs(tierlistStore)
 const { moveTierUp, moveTierDown } = tierlistStore
+// On-screen only: the image export reads the stored value, not this class.
+const screenBackground = computed(() => tierlistScreenBackground(selectedBackground.value))
 const {
 	isInspectorEnabled,
 	setHovered,
@@ -148,3 +160,14 @@ const {
 	hoveredTarget
 } = useInspector()
 </script>
+
+<style scoped>
+/* variant="none" strips the field ring, so the tier name needs its own focus indicator. */
+:deep(textarea:focus-visible) {
+	border-radius: 0.375rem;
+	outline: 2px solid var(--ui-primary);
+	outline-offset: 2px;
+	/* Fills the offset gap so the ring also reads on a tier colour close to the primary. */
+	box-shadow: 0 0 0 2px var(--ui-bg);
+}
+</style>

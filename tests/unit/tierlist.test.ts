@@ -8,7 +8,8 @@ import {
 	nbColToClass,
 	rowCornerToClass,
 	tierlistDarkBackgrounds,
-	tierlistLightBackgrounds
+	tierlistLightBackgrounds,
+	tierlistScreenBackground
 } from "../../app/utils/tierlist"
 
 describe("tierlist presentation mappings", () => {
@@ -56,4 +57,17 @@ describe("tierlist presentation mappings", () => {
 		expect(tierlistLightBackgrounds).toHaveLength(12)
 		expect(tierlistDarkBackgrounds).toHaveLength(12)
 	})
+})
+
+describe("tierlistScreenBackground", () => {
+	it("lets the light default follow the theme on screen", () => {
+		expect(tierlistScreenBackground("bg-neutral-100")).toBe("bg-neutral-100 dark:bg-muted")
+	})
+
+	it.each([...tierlistLightBackgrounds, "bg-white"].filter(value => value !== "bg-neutral-100"))(
+		"paints the deliberate pick %s as stored",
+		(value) => {
+			expect(tierlistScreenBackground(value)).toBe(value)
+		}
+	)
 })

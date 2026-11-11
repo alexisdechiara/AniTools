@@ -26,9 +26,13 @@
 				:src="coverUrl"
 				:alt="title"
 				class="size-full rounded-lg object-cover" />
+			<!-- Touch: a single "Actions" button with a 44px hit area opens the menu (Details and
+				Remove live in it), always visible because there is no hover. Fine pointers keep the
+				three small buttons. -->
 			<div
 				v-if="!isInspectorEnabled"
-				class="visible absolute top-0 -right-4 z-60 flex h-fit flex-col gap-0.5 opacity-100 transition-opacity duration-250 ease-in md:invisible md:opacity-0 md:group-focus-within:visible md:group-focus-within:opacity-100 md:group-hover:visible md:group-hover:opacity-100">
+				data-entry-actions
+				class="visible absolute top-0 -right-4 z-60 flex h-fit flex-col gap-0.5 opacity-100 transition-opacity duration-250 ease-in md:invisible md:opacity-0 md:group-focus-within:visible md:group-focus-within:opacity-100 md:group-hover:visible md:group-hover:opacity-100 pointer-coarse:visible! pointer-coarse:top-1 pointer-coarse:right-1 pointer-coarse:opacity-100!">
 				<UDropdownMenu
 					:items="actions"
 					size="sm"
@@ -39,7 +43,8 @@
 						variant="solid"
 						size="xs"
 						:aria-label="`Actions for ${title}`"
-						class="cursor-pointer rounded-full" />
+						class="relative cursor-pointer rounded-full pointer-coarse:size-8 pointer-coarse:justify-center pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5 pointer-coarse:after:content-['']"
+						:ui="{ leadingIcon: 'pointer-coarse:size-5' }" />
 				</UDropdownMenu>
 				<AnimeDetailsPopover
 					v-model:open="showDetails"
@@ -51,7 +56,7 @@
 						variant="solid"
 						size="xs"
 						:aria-label="`Show details for ${title}`"
-						class="cursor-pointer rounded-full" />
+						class="cursor-pointer rounded-full pointer-coarse:pointer-events-none pointer-coarse:invisible! pointer-coarse:absolute pointer-coarse:top-0 pointer-coarse:right-0" />
 				</AnimeDetailsPopover>
 				<UButton
 					icon="i-lucide-trash"
@@ -59,7 +64,7 @@
 					variant="solid"
 					size="xs"
 					:aria-label="`Remove ${title}`"
-					class="cursor-pointer rounded-full"
+					class="cursor-pointer rounded-full pointer-coarse:hidden"
 					@click.stop="removeAnime" />
 			</div>
 		</UContextMenu>
@@ -209,7 +214,7 @@ const actions = computed(() => [
 	],
 	[
 		{
-			label: "Delete",
+			label: "Remove",
 			color: "error" as const,
 			icon: "i-lucide-trash",
 			onClick: removeAnime

@@ -106,3 +106,15 @@ export const tierlistDarkBackgrounds = [
 export function getTierlistNeutralBackgrounds(theme: "light" | "dark"): string[] {
 	return theme === "dark" ? tierlistDarkBackgrounds : tierlistLightBackgrounds
 }
+
+/**
+ * The lane background class to paint on screen for a stored `selectedBackground`.
+ *
+ * `bg-neutral-100` is the light-theme default and the fallback for unreadable saved data, so a
+ * tier list created in the light theme would stay a pale slab on the dark page. That one value
+ * follows the theme on screen. Every other swatch is a deliberate pick and is painted as stored.
+ * The stored value itself is never rewritten: exports and saved tier lists are unaffected.
+ */
+export function tierlistScreenBackground(stored: string): string {
+	return stored === "bg-neutral-100" ? "bg-neutral-100 dark:bg-muted" : stored
+}
