@@ -3,6 +3,7 @@ import type {
 	AniListAnimeActivity,
 	AniListActivityMedia
 } from "~~/shared/types/anilist"
+import { getMediaCover, getMediaTitle } from "~/utils/media-display"
 import type {
 	TimelineGroup,
 	TimelineItem,
@@ -131,10 +132,7 @@ function startOfUtcMonth(timestamp: number) {
 
 function getAnimeTitle(activity: AniListActivity): string {
 	if (activity.kind !== "anime") return "Anime activity"
-	return activity.media?.title?.userPreferred
-		?? activity.media?.title?.english
-		?? activity.media?.title?.romaji
-		?? "Untitled anime"
+	return getMediaTitle(activity.media)
 }
 
 function getActivityActor(activity: AniListActivity): string {
@@ -276,7 +274,7 @@ export function buildTimelineGanttRows(
 				description: getGanttRowDescription(latestActivity, sortedActivities.length),
 				startedAt: firstActivity.createdAt,
 				endedAt: latestActivity.createdAt,
-				cover: media?.coverImage?.large ?? media?.coverImage?.medium ?? null,
+				cover: getMediaCover(media),
 				color: media?.coverImage?.color ?? null,
 				url: media?.siteUrl ?? null,
 				media,
