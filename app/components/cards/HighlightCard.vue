@@ -66,6 +66,7 @@
 </template>
 
 <script lang="ts" setup>
+import { getMediaCover } from "~/utils/media-display";
 import { getEntryWatchMinutes } from "~/utils/statistics";
 
 const { getBestScoreAnime, getLongestAnime, getMostWatchedAnime } = storeToRefs(
@@ -81,6 +82,7 @@ type Highlight = {
 
 const currentIndex = ref(0);
 const { format: formatScore } = usePersonalScore();
+const { title: getAnimeTitle } = useMediaTitle();
 const highlightedAnimes = computed<Highlight[]>(() => {
   const highlights: Highlight[] = [];
   const bestScore = getBestScoreAnime.value;
@@ -90,15 +92,8 @@ const highlightedAnimes = computed<Highlight[]>(() => {
   if (bestScore?.media) {
     highlights.push({
       title: "Best rated anime",
-      name:
-        bestScore.media.title?.userPreferred ||
-        bestScore.media.title?.english ||
-        bestScore.media.title?.romaji ||
-        "",
-      src:
-        bestScore.media.coverImage?.extraLarge ||
-        bestScore.media.coverImage?.large ||
-        bestScore.media.coverImage?.medium,
+      name: getAnimeTitle(bestScore.media),
+      src: getMediaCover(bestScore.media),
       value: bestScore.score ? formatScore(bestScore.score) : null,
     });
   }
@@ -106,15 +101,8 @@ const highlightedAnimes = computed<Highlight[]>(() => {
   if (longest?.media) {
     highlights.push({
       title: "Longest watch time",
-      name:
-        longest.media.title?.userPreferred ||
-        longest.media.title?.english ||
-        longest.media.title?.romaji ||
-        "",
-      src:
-        longest.media.coverImage?.extraLarge ||
-        longest.media.coverImage?.large ||
-        longest.media.coverImage?.medium,
+      name: getAnimeTitle(longest.media),
+      src: getMediaCover(longest.media),
       value: formatWatchTime(getEntryWatchMinutes(longest)),
     });
   }
@@ -123,15 +111,8 @@ const highlightedAnimes = computed<Highlight[]>(() => {
     const repeats = mostRewatched.repeat ?? 0;
     highlights.push({
       title: "Most rewatched anime",
-      name:
-        mostRewatched.media.title?.userPreferred ||
-        mostRewatched.media.title?.english ||
-        mostRewatched.media.title?.romaji ||
-        "",
-      src:
-        mostRewatched.media.coverImage?.extraLarge ||
-        mostRewatched.media.coverImage?.large ||
-        mostRewatched.media.coverImage?.medium,
+      name: getAnimeTitle(mostRewatched.media),
+      src: getMediaCover(mostRewatched.media),
       value: `${repeats} ${repeats === 1 ? "time" : "times"}`,
     });
   }

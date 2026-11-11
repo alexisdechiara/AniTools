@@ -51,8 +51,8 @@
           }"
         >
           <NuxtImg
-            :src="item.coverImage?.large || item.coverImage?.medium || ''"
-            :alt="item.title?.english || item.title?.romaji || ''"
+            :src="getMediaCover(item) ?? ''"
+            :alt="getAnimeTitle(item)"
             class="h-24 rounded-sm object-cover"
           />
         </UCarousel>
@@ -63,6 +63,9 @@
 
 <script lang="ts" setup>
 import type { listType } from "./cards/ListCard.vue";
+import { getMediaCover } from "~/utils/media-display";
+
+const { title: getAnimeTitle } = useMediaTitle();
 
 const props = defineProps<listType & { meanScoreLabel?: string }>();
 

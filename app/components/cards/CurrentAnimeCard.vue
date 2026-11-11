@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getMediaCover } from "~/utils/media-display"
+
 const { getAllAnimes } = storeToRefs(useEntriesStore())
 
 const currentAnime = computed(() =>
@@ -10,11 +12,14 @@ const currentAnime = computed(() =>
 		.slice(0, 5)
 )
 
+const { title: getAnimeTitle } = useMediaTitle()
+
 function getTitle(entry: typeof currentAnime.value[number]): string {
-	return entry.media?.title?.userPreferred
-		?? entry.media?.title?.english
-		?? entry.media?.title?.romaji
-		?? "Untitled anime"
+	return getAnimeTitle(entry.media)
+}
+
+function getCover(entry: typeof currentAnime.value[number]): string | null {
+	return getMediaCover(entry.media, "small")
 }
 
 function getProgress(entry: typeof currentAnime.value[number]): string {
@@ -36,8 +41,8 @@ function getProgress(entry: typeof currentAnime.value[number]): string {
 				:key="entry.id"
 				class="flex min-w-0 items-center gap-3">
 				<NuxtImg
-					v-if="entry.media?.coverImage?.medium"
-					:src="entry.media.coverImage.medium"
+					v-if="getCover(entry)"
+					:src="getCover(entry) ?? undefined"
 					:alt="`${getTitle(entry)} cover`"
 					class="size-11 shrink-0 rounded-md object-cover"
 					width="44"
