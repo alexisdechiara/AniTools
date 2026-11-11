@@ -121,7 +121,16 @@ describe("selectBehindEntries", () => {
 		expect(selectBehindEntries([withoutMedia], 10)).toEqual([])
 	})
 
-	it("keeps only the CURRENT status", () => {
+	it("counts a paused entry like a watched one", () => {
+		const result = selectBehindEntries([
+			entry(1, { status: "PAUSED", nextEpisode: 6, progress: 2 })
+		], 10)
+
+		expect(result.map(item => item.entry.id)).toEqual([1])
+		expect(result.map(item => item.behind)).toEqual([3])
+	})
+
+	it("keeps only the CURRENT and PAUSED statuses", () => {
 		const result = selectBehindEntries([
 			entry(1, { status: "CURRENT" }),
 			entry(2, { status: "PAUSED" }),
@@ -132,7 +141,27 @@ describe("selectBehindEntries", () => {
 			entry(7, { status: null })
 		], 10)
 
-		expect(result.map(item => item.entry.id)).toEqual([1])
+		expect(result.map(item => item.entry.id)).toEqual([1, 2])
+	})
+
+	it("excludes a rewatch even when it looks behind", () => {
+		const result = selectBehindEntries([
+			entry(1, { status: "REPEATING", nextEpisode: 9, progress: 1 })
+		], 10)
+
+		expect(result).toEqual([])
+	})
+
+	it("orders watched and paused entries together, without favouring a status", () => {
+		const result = selectBehindEntries([
+			entry(1, { status: "CURRENT", title: "Beta", nextEpisode: 4, progress: 0 }),
+			entry(2, { status: "PAUSED", title: "Gamma", nextEpisode: 10, progress: 1 }),
+			entry(3, { status: "PAUSED", title: "Alpha", nextEpisode: 4, progress: 0 }),
+			entry(4, { status: "CURRENT", title: "Delta", nextEpisode: 7, progress: 1 })
+		], 10)
+
+		expect(result.map(item => item.entry.id)).toEqual([2, 4, 3, 1])
+		expect(result.map(item => item.behind)).toEqual([8, 5, 3, 3])
 	})
 
 	it("does not need the total episode count", () => {

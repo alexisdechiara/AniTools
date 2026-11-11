@@ -14,9 +14,10 @@ function getTitle(entry: AniListAnimeListEntry): string {
 }
 
 function getBehind(entry: AniListAnimeListEntry): number {
-	// Only titles the user is actively watching: paused, dropped, planned and completed
-	// entries are not "behind" in any sense the user acts on.
-	if (entry.status !== "CURRENT") return 0
+	// Titles the user is watching or has paused. A rewatch (REPEATING) restarts the progress
+	// while the next episode is about the broadcast, so the subtraction would be wrong there.
+	// Dropped, planned and completed entries are not "behind" in any sense the user acts on.
+	if (entry.status !== "CURRENT" && entry.status !== "PAUSED") return 0
 
 	// AniList reports no next episode once a title has finished airing (or when it has no
 	// schedule), so there is nothing to compare the progress against.
@@ -29,7 +30,7 @@ function getBehind(entry: AniListAnimeListEntry): number {
 }
 
 /**
- * The titles the user is watching that have aired more episodes than they have seen,
+ * The titles the user is watching or has paused that have aired more episodes than they have seen,
  * most behind first, then by title. `limit` caps the result; a non-positive limit gives [].
  */
 export function selectBehindEntries(
