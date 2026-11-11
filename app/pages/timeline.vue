@@ -7,6 +7,7 @@ import {
 	groupTimelineAnimeActivitiesByMonth,
 	type TimelineMonthGroup
 } from "~/utils/timeline"
+import { mergeConsecutiveEpisodeActivities } from "~/utils/timeline-runs"
 
 definePageMeta({
 	feature: "timeline",
@@ -43,6 +44,11 @@ const loadMoreSentinel = ref<HTMLElement | null>(null)
 const monthGroups = computed(() =>
 	groupTimelineAnimeActivitiesByMonth(activities.value)
 )
+// Episodes of one anime watched in a row share a card. Derived once per load, not per render.
+const monthFeeds = computed(() => monthGroups.value.map(group => ({
+	group,
+	runs: mergeConsecutiveEpisodeActivities(group.activities)
+})))
 const { showPageLoader } = useProgressiveLoading(
 	computed(() => [initialized.value]),
 	{ allowPartial: false }
@@ -137,7 +143,7 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 					class="space-y-14 lg:space-y-20"
 					aria-label="Anime update feed">
 					<section
-						v-for="group in monthGroups"
+						v-for="{ group, runs } in monthFeeds"
 						:key="group.key"
 						class="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10"
 						:data-timeline-month="group.key">
@@ -166,25 +172,26 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 
 						<ol class="space-y-3">
 							<li
-								v-for="activity in group.activities"
-								:key="activity.id"
+								v-for="run in runs"
+								:key="run.key"
 								class="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4.5rem_minmax(0,1fr)]"
 								data-timeline-activity>
 								<time
-									:datetime="new Date(activity.createdAt * 1_000).toISOString()"
+									:datetime="new Date(run.activity.createdAt * 1_000).toISOString()"
 									class="relative flex min-h-16 flex-col items-center border-r border-default pr-3 text-center">
 									<span class="text-[0.65rem] font-semibold tracking-wide text-primary uppercase">
-										{{ formatActivityWeekday(activity) }}
+										{{ formatActivityWeekday(run.activity) }}
 									</span>
 									<span class="mt-0.5 text-lg font-bold text-highlighted">
-										{{ formatActivityDay(activity) }}
+										{{ formatActivityDay(run.activity) }}
 									</span>
 									<span
 										class="absolute top-4 right-0 size-1.5 translate-x-1/2 rounded-full bg-primary ring-4 ring-default"
 										aria-hidden="true" />
 								</time>
 								<TimelineActivityCard
-									:activity="activity"
+									:activity="run.activity"
+									:run="run"
 									compact
 									side="right" />
 							</li>
