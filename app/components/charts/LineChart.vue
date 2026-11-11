@@ -98,7 +98,7 @@ const props = withDefaults(
     brushThreshold: 25,
     showArea: true,
     showTooltip: true,
-    crosshairColor: "var(--ui-color-primary-700)",
+    crosshairColor: "var(--ui-primary)",
     showY: true,
   }
 );
@@ -195,8 +195,9 @@ const crosshairTemplate = (d: LineDatum) => {
   overflow: visible !important;
   --vis-area-fill-opacity: 0.1;
   --vis-area-hover-fill-opacity: 0.1;
-  --vis-color0: var(--ui-color-primary-400);
-  --vis-crosshair-line-stroke-color: var(--ui-color-primary-700) !important;
+  /* Theme tokens rather than fixed ramp steps: 700 is 1.5:1 on a black card in dark mode. */
+  --vis-color0: var(--color-completed);
+  --vis-crosshair-line-stroke-color: var(--ui-primary) !important;
   --vis-crosshair-line-stroke-width: 1px !important;
 }
 </style>

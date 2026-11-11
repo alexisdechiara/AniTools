@@ -3,7 +3,7 @@
     <!-- Légende des mois -->
     <div
       v-if="showMonths"
-      class="flex justify-between text-[10px] text-gray-500 w-full overflow-hidden"
+      class="flex justify-between text-[10px] text-muted w-full overflow-hidden"
     >
       <span
         v-for="(month, index) in months"
@@ -20,7 +20,7 @@
       <!-- Jours de la semaine -->
       <div
         v-if="showDays"
-        class="flex flex-col gap-1 mr-1 text-[10px] text-gray-500 flex-shrink-0"
+        class="flex flex-col gap-1 mr-1 text-[10px] text-muted flex-shrink-0"
       >
         <div
           v-for="(day, index) in ['', 'Mon', '', 'Wed', '', 'Fri', '']"
@@ -53,7 +53,7 @@
               <div
                 :class="[
                   'rounded-[2px]',
-                  day.isCurrentMonth ? 'bg-primary' : 'bg-gray-100 dark:bg-gray-800',
+                  day.isCurrentMonth ? 'bg-primary' : 'bg-elevated',
                   'cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0',
                   {
                     'w-3 h-3': size === 'sm',

@@ -301,7 +301,13 @@ const events = {
   transform: scale(1);
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  transition: transform 250ms ease, opacity 250ms ease, fill 250ms ease !important;
+  /*
+   * No `fill` here on purpose. Segment fills are CSS variables (`var(--color-completed)`…),
+   * and a fill transition left them on the previous theme's colour after a light/dark
+   * switch; without it the repaint is immediate. This also overrides the inline
+   * `transition: fill` Unovis sets on each segment.
+   */
+  transition: transform 250ms ease, opacity 250ms ease !important;
 }
 
 .unovis-single-container :deep(path[class*="segment"]:hover) {

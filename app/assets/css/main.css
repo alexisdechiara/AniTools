@@ -59,8 +59,43 @@
 	--color-watching: var(--ui-color-success-600);
 	--color-paused: var(--ui-color-neutral-500);
 
-	--vis-color-main: var(--ui-color-primary-400);
-	--vis-axis-tick-color: var(--ui-color-neutral-200);
+	/* Podium medals: graphics, so 3:1 against the card behind them (white here, black in dark). */
+	--color-medal-gold: oklch(0.6 0.123 78);
+	--color-medal-silver: oklch(0.6 0.022 258);
+	--color-medal-bronze: oklch(0.56 0.115 48);
+}
+
+/*
+ * Semantic aliases. Nuxt UI declares its own inside `@layer theme`; these are unlayered on
+ * purpose so they win whatever order the stylesheets load in. Because an unlayered `:root`
+ * also beats Nuxt UI's layered `.dark` rule, every alias set here is restated in `.dark` below.
+ * The ratios in the comments are asserted by tests/unit/theme-contrast.test.ts.
+ */
+:root {
+	/*
+	 * Brand indigo one step down the ramp: 500 measured 4.33:1 as text on white and under a
+	 * white button label; 600 gives 6.28:1 for both and still 5.70:1 on the elevated surface.
+	 */
+	--ui-primary: var(--ui-color-primary-600);
+
+	/*
+	 * Status colours as text and icons. The 500 steps are 1.9–3.8:1 on white; these are
+	 * 4.8–5.1:1, and a white label on the matching solid fill passes too. Soft and subtle
+	 * variants sit on their own tint and go one step darker still (see app.config.ts).
+	 */
+	--ui-success: var(--ui-color-success-700);
+	--ui-info: var(--ui-color-info-600);
+	--ui-warning: var(--ui-color-warning-700);
+	--ui-error: var(--ui-color-error-600);
+
+	/*
+	 * Dimmed carries real text here (weekday labels, captions), so each quiet step moves up
+	 * one: dimmed 2.6 → 4.8:1 on white, muted 4.4 → 6.9:1 on the elevated surface. Toned is
+	 * nudged past the new muted so the three steps stay distinct.
+	 */
+	--ui-text-dimmed: var(--ui-color-neutral-500);
+	--ui-text-muted: var(--ui-color-neutral-600);
+	--ui-text-toned: oklch(from var(--ui-color-neutral-700) 0.41 c h);
 }
 
 .dark {
@@ -94,10 +129,32 @@
   --ui-bg-accented: var(--ui-color-primary-700);
   --ui-bg-inverted: oklch(from var(--ui-color-primary-50) 0.99 c h);
 
-	--ui-border: var(--ui-color-primary-900);
-  --ui-border-muted: var(--ui-color-primary-800);
-  --ui-border-accented: var(--ui-color-primary-700);
+	/*
+	 * Hairlines were the surface steps themselves (900 on a 950 page: 1.07:1, invisible around
+	 * black cards). Two steps up they read at 1.5 / 1.9 / 2.5:1 on both card and page and stay
+	 * indigo rather than grey.
+	 */
+	--ui-border: var(--ui-color-primary-700);
+  --ui-border-muted: var(--ui-color-primary-600);
+  --ui-border-accented: var(--ui-color-primary-500);
 	--ui-border-inverted: oklch(from var(--ui-color-primary-50) 0.99 c h);
+
+	/*
+	 * The ramp above is re-stepped darker, so Nuxt UI's default (400, #4f46e5) was 3.3:1 as
+	 * text and 2.8:1 under the dark button label. Step 200 is the light theme's 300: 9.6:1 as
+	 * text on the page and 7.9:1 under the label.
+	 */
+	--ui-primary: var(--ui-color-primary-200);
+
+	--ui-success: var(--ui-color-success-400);
+	--ui-info: var(--ui-color-info-400);
+	--ui-warning: var(--ui-color-warning-400);
+	--ui-error: var(--ui-color-error-400);
+
+	/* Dimmed was 4.3:1 on black; lifted between neutral 500 and 400 so muted stays the brighter step. */
+	--ui-text-dimmed: oklch(from var(--ui-color-neutral-500) 0.62 c h);
+	--ui-text-muted: var(--ui-color-neutral-400);
+	--ui-text-toned: var(--ui-color-neutral-300);
 
 	/* On black cards the light steps all clear 3:1 by a wide margin. */
 	--color-completed: var(--ui-color-primary-300);
@@ -105,6 +162,91 @@
 	--color-dropped: var(--ui-color-error-400);
 	--color-watching: var(--ui-color-success-400);
 	--color-paused: var(--ui-color-neutral-400);
+
+	--color-medal-gold: oklch(0.82 0.14 85);
+	--color-medal-silver: oklch(0.78 0.02 258);
+	--color-medal-bronze: oklch(0.7 0.12 50);
+}
+
+/*
+ * Chart chrome. Unovis injects its defaults on `:root` at runtime, after this stylesheet, so
+ * they are overridden one level down. Every value is a semantic token, which is what makes
+ * axes, grid lines and tooltips follow the theme: one block serves light and dark.
+ */
+body {
+	--vis-font-family: var(--font-sans);
+	--vis-color-main: var(--color-completed);
+	--vis-axis-grid-color: var(--ui-border);
+	--vis-axis-tick-color: var(--ui-border-muted);
+	--vis-axis-domain-color: var(--ui-border-muted);
+	--vis-axis-label-color: var(--ui-text-muted);
+	--vis-axis-tick-label-color: var(--ui-text-muted);
+	--vis-tooltip-background-color: var(--ui-bg);
+	--vis-tooltip-border-color: var(--ui-border-accented);
+	--vis-tooltip-text-color: var(--ui-text-highlighted);
+	--vis-tooltip-shadow-color: transparent;
+	--vis-crosshair-line-stroke-color: var(--ui-border-accented);
+	--vis-crosshair-circle-stroke-color: var(--ui-bg);
+	--vis-brush-unselected-fill-color: var(--ui-bg-accented);
+	--vis-brush-unselected-stroke-color: var(--ui-border-accented);
+	--vis-brush-handle-fill-color: var(--ui-text-muted);
+	--vis-brush-handle-stroke-color: var(--ui-bg);
+	--vis-donut-central-label-text-color: var(--ui-text-highlighted);
+	--vis-donut-central-sub-label-text-color: var(--ui-text-muted);
+}
+
+/*
+ * Focus indicator: one solid 2px ring in the brand colour, 2px clear of the control so it
+ * shows against the page even around a filled primary button (6.3:1 light, 9.6:1 dark).
+ *
+ * The base-layer rule is the fallback for anything without its own treatment; utilities
+ * still override it, so components that draw their own 2px outline keep exactly one ring.
+ */
+@layer base {
+	:focus-visible {
+		outline: 2px solid var(--ui-primary);
+		outline-offset: 2px;
+	}
+}
+
+/*
+ * Nuxt UI draws focus as a 3px halo at 25% opacity (`outline-<colour>/25`), about 1.4:1.
+ * The opacity is compiled into the utility, so the halo is re-coloured where that class is
+ * present. These properties only show while the component's own `focus-visible:outline-3`
+ * applies, so nothing gains a second ring.
+ */
+:is(
+	[class*="outline-primary/25"],
+	[class*="outline-secondary/25"],
+	[class*="outline-success/25"],
+	[class*="outline-info/25"],
+	[class*="outline-warning/25"],
+	[class*="outline-error/25"],
+	[class*="outline-inverted/25"]
+) {
+	outline-color: var(--ui-primary);
+	outline-width: 2px;
+	outline-offset: 2px;
+}
+
+/* Navigation links draw the same halo on their `::before` pill instead of on the link. */
+:is(
+	[class*="before:outline-primary/25"],
+	[class*="before:outline-secondary/25"],
+	[class*="before:outline-success/25"],
+	[class*="before:outline-info/25"],
+	[class*="before:outline-warning/25"],
+	[class*="before:outline-error/25"],
+	[class*="before:outline-inverted/25"]
+)::before {
+	outline-color: var(--ui-primary);
+	outline-width: 2px;
+}
+
+/* `variant="none"` fields remove the outline and put nothing in its place (tier names). */
+:is(input, textarea, select)[class~="focus:outline-none"]:focus-visible {
+	outline: 2px solid var(--ui-primary);
+	outline-offset: 2px;
 }
 
 :where(
@@ -125,6 +267,24 @@
 		animation-duration: 0.01ms !important;
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
+	}
+
+	/*
+	 * Progress indicators are the exception: frozen after one frame, a spinner or skeleton
+	 * looks like a stalled page. They keep signalling work with a slow opacity pulse, which
+	 * moves nothing across the screen.
+	 */
+	.animate-spin,
+	.animate-pulse,
+	[data-loader-core],
+	[role="progressbar"] [data-state="indeterminate"] {
+		animation: progress-pulse 1.6s ease-in-out infinite !important;
+	}
+}
+
+@keyframes progress-pulse {
+	50% {
+		opacity: 0.4;
 	}
 }
 
@@ -172,10 +332,10 @@
 
 @keyframes podium-glow {
 	0%, 100% {
-		box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-color-warning-400) 45%, transparent);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-medal-gold) 45%, transparent);
 	}
 
 	50% {
-		box-shadow: 0 0 22px 6px color-mix(in srgb, var(--ui-color-warning-400) 35%, transparent);
+		box-shadow: 0 0 22px 6px color-mix(in srgb, var(--color-medal-gold) 35%, transparent);
 	}
 }
