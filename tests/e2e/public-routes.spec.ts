@@ -106,3 +106,30 @@ test("the unauthenticated session endpoint never exposes a token", async ({ requ
 	})
 	expect(JSON.stringify(body)).not.toContain("accessToken")
 })
+
+test("the calendar My list toggle explains itself to a guest instead of filtering", async ({ page }) => {
+	await page.route(url => url.pathname === "/api/calendar", route => route.fulfill({
+		json: { airingSchedules: [], simuldubs: [], missingMedia: [], warnings: [] }
+	}))
+	// Reached by a client-side navigation so the calendar request is made by the browser.
+	await page.goto("/login")
+	await page.getByRole("link", { name: "Calendar" }).click()
+	await expect(page).toHaveURL(/\/calendar$/)
+
+	const toggle = page.getByRole("button", { name: "My list", exact: true })
+	await expect(toggle).toHaveAttribute("aria-pressed", "false")
+
+	await toggle.click()
+
+	const help = page.getByRole("dialog")
+	await expect(help.getByText("Show only your anime")).toBeVisible()
+	await expect(help.getByText(
+		"My list keeps the titles on your Watching and Planning lists. It needs an AniList sign-in or a public profile name."
+	)).toBeVisible()
+	await expect(help.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+		"href",
+		/^\/login\?redirect=(\/|%2F)calendar$/
+	)
+	await expect(toggle).toHaveAttribute("aria-pressed", "false")
+	await expect(page.getByRole("button", { name: "Filter calendar events", exact: true })).toBeVisible()
+})

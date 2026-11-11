@@ -31,6 +31,9 @@
 								aria-label="Next period"
 								@click="view.next()" />
 						</div>
+						<p v-if="myListSummary" aria-hidden="true" class="ms-2 hidden truncate text-xs text-muted xl:block">
+							{{ myListSummary }}
+						</p>
 					</div>
 					<div class="flex w-full min-w-0 items-center justify-end gap-2 overflow-x-auto sm:w-auto sm:overflow-visible">
 						<UInput ref="inputRef" v-model="searchQuery" icon="i-lucide-search" placeholder="Search..." variant="soft"
@@ -45,10 +48,35 @@
 									: 'cursor-pointer text-default'" />
 							</template>
 						</UInput>
-						<UDropdownMenu :items="items" size="sm" :ui="{ item: 'cursor-pointer' }">
-							<UButton icon="i-lucide-list-filter" size="sm" color="neutral" variant="soft"
-								aria-label="Filter calendar events" class="h-fit cursor-pointer" />
-						</UDropdownMenu>
+						<UPopover v-if="!hasIdentity" v-model:open="myListHelpOpen" :content="{ align: 'end', sideOffset: 8 }">
+							<UButton label="My list" icon="i-lucide-bookmark" size="sm" color="neutral" variant="soft"
+								aria-pressed="false" class="shrink-0 cursor-pointer rounded-full" />
+							<template #content>
+								<div class="flex w-72 max-w-[calc(100vw-2rem)] flex-col items-start gap-2 p-4">
+									<p class="text-sm font-semibold text-highlighted">
+										Show only your anime
+									</p>
+									<p class="text-xs text-muted">
+										My list keeps the titles on your Watching and Planning lists. It needs an AniList sign-in or a public profile name.
+									</p>
+									<UButton label="Sign in" size="sm" color="primary" class="rounded-full" :to="loginTarget" />
+								</div>
+							</template>
+						</UPopover>
+						<UButton v-else label="My list"
+							:icon="listLoading ? 'i-lucide-loader-circle' : 'i-lucide-bookmark'" size="sm"
+							:color="myListOn ? 'primary' : 'neutral'"
+							:variant="myListOn && !listLoading ? 'solid' : 'soft'"
+							:aria-pressed="myListOn" :aria-busy="myListOn && listLoading ? true : undefined"
+							:ui="{ leadingIcon: listLoading ? 'animate-spin' : '' }"
+							class="shrink-0 cursor-pointer rounded-full" @click="toggleMyList" />
+						<UChip :show="hasStatusFilter" color="primary" size="md" inset class="shrink-0">
+							<UDropdownMenu :items="items" size="sm" :ui="{ item: 'cursor-pointer' }">
+								<UButton icon="i-lucide-list-filter" size="sm" color="neutral" variant="soft"
+									:aria-label="hasStatusFilter ? 'Filter calendar events, filters active' : 'Filter calendar events'"
+									class="h-fit cursor-pointer" />
+							</UDropdownMenu>
+						</UChip>
 						<UTabs v-model="store.currentView" size="xs" class="w-fit" color="neutral"
 							aria-label="Calendar view"
 							:ui="{ root: 'gap-0', trigger: 'cursor-pointer' }"
@@ -142,10 +170,20 @@
 		</Transition>
 
 		<div
-			v-if="showEmptyState"
-			class="pointer-events-none absolute bottom-4 right-4 z-40 max-w-xs rounded-lg border border-default bg-default/95 px-4 py-3 text-sm text-muted shadow-sm"
-			role="status">
-			No events match the current search and filters.
+			v-if="showEmptyState || showTruncatedWarning"
+			class="pointer-events-none absolute bottom-4 right-4 z-40 flex max-w-xs flex-col gap-2">
+			<UAlert
+				v-if="showTruncatedWarning"
+				color="warning"
+				variant="subtle"
+				icon="i-lucide-triangle-alert"
+				description="Your list was only partly loaded. Some titles may be missing." />
+			<div
+				v-if="showEmptyState"
+				class="rounded-lg border border-default bg-default/95 px-4 py-3 text-sm text-muted shadow-sm"
+				role="status">
+				{{ emptyStateMessage }}
+			</div>
 		</div>
 	</UDashboardPanel>
 </template>
@@ -155,13 +193,13 @@ import { VueCal, addDatePrototypes, type VueCalView } from "vue-cal"
 import "vue-cal/style"
 import { FEATURE_REGISTRY } from "#shared/config/features"
 import { useAiringSchedules } from "~/composables/useAiringSchedules"
-import { getDubbingLabel, useCalendarStore } from "~/stores/Calendar"
+import { MY_LIST_STATUSES, getDubbingLabel, useCalendarStore } from "~/stores/Calendar"
 import type {
 	CalendarApiResponse,
 	CalendarEvent,
 	CalendarMedia
 } from "~/types/calendar"
-import { buildCalendarEvents } from "~/utils/calendar-events"
+import { buildCalendarEvents, filterCalendarEventsByListStatus } from "~/utils/calendar-events"
 
 definePageMeta({
 	feature: "calendar",
@@ -172,9 +210,12 @@ definePageMeta({
 const store = useCalendarStore()
 const userStore = useUserStore()
 const entriesStore = useEntriesStore()
+const preferences = usePreferencesStore()
+const route = useRoute()
 const {
 	getAllAnimes: animeEntries,
-	isInitialized: entriesInitialized
+	isInitialized: entriesInitialized,
+	truncated: entriesTruncated
 } = storeToRefs(entriesStore)
 const seo = {
 	title: "Anime Calendar",
@@ -275,6 +316,7 @@ const missingSimuldubMediaById = computed(() => {
 })
 
 const toast = useToast()
+const LIST_ERROR_TOAST_ID = "calendar-list-error"
 
 function isCancelled(event: { status?: string }) {
 	return event.status === "cancelled"
@@ -334,17 +376,42 @@ const statusByMediaId = computed(() => new Map(
 	)
 ))
 
+// ========== My list and the status filter ==========
+// The list belongs to an identity (OAuth session or public profile): a guest has no status filter.
+const identity = computed(() =>
+	userStore.isAuthenticated && userStore.getUsername
+		? `${userStore.authMode ?? "anonymous"}:${userStore.getUsername}`
+		: null
+)
+const hasIdentity = computed(() => identity.value !== null)
+const activeStatuses = computed(() => hasIdentity.value ? store.currentStatus : [])
+const hasStatusFilter = computed(() => activeStatuses.value.length > 0)
+const myListOn = computed(() => hasIdentity.value && store.isMyListActive)
+const listLoading = computed(() => hasStatusFilter.value && !entriesInitialized.value)
+const myListHelpOpen = ref(false)
+const loginTarget = computed(() => ({ path: "/login", query: { redirect: route.fullPath } }))
+
+function toggleMyList() {
+	store.setMyList(!store.isMyListActive)
+}
+
+const listFilteredEvents = computed(() => {
+	if (!hasStatusFilter.value) return allCalendarEvents.value
+	// No events until the list is ready: showing everything first would flash, then snap.
+	if (listLoading.value) return []
+	return filterCalendarEventsByListStatus(
+		allCalendarEvents.value,
+		statusByMediaId.value,
+		activeStatuses.value
+	)
+})
+
 const filteredCalendarEvents = computed(() => {
 	const search = searchQuery.value.trim().toLocaleLowerCase()
 
-	return allCalendarEvents.value.filter((event) => {
+	return listFilteredEvents.value.filter((event) => {
 		const format = event.media.format
 		const formatMatch = !format || store.currentFormat.includes(format)
-		let statusMatch = true
-		if (store.currentStatus.length > 0 && entriesInitialized.value) {
-			const status = statusByMediaId.value.get(event.media.id)
-			statusMatch = Boolean(status && store.currentStatus.includes(status))
-		}
 		const languageMatch = event.languages.length === 0
 			|| event.languages.some(language => store.dubbing.includes(language))
 		const searchableTitles = [
@@ -356,7 +423,7 @@ const filteredCalendarEvents = computed(() => {
 			.filter((title): title is string => Boolean(title))
 			.map(title => title.toLocaleLowerCase())
 		const searchMatch = !search || searchableTitles.some(title => title.includes(search))
-		return formatMatch && statusMatch && languageMatch && searchMatch
+		return formatMatch && languageMatch && searchMatch
 	})
 })
 
@@ -379,11 +446,32 @@ function syncCalendarWarningToast(hasWarning: boolean) {
 const showEmptyState = computed(() =>
 	calendarStatus.value !== "pending"
 	&& !calendarError.value
+	&& !listLoading.value
 	&& filteredCalendarEvents.value.length === 0
 )
+const emptyStateMessage = computed(() => myListOn.value
+	? "None of the titles on your Watching or Planning list air in this period."
+	: "No events match the current search and filters."
+)
+const showTruncatedWarning = computed(() =>
+	hasStatusFilter.value && !listLoading.value && entriesTruncated.value
+)
+
+function countEvents(count: number) {
+	return `${count} ${count === 1 ? "event" : "events"}`
+}
+
+const myListSummary = computed(() => {
+	if (calendarStatus.value === "pending" || calendarError.value) return ""
+	if (listLoading.value) return "Loading your list"
+	if (!myListOn.value) return ""
+	return `${countEvents(filteredCalendarEvents.value.length)} from your list this ${store.currentView}`
+})
 const calendarStatusMessage = computed(() => {
 	if (calendarStatus.value === "pending") return "Loading calendar events."
 	if (calendarError.value) return "The calendar could not be loaded."
+	if (listLoading.value) return "Loading your list"
+	if (myListOn.value) return `My list on, ${countEvents(filteredCalendarEvents.value.length)}`
 	if (hasCalendarWarning.value) {
 		return `Loaded ${filteredCalendarEvents.value.length} events without simuldub details.`
 	}
@@ -433,8 +521,48 @@ onMounted(() => {
 		store.currentView = "day"
 	}
 
-	// The list only serves the Status filter: load it when that filter is already active.
-	if (userStore.isAuthenticated && store.currentStatus.length > 0) void entriesStore.fetchAllAnimes().catch(() => undefined)
+	// Runs on mount and whenever the identity changes. The remembered choice lives in the browser,
+	// so it is only applied here, never during server rendering.
+	watch(identity, (currentIdentity) => {
+		if (!currentIdentity) {
+			// A guest has no list: drop the filter instead of showing it active with nothing behind it.
+			if (store.currentStatus.length > 0) store.setStatuses([])
+			return
+		}
+		myListHelpOpen.value = false
+		if (store.currentStatus.length > 0) {
+			// The list only serves the status filter: (re)load it for this identity.
+			store.refreshList()
+		} else if (preferences.calendarMyList) {
+			store.setStatuses(MY_LIST_STATUSES)
+		}
+	}, { immediate: true })
+
+	watch(() => store.listError, (failed) => {
+		if (!failed) return
+		const failedStatuses = [...store.currentStatus]
+		const wasMyList = store.isMyListActive
+		// Never leave a filter ticked that silently shows everything.
+		store.setStatuses([])
+		toast.add({
+			id: LIST_ERROR_TOAST_ID,
+			title: "Your list could not be loaded",
+			description: wasMyList ? "My list was turned off." : "The status filter was turned off.",
+			icon: "i-lucide-circle-alert",
+			color: "error",
+			duration: 0,
+			actions: [{
+				label: "Try again",
+				color: "error",
+				variant: "soft",
+				onClick: () => store.setStatuses(failedStatuses)
+			}]
+		})
+	}, { immediate: true })
+
+	watch(() => store.currentStatus.length, (count) => {
+		if (count > 0) toast.remove(LIST_ERROR_TOAST_ID)
+	})
 
 	scheduleScrollToCurrentTime()
 })
@@ -443,6 +571,7 @@ onBeforeUnmount(() => {
 	if (scrollTimer) clearTimeout(scrollTimer)
 	toast.remove("calendar-load-error")
 	toast.remove("calendar-simuldub-warning")
+	toast.remove(LIST_ERROR_TOAST_ID)
 })
 </script>
 
