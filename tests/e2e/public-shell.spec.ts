@@ -39,10 +39,10 @@ test("mobile visitors can open the navigation and reach another tool", async ({ 
 		await navbar.getByRole("button", { name: "Open navigation" }).click()
 		await expect(drawer).toBeVisible({ timeout: 1_000 })
 	}).toPass()
-	await drawer.getByRole("link", { name: "Tierlist" }).click()
+	await drawer.getByRole("link", { name: "Tier list", exact: true }).click()
 
 	await expect(page).toHaveURL(/\/tierlist$/)
-	await expect(navbar).toContainText("Tierlist")
+	await expect(navbar).toContainText("Tier list")
 })
 
 test("the login points guests to the tools that need no account", async ({ page }) => {
@@ -61,7 +61,7 @@ test("an unknown public profile is reported next to the username field", async (
 
 	const field = page.getByRole("textbox", { name: "AniList username" })
 	await field.fill("nobody-here")
-	await page.getByRole("button", { name: "Load public AniList profile" }).click()
+	await page.getByRole("button", { name: "View profile" }).click()
 
 	await expect(page.getByRole("alert")).toContainText("no public profile called \"nobody-here\"")
 	await expect(field).toHaveAttribute("aria-invalid", "true")
