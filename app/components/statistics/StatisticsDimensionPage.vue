@@ -16,6 +16,9 @@ const props = defineProps<{
 
 const entriesStore = useEntriesStore()
 const statisticsStore = useStatisticsStore()
+const userStore = useUserStore()
+// List scores are stored in the profile's own format; AniList statistics means are always 0-100.
+const sourceScoreFormat = computed(() => userStore.mediaListOptions.scoreFormat ?? "POINT_100")
 const { getAllAnimes } = storeToRefs(entriesStore)
 const { genres, tags, studios } = storeToRefs(statisticsStore)
 const selectedPeriod = ref("all")
@@ -83,7 +86,8 @@ const items = computed(() =>
 		: aggregateEntriesByDimension(
 			getAllAnimes.value,
 			props.dimension,
-			selectedYear.value
+			selectedYear.value,
+			sourceScoreFormat.value
 		)
 )
 const previousItems = computed(() =>
@@ -92,7 +96,8 @@ const previousItems = computed(() =>
 		: aggregateEntriesByDimension(
 			getAllAnimes.value,
 			props.dimension,
-			selectedYear.value - 1
+			selectedYear.value - 1,
+			sourceScoreFormat.value
 		)
 )
 const comparisonLabel = computed(() =>

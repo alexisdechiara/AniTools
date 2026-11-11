@@ -71,6 +71,20 @@ export function formatScoreFromPercent(
 	}
 }
 
+/**
+ * Formats a mean score held on AniList's 0-100 scale, unit included.
+ *
+ * A mean of zero means no entry was scored, so it reads as a dash instead of
+ * being rounded up to the lowest step of the display format.
+ */
+export function formatMeanScore(
+	meanPercent: number | null | undefined,
+	displayFormat: AniListScoreFormat
+): string {
+	if (meanPercent == null || !Number.isFinite(meanPercent) || meanPercent <= 0) return "—"
+	return formatScoreFromPercent(Math.min(100, meanPercent), displayFormat)
+}
+
 /** Formats a personal AniList list score stored in `sourceFormat` for display in `displayFormat`. */
 export function formatPersonalScore(
 	rawScore: number | null | undefined,

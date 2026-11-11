@@ -31,8 +31,10 @@ const media = computed(() =>
 <template>
 	<div
 		v-if="media.length"
-		class="flex gap-2 overflow-x-auto border-t border-default px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-5"
-		aria-label="Anime represented in this statistic">
+		role="group"
+		tabindex="0"
+		class="flex scrollbar-thin [scrollbar-color:var(--ui-border-accented)_transparent] gap-2 overflow-x-auto border-t border-default px-4 pt-4 pb-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:px-5"
+		aria-label="Anime represented in this statistic, scrollable">
 		<NuxtLink
 			v-for="anime in media"
 			:key="anime.id"
@@ -40,7 +42,7 @@ const media = computed(() =>
 			external
 			target="_blank"
 			rel="noopener noreferrer"
-			class="group relative aspect-[2/3] w-16 shrink-0 overflow-hidden rounded-lg bg-muted shadow-sm ring-1 ring-default transition hover:-translate-y-0.5 hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[4.5rem]"
+			class="group relative aspect-2/3 w-16 shrink-0 overflow-hidden rounded-lg bg-muted shadow-sm ring-1 ring-default transition hover:-translate-y-0.5 hover:ring-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-18"
 			:aria-label="`Open ${anime.title} on AniList`"
 			:style="anime.color ? { backgroundColor: anime.color } : undefined">
 			<NuxtImg

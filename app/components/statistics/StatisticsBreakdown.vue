@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import StatisticsMediaStrip from "~/components/statistics/StatisticsMediaStrip.vue"
 import type { StatisticMetric } from "~/utils/statistics"
+import { formatMeanScore } from "~/utils/score-format"
 import {
-	getCountChange,
+	describeCountComparison,
 	sortBreakdownItems,
+	type CountComparison,
+	type CountComparisonTone,
 	type StatisticsBreakdownItem
 } from "~/utils/statistics-breakdown"
 
@@ -21,10 +24,17 @@ const selectedMetric = defineModel<StatisticMetric>("metric", {
 	default: "count"
 })
 const search = ref("")
+const preferences = usePreferencesStore()
+
+const COMPARISON_TONE_CLASSES: Record<CountComparisonTone, string> = {
+	positive: "text-success",
+	negative: "text-error",
+	neutral: "text-muted"
+}
 
 const metricOptions = [
 	{ label: "Count", value: "count", icon: "i-lucide-list-ordered" },
-	{ label: "Mean score", value: "meanScore", icon: "i-lucide-percent" },
+	{ label: "Mean score", value: "meanScore", icon: "i-lucide-star" },
 	{ label: "Time watched", value: "minutesWatched", icon: "i-lucide-clock-3" }
 ]
 const previousCountByKey = computed(() =>
@@ -52,9 +62,20 @@ function itemUrl(item: StatisticsBreakdownItem): string {
 	return `https://anilist.co/search/anime?genres=${encodeURIComponent(item.name)}`
 }
 
-function comparison(item: StatisticsBreakdownItem): number | null {
-	return getCountChange(item.count, previousCountByKey.value.get(item.key) ?? 0)
-}
+const comparisonByKey = computed(() => {
+	const comparisons = new Map<string, CountComparison>()
+	if (!props.comparisonLabel) return comparisons
+
+	for (const item of props.items) {
+		comparisons.set(item.key, describeCountComparison(
+			item.count,
+			previousCountByKey.value.get(item.key) ?? 0,
+			props.comparisonLabel
+		))
+	}
+
+	return comparisons
+})
 </script>
 
 <template>
@@ -115,7 +136,7 @@ function comparison(item: StatisticsBreakdownItem): number | null {
 								Mean score
 							</dt>
 							<dd class="mt-0.5 font-semibold text-highlighted tabular-nums">
-								{{ Number(item.meanScore.toFixed(2)) }}%
+								{{ formatMeanScore(item.meanScore, preferences.scoreFormat) }}
 							</dd>
 						</div>
 						<div
@@ -131,20 +152,10 @@ function comparison(item: StatisticsBreakdownItem): number | null {
 					</dl>
 
 					<p
-						v-if="comparisonLabel"
+						v-if="comparisonByKey.get(item.key)"
 						class="mt-3 text-xs"
-						:class="comparison(item) === null
-							? 'text-muted'
-							: (comparison(item) ?? 0) >= 0
-								? 'text-success'
-								: 'text-error'">
-						<template v-if="comparison(item) === null">
-							New compared with {{ comparisonLabel }}
-						</template>
-						<template v-else>
-							{{ (comparison(item) ?? 0) > 0 ? '+' : '' }}{{ comparison(item) }}%
-							titles compared with {{ comparisonLabel }}
-						</template>
+						:class="COMPARISON_TONE_CLASSES[comparisonByKey.get(item.key)?.tone ?? 'neutral']">
+						{{ comparisonByKey.get(item.key)?.text }}
 					</p>
 				</div>
 
