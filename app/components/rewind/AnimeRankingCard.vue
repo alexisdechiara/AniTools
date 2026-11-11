@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getMediaCover } from "~/utils/media-display"
 import type { RewindAnimeMetric } from "~/utils/rewind"
 
 const props = withDefaults(defineProps<{
@@ -11,18 +12,14 @@ const props = withDefaults(defineProps<{
 	variant: "top"
 })
 
+const { title: getAnimeTitle } = useMediaTitle()
+
 function getTitle(item: RewindAnimeMetric): string {
-	return item.entry.media?.title?.userPreferred
-		|| item.entry.media?.title?.english
-		|| item.entry.media?.title?.romaji
-		|| `Anime #${item.entry.media?.id ?? item.entry.id}`
+	return getAnimeTitle(item.entry.media ?? { id: item.entry.id })
 }
 
 function getCover(item: RewindAnimeMetric): string | undefined {
-	return item.entry.media?.coverImage?.extraLarge
-		|| item.entry.media?.coverImage?.large
-		|| item.entry.media?.coverImage?.medium
-		|| undefined
+	return getMediaCover(item.entry.media) ?? undefined
 }
 
 function podiumOrder(rank: number): number {
