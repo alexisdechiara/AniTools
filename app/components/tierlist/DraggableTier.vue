@@ -6,14 +6,18 @@
 			:data-tier-lane="laneId"
 			draggable="[data-tier-entry]"
 			filter="[data-locked='true']"
-			class="grid size-full min-h-32 flex-wrap content-start gap-2 p-4"
-			:class="nbColClass"
+						class="grid size-full flex-wrap content-start gap-2"
+			:class="[
+				nbColClass,
+				isCompact ? 'min-h-14 px-4 py-3' : 'min-h-32 p-4',
+				compact ? phoneStripClass : ''
+			]"
 			:disabled="isInspectorEnabled || hasHiddenEntries"
 			:animation="90"
 			:force-fallback="true"
 			:fallback-on-body="true"
 			:fallback-tolerance="4"
-			:empty-insert-threshold="48"
+			:empty-insert-threshold="4"
 			ghost-class="tierlist-drag-ghost"
 			chosen-class="tierlist-drag-chosen"
 			drag-class="tierlist-drag-active"
@@ -72,6 +76,13 @@ import {
 
 const props = defineProps<{
 	laneId: TierlistLaneId
+	/**
+	 * Shrinks the lane to a slim drop row while it holds no anime. A card dragged over it is
+	 * inserted as a placeholder, so the lane grows to card height for as long as the drag hovers.
+	 */
+	compactWhenEmpty?: boolean
+	/** Always uses the slim padding, for the Unranked tray that must not crowd the board. */
+	compact?: boolean
 }>()
 
 const modelValue = defineModel<TierlistEntry[]>({ default: () => [] })
@@ -84,6 +95,12 @@ const { nbColClass } = storeToRefs(tierlistStore)
 const { isInspectorEnabled } = useInspector()
 
 const filteredEntries = computed(() => modelValue.value.filter(filterEntry))
+// Phones: the tray becomes one row of small cards that scrolls sideways, so it stays a tray
+// instead of covering the tiers with two-column cards.
+const phoneStripClass = "max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[&>[data-tier-entry]]:w-20 max-sm:[&>[data-tier-entry]]:shrink-0"
+const isCompact = computed(() =>
+	props.compact || (props.compactWhenEmpty && modelValue.value.length === 0)
+)
 const hasHiddenEntries = computed(() => filteredEntries.value.length !== modelValue.value.length)
 const moveTargets = computed(() => tierlistStore.getMoveTargets(props.laneId))
 const hasPreviousLane = computed(() =>
@@ -118,16 +135,20 @@ function handleDragEnd(event: SortableDragEndEvent): void {
 	const targetLaneId = targetLane?.dataset.tierLane
 	if (
 		!targetLaneId
-		|| targetLaneId === props.laneId
 		|| (
 			targetLaneId !== "unranked"
 			&& !tierlistStore.tiers.some(tier => tier.id === targetLaneId)
 		)
 	) return
 
-	// Sortable handles empty lanes correctly. Its fallback mode can miss a
-	// populated CSS grid, so finish that cross-lane move from the drop point.
-	tierlistStore.moveEntry(mediaId, props.laneId, targetLaneId)
+	// The drop point decides the lane. Sortable has already updated the lists by now, and it
+	// can disagree: its fallback mode can miss a populated CSS grid, and its empty-lane
+	// detection can pick a neighbouring slim lane. Move the card from wherever it ended up.
+	const currentLaneId = tierlistStore.unrankedTier.some(entry => entry.media.id === mediaId)
+		? "unranked"
+		: tierlistStore.tiers.find(tier => tier.entries.some(entry => entry.media.id === mediaId))?.id
+	if (!currentLaneId || currentLaneId === targetLaneId) return
+	tierlistStore.moveEntry(mediaId, currentLaneId, targetLaneId)
 }
 
 function entryIndex(item: TierlistEntry): number {

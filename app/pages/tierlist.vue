@@ -1,7 +1,8 @@
 <template>
-	<UDashboardPanel id="tierlist">
+	<!-- #main-content is the scroller; the panel's own overflow would trap the sticky toolbar and tray. -->
+	<UDashboardPanel id="tierlist" class="overflow-visible!">
 		<UContainer class="max-w-none">
-			<PageHeader title="Anime tier list" visually-hidden />
+			<PageHeader title="Anime tier list" class="ml-8 pt-4 sm:mx-4 lg:mx-12" />
 			<input
 				ref="jsonFileInput"
 				type="file"
@@ -14,23 +15,34 @@
 				description="Applying your saved tiers and preparing drag and drop." />
 			<!-- v-if, not v-show: the board depends on the persisted store, which only exists on the client. -->
 			<div v-if="!showPageLoader">
-				<div data-tier-toolbar class="ml-8 sm:mx-4 lg:mx-12">
-					<UHeader
-						title=""
-						:ui="{
-							center: 'w-xs grow',
-							container: 'max-w-none px-0 sm:px-0 lg:px-0'
-						}">
-				<div class="flex w-full items-center gap-2">
+				<!-- One always-visible row: no collapsed menu, so search stays reachable on phones. -->
+				<div
+					data-tier-toolbar
+					class="sticky top-0 z-30 mt-3 ml-8 flex items-center gap-2 bg-default/90 py-2 backdrop-blur sm:mx-4 lg:mx-12">
+					<UDropdownMenu :items="settingsItems" :content="{ align: 'start' }">
+						<UButton
+							icon="i-lucide-sliders-horizontal"
+							label="Options"
+							variant="outline"
+							color="neutral"
+							aria-label="Tier list options"
+							class="shrink-0 cursor-pointer" />
+					</UDropdownMenu>
+					<SlideoverSettings v-model:open="openSlideover" />
 					<UModal
 						v-model:open="openSearch"
+						title="Add anime"
+						description="Search AniList, then press Enter to add the highlighted anime to Unranked."
+						:content="{ onCloseAutoFocus: revealLastAdded }"
 						:ui="{ content: 'sm:max-w-4xl' }">
 						<UButton
-							label="Search anime..."
+							aria-label="Search anime..."
 							color="neutral"
 							variant="outline"
-							block
-							icon="i-lucide-search">
+							icon="i-lucide-search"
+							class="min-w-0 flex-1 lg:mx-auto lg:max-w-xl">
+							<span class="truncate sm:hidden">Search</span>
+							<span class="hidden truncate sm:inline">Search anime...</span>
 							<template #trailing>
 								<div class="ms-auto hidden items-center gap-0.5 lg:flex">
 									<UKbd value="meta" variant="subtle" />
@@ -42,6 +54,7 @@
 							<AnimePicker
 								:suggestions="searchSuggestions"
 								:excluded-ids="tierlistMediaIds"
+								multiple
 								action-label="Add"
 								empty-label="Search AniList or load a profile to see anime here."
 								@select="addAnime" />
@@ -54,6 +67,7 @@
 							color="neutral"
 							size="md"
 							aria-label="Filter tier list"
+							class="shrink-0"
 							:ui="{ base: 'p-2', leadingIcon: 'size-4' }" />
 						<template #content>
 							<div class="flex flex-col gap-y-2 px-4 py-6">
@@ -74,24 +88,12 @@
 							</div>
 						</template>
 					</UPopover>
-				</div>
-				<template #left>
-					<UDropdownMenu :items="settingsItems" :content="{ align: 'start' }">
-						<UButton
-							icon="i-lucide-ellipsis-vertical"
-							variant="ghost"
-							color="neutral"
-							aria-label="Tier list actions"
-							class="cursor-pointer" />
-					</UDropdownMenu>
-					<SlideoverSettings v-model:open="openSlideover" />
-				</template>
-				<template #right>
 					<UTooltip text="Click a tier, row or anime to restyle it">
 						<UButton
 							icon="i-lucide-paintbrush"
 							:label="isInspectorEnabled ? 'Done' : 'Customize'"
-							class="cursor-pointer"
+							:aria-label="isInspectorEnabled ? 'Done customizing' : 'Customize'"
+							class="shrink-0 cursor-pointer"
 							:variant="isInspectorEnabled ? 'solid' : 'ghost'"
 							color="neutral"
 							size="md"
@@ -99,8 +101,6 @@
 							:ui="{ label: 'hidden sm:inline' }"
 							@click="toggleInspector" />
 					</UTooltip>
-				</template>
-					</UHeader>
 				</div>
 
 			<UAlert
@@ -139,24 +139,48 @@
 						@update:entries="tier.entries = $event" />
 				</VueDraggable>
 
-				<div
+				<!-- Stays last in the DOM (arrow keys walk the lanes top to bottom, Unranked last) and
+					sticks to the bottom of the scroll area so the pool is reachable from any tier. -->
+				<section
 					data-unranked-tier
-					class="mt-8 flex min-h-32 w-full"
-					:class="rowCornerClass">
-					<DraggableTier v-model="unrankedTier" lane-id="unranked">
-						<template #empty>
-							<UEmpty
-								data-tier-empty
-								variant="outline"
-								icon="i-lucide-file-question-mark"
-								title="No unranked anime"
-								class="col-span-full min-h-24"
-								:ui="{ root: 'border border-default border-dashed ring-0 flex items-center justify-center' }"
-								description="Drop an anime here, search for one, or import your AniList collection."
-								:actions="emptyActions"/>
-						</template>
-					</DraggableTier>
-				</div>
+					aria-labelledby="unranked-heading"
+					class="sticky bottom-0 z-30 mt-4 -mr-2 -ml-8 flex max-h-[42svh] flex-col border-t border-default bg-default/95 py-3 pr-2 pl-8 backdrop-blur sm:-ml-2 sm:pl-2">
+					<h2 id="unranked-heading" class="flex shrink-0 items-baseline gap-2 text-sm font-semibold text-highlighted">
+						Unranked
+						<span class="font-normal text-muted tabular-nums">
+							{{ unrankedTier.length }}
+							<span class="sr-only">anime</span>
+						</span>
+					</h2>
+					<div
+						data-unranked-scroll
+						class="mt-2 min-h-14 w-full shrink overflow-y-auto border border-dashed border-default"
+						:class="rowCornerClass">
+						<DraggableTier v-model="unrankedTier" lane-id="unranked" compact>
+							<template #empty>
+								<div
+									data-tier-empty
+									class="col-span-full flex flex-wrap items-center gap-x-3 gap-y-2 px-2 py-1 text-sm text-muted">
+									<span class="min-w-0 flex-1 basis-48">
+										Nothing is waiting to be ranked. Anime you add or drop here land in this tray.
+									</span>
+									<!-- The onboarding alert already offers both actions on an empty tier list. -->
+									<span v-if="tierlistStore.entryCount > 0" class="flex flex-wrap gap-2">
+										<UButton
+											v-for="action in emptyActions"
+											:key="action.label"
+											:icon="action.icon"
+											:label="action.label"
+											color="neutral"
+											variant="subtle"
+											class="rounded-full"
+											@click="action.onClick" />
+									</span>
+								</div>
+							</template>
+						</DraggableTier>
+					</div>
+				</section>
 			</div>
 			</div>
 		</UContainer>
@@ -295,6 +319,8 @@ const emptyActions = computed(() => [
 	{
 		icon: "i-lucide-cloud-download",
 		label: "Import from AniList",
+		size: "md" as const,
+		class: "rounded-full",
 		onClick: () => {
 			openImport.value = true
 		}
@@ -302,6 +328,8 @@ const emptyActions = computed(() => [
 	{
 		icon: "i-lucide-search",
 		label: "Search anime",
+		size: "md" as const,
+		class: "rounded-full",
 		color: "neutral" as const,
 		variant: "subtle" as const,
 		onClick: () => {
@@ -343,22 +371,31 @@ const settingsItems = computed<DropdownMenuItem[]>(() => [
 	}
 ])
 
-async function addAnime(media: AniListMediaListSummary): Promise<void> {
-	try {
-		const added = tierlistStore.addAnimeMedia(media)
-		toast.add({
-			title: added ? "Anime added" : "Anime not added",
-			description: added ? undefined : "It may already be present in this tier list.",
-			color: added ? "success" : "warning"
-		})
-		if (added) openSearch.value = false
-	} catch {
-		toast.add({
-			title: "Anime not added",
-			description: "AniList could not be reached.",
-			color: "error"
-		})
+const lastAddedMediaId = ref<number | null>(null)
+
+function addAnime(media: AniListMediaListSummary): void {
+	// The picker stays open and confirms a successful add in place; only a failure needs a toast.
+	if (tierlistStore.addAnimeMedia(media)) {
+		lastAddedMediaId.value = media.id
+		return
 	}
+	toast.add({
+		title: "Anime not added",
+		description: "It is already in this tier list, or the tier list is full.",
+		color: "warning"
+	})
+}
+
+/** When the picker closes after an add, land on the new card instead of back on the trigger. */
+function revealLastAdded(event: Event): void {
+	const mediaId = lastAddedMediaId.value
+	lastAddedMediaId.value = null
+	if (mediaId === null) return
+	const card = document.querySelector<HTMLElement>(`[data-tier-entry][data-media-id="${mediaId}"]`)
+	if (!card) return
+	event.preventDefault()
+	card.scrollIntoView({ block: "nearest" })
+	card.focus({ preventScroll: true })
 }
 
 async function exportTierlist(format: "json" | TierlistImageFormat): Promise<void> {
