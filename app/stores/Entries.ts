@@ -9,6 +9,7 @@ import {
 	sortAnimeEntriesByScore,
 	type AnimeListGroup
 } from "~/utils/anilist-list"
+import { getProfileIdentityKey } from "~/utils/explore-picks"
 
 export type AnimeListEntry = AniListAnimeListEntry
 
@@ -37,10 +38,11 @@ export const useEntriesStore = defineStore("Entries", () => {
 	// the state while the generation it started with is still the current one.
 	let generation = 0
 
-	const identity = computed(() => {
-		if (!user.isAuthenticated || !user.getUsername) return null
-		return `${user.authMode ?? "anonymous"}:${user.getUsername}`
-	})
+	const identity = computed(() => getProfileIdentityKey({
+		isAuthenticated: user.isAuthenticated,
+		authMode: user.authMode,
+		username: user.getUsername
+	}))
 
 	// A different identity must never see the previous one's list, even before a refetch.
 	// Synchronous so the reset always lands before a caller can start the next identity's request.
