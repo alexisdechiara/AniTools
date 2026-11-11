@@ -3,7 +3,6 @@ import { FEATURE_REGISTRY } from "#shared/config/features"
 import RewindAnimeRankingCard from "~/components/rewind/AnimeRankingCard.vue"
 import RewindBreakdownCard from "~/components/rewind/BreakdownCard.vue"
 import RewindHighlightsCard from "~/components/rewind/HighlightsCard.vue"
-import RewindStatusDonutCard from "~/components/rewind/RewindStatusDonutCard.vue"
 import { formatNumber } from "~/utils/format"
 import { formatWatchTime } from "~/utils/formatTime"
 import { getMediaCover } from "~/utils/media-display"
@@ -335,7 +334,13 @@ useSeoMeta({
 								title="Anime by release season"
 								:items="summary.seasons"
 								:limit="4" />
-							<RewindStatusDonutCard :items="summary.statuses" />
+							<!-- The donut pulls in unovis: Node cannot import it during server rendering. -->
+							<ClientOnly>
+								<LazyRewindStatusDonutCard :items="summary.statuses" />
+								<template #fallback>
+									<WidgetLoadingSkeleton label="Loading list status chart" class="min-h-72" />
+								</template>
+							</ClientOnly>
 						</div>
 					</section>
 
