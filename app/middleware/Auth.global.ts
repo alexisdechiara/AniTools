@@ -5,6 +5,12 @@ import {
 } from "#shared/config/features"
 
 export default defineNuxtRouteMiddleware(async (to) => {
+	// A URL that matches no page is not a protected feature: let Nuxt answer 404
+	// instead of sending the visitor to the login page for a route that does not exist.
+	if (to.matched.length === 0) {
+		return
+	}
+
 	const access = to.meta.auth ?? FEATURE_ACCESS.oauth
 
 	if (access.mode === "public") {
