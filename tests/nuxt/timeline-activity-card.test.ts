@@ -1,6 +1,7 @@
 import { mountSuspended } from "@nuxt/test-utils/runtime"
 import { describe, expect, it } from "vitest"
 import TimelineActivityCard from "~/components/timeline/ActivityCard.vue"
+import { useTimeDisplay } from "~/composables/useTimeDisplay"
 import { formatRunSpan } from "~/utils/timeline-run-format"
 import { mergeConsecutiveEpisodeActivities } from "~/utils/timeline-runs"
 import type { AniListAnimeActivity } from "~~/shared/types/anilist"
@@ -54,8 +55,11 @@ describe("TimelineActivityCard", () => {
 		expect(card.text()).toContain("3 anime updates")
 		expect(card.get("[data-timeline-run-range]").text().replace(/\s+/g, " "))
 			.toBe("watched episodes 3 → 5")
+		// The card prints the span with the visitor's zone and clock.
 		expect(card.get("[data-timeline-run-span]").text())
-			.toBe(formatRunSpan(run.startedAt, run.endedAt))
+			.toBe(formatRunSpan(run.startedAt, run.endedAt, {
+				display: useTimeDisplay().activeDisplay.value
+			}))
 		expect(card.get("[data-timeline-run-span]").attributes("datetime"))
 			.toBe(new Date(NOON * 1_000).toISOString())
 
