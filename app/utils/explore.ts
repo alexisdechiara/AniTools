@@ -1,10 +1,11 @@
 import type {
 	AniListAnimeListEntry,
+	AniListMediaListSummary,
 	AniListMediaSummary
 } from "~~/shared/types/anilist"
 
 export interface ExploreSeed {
-	media: AniListMediaSummary
+	media: AniListMediaListSummary
 	score: number
 }
 
@@ -134,7 +135,7 @@ export function filterExploreMedia(
 	})
 }
 
-export function getExploreTitle(media: AniListMediaSummary): string {
+export function getExploreTitle(media: AniListMediaListSummary): string {
 	return media.title?.userPreferred
 		?? media.title?.english
 		?? media.title?.romaji

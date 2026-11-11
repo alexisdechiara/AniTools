@@ -32,6 +32,7 @@ import {
 	type AniListAnimeListIdsResponse,
 	type AniListAnimeListResponse,
 	type AniListListSort,
+	type AniListMediaListSummary,
 	type AniListMediaResponse,
 	type AniListMediaSummary,
 	type AniListPageInfo,
@@ -165,6 +166,45 @@ const MEDIA_SUMMARY_FIELDS = `
 	}
 `
 
+// What a list row needs: MEDIA_SUMMARY_FIELDS without the details-view fields (idMal,
+// description, rankings, external links, trailer), the tag spoiler/adult flags and the relation
+// titles and formats. Tier-list franchise grouping only reads relation types and ids. A field a
+// card or a calculation needs goes in both sets; one only a details view needs goes in the full
+// set, and the details popover fetches it on demand (see app/utils/media-details.ts).
+const MEDIA_LIST_FIELDS = `
+	id
+	type
+	title { romaji english native userPreferred }
+	coverImage { extraLarge large medium color }
+	bannerImage
+	format
+	status
+	episodes
+	duration
+	genres
+	countryOfOrigin
+	season
+	seasonYear
+	startDate { year month day }
+	endDate { year month day }
+	averageScore
+	meanScore
+	popularity
+	favourites
+	isFavourite
+	isAdult
+	tags { id name category rank }
+	nextAiringEpisode { airingAt episode timeUntilAiring }
+	siteUrl
+	studios(isMain: true) {
+		edges {
+			isMain
+			node { id name isAnimationStudio siteUrl }
+		}
+	}
+	relations { edges { relationType node { id } } }
+`
+
 const PROFILE_QUERY = `
 	query AniToolsPublicProfile($username: String!) {
 		User(name: $username) {
@@ -215,7 +255,7 @@ const ANIME_LIST_QUERY = `
 				startedAt { year month day }
 				completedAt { year month day }
 				media {
-					${MEDIA_SUMMARY_FIELDS}
+					${MEDIA_LIST_FIELDS}
 				}
 			}
 		}
@@ -252,7 +292,7 @@ const ANIME_COLLECTION_QUERY = `
 					startedAt { year month day }
 					completedAt { year month day }
 					media {
-						${MEDIA_SUMMARY_FIELDS}
+						${MEDIA_LIST_FIELDS}
 					}
 				}
 			}
@@ -509,7 +549,7 @@ const AIRING_SCHEDULES_QUERY = `
 				episode
 				timeUntilAiring
 				media {
-					${MEDIA_SUMMARY_FIELDS}
+					${MEDIA_LIST_FIELDS}
 				}
 			}
 		}
@@ -765,6 +805,22 @@ const searchMediaSchema = z.object({
 	title: titleSchema.nullable()
 })
 
+const mediaTagSchema = z.object({
+	id: z.number().int().positive(),
+	name: z.string().min(1).max(200),
+	category: z.string().max(200).nullable(),
+	rank: z.number().int().nullable(),
+	isAdult: z.boolean(),
+	isGeneralSpoiler: z.boolean(),
+	isMediaSpoiler: z.boolean()
+})
+
+const mediaRelationNodeSchema = z.object({
+	id: z.number().int().positive(),
+	format: z.string().max(64).nullable(),
+	title: titleSchema.nullable()
+})
+
 const mediaSchema = z.object({
 	id: z.number().int().positive(),
 	idMal: z.number().int().positive().nullable(),
@@ -794,15 +850,7 @@ const mediaSchema = z.object({
 	favourites: z.number().int().nonnegative().nullable(),
 	isFavourite: z.boolean(),
 	isAdult: z.boolean().nullable(),
-	tags: z.array(z.object({
-		id: z.number().int().positive(),
-		name: z.string().min(1).max(200),
-		category: z.string().max(200).nullable(),
-		rank: z.number().int().nullable(),
-		isAdult: z.boolean(),
-		isGeneralSpoiler: z.boolean(),
-		isMediaSpoiler: z.boolean()
-	}).nullable()).max(100).nullable(),
+	tags: z.array(mediaTagSchema.nullable()).max(100).nullable(),
 	nextAiringEpisode: z.object({
 		airingAt: z.number().int().nonnegative(),
 		episode: z.number().int().positive(),
@@ -842,10 +890,31 @@ const mediaSchema = z.object({
 	relations: z.object({
 		edges: z.array(z.object({
 			relationType: z.string().max(64).nullable(),
-			node: z.object({
-				id: z.number().int().positive(),
-				format: z.string().max(64).nullable(),
-				title: titleSchema.nullable()
+			node: mediaRelationNodeSchema.nullable()
+		}).nullable()).max(MAX_MEDIA_RELATION_EDGES).nullable()
+	}).nullable()
+})
+
+// The shape MEDIA_LIST_FIELDS returns: the details-view fields, the tag flags and the relation
+// node titles and formats are optional, and stay absent (undefined, never null) once normalised.
+const mediaListSchema = mediaSchema.partial({
+	idMal: true,
+	description: true,
+	rankings: true,
+	externalLinks: true,
+	trailer: true
+}).extend({
+	tags: z.array(mediaTagSchema.partial({
+		isAdult: true,
+		isGeneralSpoiler: true,
+		isMediaSpoiler: true
+	}).nullable()).max(100).nullable(),
+	relations: z.object({
+		edges: z.array(z.object({
+			relationType: z.string().max(64).nullable(),
+			node: mediaRelationNodeSchema.partial({
+				format: true,
+				title: true
 			}).nullable()
 		}).nullable()).max(MAX_MEDIA_RELATION_EDGES).nullable()
 	}).nullable()
@@ -855,7 +924,7 @@ const airingScheduleSchema = z.object({
 	airingAt: z.number().int().positive().max(GRAPHQL_INT_MAX),
 	episode: z.number().int().positive(),
 	timeUntilAiring: z.number().int().nullable(),
-	media: mediaSchema.nullable()
+	media: mediaListSchema.nullable()
 })
 
 const nullablePageInfoSchema = z.object({
@@ -876,7 +945,7 @@ const animeListEntrySchema = z.object({
 	updatedAt: z.number().int().nonnegative().nullable(),
 	startedAt: fuzzyDateSchema.nullable(),
 	completedAt: fuzzyDateSchema.nullable(),
-	media: mediaSchema.nullable()
+	media: mediaListSchema.nullable()
 })
 
 const metricSchema = z.object({
@@ -1175,32 +1244,59 @@ function normalizePageInfo(
 	}
 }
 
+function withoutNulls<T>(items: ReadonlyArray<T | null> | null): T[] {
+	return (items ?? []).filter((item): item is T => item !== null)
+}
+
+function normalizeStudios(
+	studios: z.infer<typeof mediaSchema>["studios"]
+): AniListMediaSummary["studios"] {
+	return studios
+		? {
+				edges: (studios.edges ?? [])
+					.flatMap(edge => edge?.node
+						? [{ isMain: edge.isMain, node: edge.node }]
+						: [])
+			}
+		: null
+}
+
+function normalizeRelations<Edge>(
+	relations: { edges: ReadonlyArray<Edge | null> | null } | null
+): { edges: Edge[] } | null {
+	return relations ? { edges: withoutNulls(relations.edges) } : null
+}
+
 function normalizeMedia(
 	media: z.infer<typeof mediaSchema>
 ): AniListMediaSummary {
 	return {
 		...media,
-		genres: (media.genres ?? []).filter((genre): genre is string => genre !== null),
-		tags: (media.tags ?? [])
-			.filter((tag): tag is NonNullable<typeof tag> => tag !== null),
-		studios: media.studios
-			? {
-					edges: (media.studios.edges ?? [])
-						.flatMap(edge => edge?.node
-							? [{ isMain: edge.isMain, node: edge.node }]
-							: [])
-				}
-			: null,
-		rankings: (media.rankings ?? [])
-			.filter((ranking): ranking is NonNullable<typeof ranking> => ranking !== null),
-		externalLinks: (media.externalLinks ?? [])
-			.filter((link): link is NonNullable<typeof link> => link !== null),
-		relations: media.relations
-			? {
-					edges: (media.relations.edges ?? [])
-						.filter((edge): edge is NonNullable<typeof edge> => edge !== null)
-				}
-			: null
+		genres: withoutNulls(media.genres),
+		tags: withoutNulls(media.tags),
+		studios: normalizeStudios(media.studios),
+		rankings: withoutNulls(media.rankings),
+		externalLinks: withoutNulls(media.externalLinks),
+		relations: normalizeRelations(media.relations)
+	}
+}
+
+/**
+ * List media: the details-view fields MEDIA_LIST_FIELDS does not select stay absent rather than
+ * becoming `null` or `[]`, because `hasMediaDetails` reads `undefined` as "not fetched yet".
+ */
+function normalizeListMedia(
+	media: z.infer<typeof mediaListSchema>
+): AniListMediaListSummary {
+	const { rankings, externalLinks, ...rest } = media
+	return {
+		...rest,
+		genres: withoutNulls(media.genres),
+		tags: withoutNulls(media.tags),
+		studios: normalizeStudios(media.studios),
+		...(rankings === undefined ? {} : { rankings: withoutNulls(rankings) }),
+		...(externalLinks === undefined ? {} : { externalLinks: withoutNulls(externalLinks) }),
+		relations: normalizeRelations(media.relations)
 	}
 }
 
@@ -1684,7 +1780,7 @@ export async function getAniListAiringSchedulesPage(
 			airingAt: schedule.airingAt,
 			episode: schedule.episode,
 			timeUntilAiring: schedule.timeUntilAiring,
-			media: normalizeMedia(schedule.media)
+			media: normalizeListMedia(schedule.media)
 		}]
 	})
 
@@ -1831,7 +1927,7 @@ export async function getAniListAnimeListResponse(
 			.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
 			.map(entry => ({
 				...entry,
-				media: entry.media ? normalizeMedia(entry.media) : null
+				media: entry.media ? normalizeListMedia(entry.media) : null
 			}))
 	}
 }
@@ -1883,7 +1979,7 @@ export async function getAniListAnimeCollectionResponse(
 				if (!entry || entries.has(entry.id)) continue
 				entries.set(entry.id, {
 					...entry,
-					media: entry.media ? normalizeMedia(entry.media) : null
+					media: entry.media ? normalizeListMedia(entry.media) : null
 				})
 			}
 		}

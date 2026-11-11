@@ -125,6 +125,10 @@ describe("AniList Explore allowlisted operations", () => {
 		}
 
 		expect(body.query).toContain("query AniToolsRecommendations")
+		// Explore cards read descriptions, tag flags and relation titles: the full field set.
+		expect(body.query).toContain("description")
+		expect(body.query).toContain("isMediaSpoiler")
+		expect(body.query).toMatch(/relations \{\s*edges \{\s*relationType\s*node \{\s*id\s*format\s*title \{/)
 		expect(body.variables).toEqual({ mediaId: 1, page: 1, perPage: 12 })
 		expect(result.recommendations[0]).toMatchObject({
 			id: 9,

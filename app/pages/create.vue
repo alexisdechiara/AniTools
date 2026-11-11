@@ -4,7 +4,7 @@ import CreateCanvasPreview from "~/components/create/CanvasPreview.vue"
 import CreateGraduatedSlider from "~/components/create/GraduatedSlider.vue"
 import type {
 	AniListAnimeListEntry,
-	AniListMediaSummary
+	AniListMediaListSummary
 } from "~~/shared/types/anilist"
 import type {
 	CreateContentId,
@@ -224,7 +224,7 @@ watch(() => userStore.isAuthenticated, async (authenticated) => {
 	}
 }, { immediate: true })
 
-function selectAnime(media: AniListMediaSummary) {
+function selectAnime(media: AniListMediaListSummary) {
 	animeError.value = null
 	const image = media.coverImage?.extraLarge
 		?? media.coverImage?.large

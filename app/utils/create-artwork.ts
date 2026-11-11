@@ -1,6 +1,6 @@
 import type {
 	AniListAnimeListEntry,
-	AniListMediaSummary
+	AniListMediaListSummary
 } from "~~/shared/types/anilist"
 import { getEntryWatchMinutes } from "~/utils/statistics"
 
@@ -225,7 +225,7 @@ export function getCreateFont(id: CreateFontId): CreateFontOption {
 	return CREATE_FONTS[id]
 }
 
-function getFallbackTitle(media: AniListMediaSummary): string {
+function getFallbackTitle(media: AniListMediaListSummary): string {
 	return media.title?.userPreferred
 		?? media.title?.english
 		?? media.title?.romaji
@@ -234,14 +234,14 @@ function getFallbackTitle(media: AniListMediaSummary): string {
 }
 
 export function getCreateMediaTitle(
-	media: AniListMediaSummary,
+	media: AniListMediaListSummary,
 	language: CreateTitleLanguage
 ): string {
 	return media.title?.[language] ?? getFallbackTitle(media)
 }
 
 export function getCreateMediaImage(
-	media: AniListMediaSummary,
+	media: AniListMediaListSummary,
 	source: CreateImageSource
 ): string | null {
 	if (source === "banner") return media.bannerImage
@@ -277,7 +277,7 @@ export function selectCreateContentEntries(
 	limit = 10
 ): AniListAnimeListEntry[] {
 	const withMedia = entries.filter(
-		(entry): entry is AniListAnimeListEntry & { media: AniListMediaSummary } =>
+		(entry): entry is AniListAnimeListEntry & { media: AniListMediaListSummary } =>
 			entry.media != null
 	)
 	const safeLimit = Math.max(0, Math.floor(limit))

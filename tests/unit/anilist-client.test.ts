@@ -24,6 +24,7 @@ import {
 	saveAniListMediaListEntry,
 	setAniListResponseCache
 } from "../../server/utils/anilist-client"
+import { hasMediaDetails } from "../../app/utils/media-details"
 
 const publicAccess = {
 	mode: "public" as const,
@@ -111,6 +112,19 @@ const media = {
 	externalLinks: null,
 	trailer: null,
 	relations: null
+}
+
+const MEDIA_DETAIL_FIELDS = ["idMal", "description", "rankings", "externalLinks", "trailer"]
+
+// The slim shape list, collection and airing queries select: no details-view fields, no tag
+// flags, relation nodes reduced to their id.
+const listMedia: Record<string, unknown> = {
+	...Object.fromEntries(Object.entries(media)
+		.filter(([field]) => !MEDIA_DETAIL_FIELDS.includes(field))),
+	tags: [{ id: 3, name: "Alchemy", category: "Theme-Fantasy", rank: 95 }],
+	relations: {
+		edges: [{ relationType: "PREQUEL", node: { id: 121 } }]
+	}
 }
 
 function jsonResponse(
@@ -287,6 +301,10 @@ describe("AniList allowlisted client", () => {
 			variables: Record<string, unknown>
 		}
 		expect(body.query).toContain("query AniToolsMedia")
+		// The details view keeps the full field set.
+		expect(body.query).toContain("description")
+		expect(body.query).toContain("externalLinks")
+		expect(body.query).toContain("isMediaSpoiler")
 		expect(body.variables).toEqual({ mediaId: 7 })
 		expect(new Headers(request?.headers).has("Authorization")).toBe(false)
 	})
@@ -413,7 +431,7 @@ describe("AniList allowlisted client", () => {
 						airingAt: 1_800_000_000,
 						episode: 12,
 						timeUntilAiring: 600,
-						media
+						media: listMedia
 					}]
 				}
 			}
@@ -432,10 +450,16 @@ describe("AniList allowlisted client", () => {
 				episode: 12,
 				media: {
 					id: 7,
-					genres: ["Action"]
+					genres: ["Action"],
+					tags: [{ id: 3, name: "Alchemy" }],
+					relations: { edges: [{ relationType: "PREQUEL", node: { id: 121 } }] }
 				}
 			}]
 		})
+		const airingMedia = result.airingSchedules[0]?.media
+		expect(airingMedia?.description).toBeUndefined()
+		expect(airingMedia && "rankings" in airingMedia).toBe(false)
+		expect(airingMedia && "externalLinks" in airingMedia).toBe(false)
 
 		const [, request] = requester.mock.calls[0]!
 		const body = JSON.parse(String(request?.body)) as {
@@ -443,6 +467,8 @@ describe("AniList allowlisted client", () => {
 			variables: Record<string, unknown>
 		}
 		expect(body.query).toContain("query AniToolsAiringSchedules")
+		expect(body.query).not.toContain("description")
+		expect(body.query).not.toContain("externalLinks")
 		expect(body.variables).toEqual({
 			page: 2,
 			perPage: 50,
@@ -562,6 +588,8 @@ describe("AniList allowlisted client", () => {
 			total: 11
 		})
 		expect(body.query).toContain("query AniToolsAnimeList")
+		expect(body.query).not.toContain("description")
+		expect(body.query).not.toContain("externalLinks")
 		expect(body.variables).toMatchObject({
 			username: "Alexis",
 			page: 2,
@@ -620,7 +648,7 @@ describe("AniList allowlisted client", () => {
 			updatedAt: 1_800_000_000,
 			startedAt: { year: null, month: null, day: null },
 			completedAt: { year: null, month: null, day: null },
-			media: null
+			media: id === 1 ? listMedia : null
 		})
 		let requestIndex = 0
 		const requester = fetchMock(async () => {
@@ -648,7 +676,25 @@ describe("AniList allowlisted client", () => {
 		expect(result.source).toEqual({ mode: "public", username: "Alexis" })
 		expect(requestBodies).toHaveLength(2)
 		expect(requestBodies[0]?.query).toContain("query AniToolsAnimeCollection")
+		expect(requestBodies[0]?.query).not.toContain("description")
+		expect(requestBodies[0]?.query).not.toContain("externalLinks")
+		expect(requestBodies[0]?.query).not.toContain("isMediaSpoiler")
 		expect(requestBodies.map(body => body.variables.chunk)).toEqual([1, 2])
+		// Absent details stay undefined, so hasMediaDetails reads them as "not fetched yet".
+		const collectionMedia = result.entries[0]?.media
+		expect(collectionMedia).toMatchObject({
+			id: 7,
+			genres: ["Action"],
+			relations: { edges: [{ relationType: "PREQUEL", node: { id: 121 } }] }
+		})
+		expect(collectionMedia?.description).toBeUndefined()
+		expect(collectionMedia?.rankings).toBeUndefined()
+		expect(collectionMedia?.externalLinks).toBeUndefined()
+		expect(collectionMedia?.trailer).toBeUndefined()
+		expect(hasMediaDetails(collectionMedia)).toBe(false)
+		expect(collectionMedia?.tags).toEqual([
+			{ id: 3, name: "Alchemy", category: "Theme-Fantasy", rank: 95 }
+		])
 		expect(requestBodies[0]?.variables).toMatchObject({ username: "Alexis", perChunk: 500 })
 	})
 

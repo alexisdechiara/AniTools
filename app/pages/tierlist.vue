@@ -185,7 +185,7 @@
 import type { DropdownMenuItem } from "@nuxt/ui"
 import { VueDraggable } from "vue-draggable-plus"
 import { FEATURE_REGISTRY } from "#shared/config/features"
-import type { AniListMediaSummary } from "~~/shared/types/anilist"
+import type { AniListMediaListSummary } from "~~/shared/types/anilist"
 import type { TierlistExportDocument } from "~/types/tierlist"
 import type { TierlistImageFormat } from "~/utils/tierlist-export"
 import {
@@ -343,7 +343,7 @@ const settingsItems = computed<DropdownMenuItem[]>(() => [
 	}
 ])
 
-async function addAnime(media: AniListMediaSummary): Promise<void> {
+async function addAnime(media: AniListMediaListSummary): Promise<void> {
 	try {
 		const added = tierlistStore.addAnimeMedia(media)
 		toast.add({

@@ -2,7 +2,7 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import { defineStore } from "pinia"
 import type {
 	AniListMediaResponse,
-	AniListMediaSummary,
+	AniListMediaListSummary,
 	AniListScoreFormat
 } from "~~/shared/types/anilist"
 import type {
@@ -254,7 +254,7 @@ export const useTierlistStore = defineStore("tierlist", () => {
 		return entry ? addEntryToUnrankedTier(entry) : false
 	}
 
-	function addAnimeMedia(media: AniListMediaSummary): boolean {
+	function addAnimeMedia(media: AniListMediaListSummary): boolean {
 		const { getAllAnimes } = storeToRefs(useEntriesStore())
 		const existingEntry = getAllAnimes.value.find(entry => entry.media?.id === media.id)
 		if (existingEntry) {
