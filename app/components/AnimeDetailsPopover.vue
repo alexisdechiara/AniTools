@@ -62,7 +62,7 @@
 									</TextHover>
 									<TextHover class="text-base text-pretty font-semibold text-highlighted leading-tight">
 										<template #default>
-											{{ data?.media?.title?.english || data?.media?.title?.romaji }}
+											{{ mediaTitle }}
 										</template>
 										<template #hover>
 											{{ data?.media?.title?.romaji }}
@@ -81,19 +81,14 @@
 											<div v-if="data?.media?.relations?.edges?.length"
 												class="hidden group-hover/subtitle:inline-flex text-dimmed font-light italic truncate">
 												<span v-if="data.media.relations.edges.some((edge) => edge.relationType === 'PREQUEL')">
-													Sequel to "{{data.media.relations.edges.find((edge) => edge.relationType ===
-														'PREQUEL')?.node?.title?.english || data.media.title}}"
+													Sequel to "{{ relationTitle('PREQUEL') }}"
 												</span>
 												<span
 													v-else-if="data.media.relations.edges.some((edge) => edge.relationType === 'ADAPTATION')">
-													Adapted from "{{data.media.relations.edges.find((edge) => edge.relationType ===
-	'ADAPTATION')?.node?.title?.english || data.media.title?.romaji}}"
+													Adapted from "{{ relationTitle('ADAPTATION') }}"
 												</span>
 												<span v-else>
-													Source : "{{
-														data.media.relations.edges[0]?.node?.title?.english ||
-														data.media.title?.romaji
-													}}"
+													Source : "{{ relationTitle() }}"
 												</span>
 											</div>
 										</template>
@@ -187,6 +182,7 @@ import { useDraggable, useEventListener } from '@vueuse/core'
 import type { PopoverProps, TabsItem } from '@nuxt/ui'
 import type { AniListMediaResponse, AniListMediaSummary } from '~~/shared/types/anilist'
 import { hasMediaDetails } from '~/utils/media-details'
+import { getMediaCover, sanitizeMediaDescription } from '~/utils/media-display'
 import TextHover from './TextHover.vue';
 
 interface AnimeDetailsPopoverTitle {
@@ -303,11 +299,16 @@ const activeTab = ref("summary");
 const { format: formatScore } = usePersonalScore();
 
 const media = computed(() => data.value?.media);
-const coverUrl = computed(() => media.value?.coverImage?.extraLarge
-	?? media.value?.coverImage?.large
-	?? media.value?.coverImage?.medium
-	?? null
-)
+const { title: getAnimeTitle } = useMediaTitle();
+const mediaTitle = computed(() => getAnimeTitle(media.value));
+const coverUrl = computed(() => getMediaCover(media.value));
+
+// Title of the related anime for a relation type, or of the first relation when none is given.
+function relationTitle(relationType?: string): string {
+	const edges = media.value?.relations?.edges ?? [];
+	const edge = relationType ? edges.find((item) => item.relationType === relationType) : edges[0];
+	return getAnimeTitle(edge?.node);
+}
 const mainStudios = computed(() => media.value?.studios?.edges?.filter((edge) => edge.isMain && edge.node) || []);
 const externalLinks = computed(() => media.value?.externalLinks ?? [])
 const nbLinks = computed(() => externalLinks.value.length);
@@ -337,25 +338,7 @@ const trailerUrl = computed(() => {
 })
 
 const animeThemeColor = computed(() => media.value?.coverImage?.color || 'var(--ui-color-primary-400)');
-const HTML_ENTITIES: Record<string, string> = {
-	amp: '&', apos: "'", gt: '>', hellip: '…', lt: '<', ldquo: '“', lsquo: '‘',
-	mdash: '—', nbsp: ' ', ndash: '–', quot: '"', rdquo: '”', rsquo: '’'
-};
-
-// AniList descriptions arrive HTML-encoded: strip tags, then render entities as their characters.
-function decodeHtmlEntities(value: string): string {
-	return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-		if (entity.startsWith('#')) {
-			const codePoint = entity[1]?.toLowerCase() === 'x'
-				? Number.parseInt(entity.slice(2), 16)
-				: Number.parseInt(entity.slice(1), 10);
-			return Number.isFinite(codePoint) && codePoint > 0 ? String.fromCodePoint(codePoint) : match;
-		}
-		return HTML_ENTITIES[entity.toLowerCase()] ?? match;
-	});
-}
-
-const sanitizedDescription = computed(() => decodeHtmlEntities((media.value?.description || '').replace(/(<([^>]+)>)/ig, '')));
+const sanitizedDescription = computed(() => sanitizeMediaDescription(media.value?.description));
 
 // Details are fetched only once the details section is on screen: the summary renders from the
 // list media it was given.

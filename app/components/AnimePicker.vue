@@ -4,7 +4,7 @@ import type {
 	AniListMediaResponse,
 	AniListSearchResponse
 } from "~~/shared/types/anilist"
-import { getCreateMediaTitle } from "~/utils/create-artwork"
+import { getMediaCover, sanitizeMediaDescription } from "~/utils/media-display"
 
 interface PickerItem {
 	id: number
@@ -30,6 +30,7 @@ const emit = defineEmits<{
 	select: [media: AniListMediaListSummary]
 }>()
 
+const { title: getAnimeTitle } = useMediaTitle()
 const searchTerm = ref("")
 const searchResults = ref<AniListSearchResponse["result"]["predictions"]>([])
 const mediaCache = reactive(new Map<number, AniListMediaListSummary>())
@@ -44,7 +45,7 @@ const suggestionItems = computed<PickerItem[]>(() => props.suggestions
 	.slice(0, props.searchable ? 60 : 10)
 	.map(media => ({
 		id: media.id,
-		title: getCreateMediaTitle(media, "userPreferred"),
+		title: getAnimeTitle(media),
 		media
 	})))
 
@@ -68,17 +69,8 @@ const activeMedia = computed(() => activeId.value
 	? mediaCache.get(activeId.value) ?? activeItem.value?.media ?? null
 	: null
 )
-const description = computed(() => (activeMedia.value?.description ?? "")
-	.replace(/<br\s*\/?>/gi, " ")
-	.replace(/<[^>]*>/g, "")
-	.replace(/\s+/g, " ")
-	.trim()
-)
-const cover = computed(() => activeMedia.value?.coverImage?.extraLarge
-	?? activeMedia.value?.coverImage?.large
-	?? activeMedia.value?.coverImage?.medium
-	?? null
-)
+const description = computed(() => sanitizeMediaDescription(activeMedia.value?.description))
+const cover = computed(() => getMediaCover(activeMedia.value))
 const animeUrl = computed(() => activeMedia.value?.siteUrl
 	?? (activeMedia.value ? `https://anilist.co/anime/${activeMedia.value.id}` : null)
 )
@@ -219,7 +211,7 @@ async function selectItem(item: PickerItem): Promise<void> {
 					<NuxtImg
 						v-if="activeMedia.bannerImage || cover"
 						:src="activeMedia.bannerImage || cover!"
-						:alt="getCreateMediaTitle(activeMedia, 'userPreferred')"
+						:alt="getAnimeTitle(activeMedia)"
 						class="size-full object-cover" />
 					<div class="absolute inset-0 bg-linear-to-t from-black/65 via-transparent to-transparent" />
 					<UButton
@@ -237,7 +229,7 @@ async function selectItem(item: PickerItem): Promise<void> {
 				</div>
 
 				<h3 class="mt-4 text-lg leading-tight font-semibold text-highlighted">
-					{{ getCreateMediaTitle(activeMedia, "userPreferred") }}
+					{{ getAnimeTitle(activeMedia) }}
 				</h3>
 				<p class="mt-1 text-xs text-muted">
 					{{ activeMedia.format?.replaceAll("_", " ") || "Anime" }}
