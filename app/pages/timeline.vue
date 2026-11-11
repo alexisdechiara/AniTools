@@ -68,10 +68,11 @@ function formatActivityWeekday(activity: AniListAnimeActivity) {
 }
 
 function monthStats(group: TimelineMonthGroup) {
+	const { updates, titles, activeDays } = group.stats
 	return [
-		{ label: "Updates", value: group.stats.updates },
-		{ label: "Anime", value: group.stats.titles },
-		{ label: "Active days", value: group.stats.activeDays }
+		{ label: updates === 1 ? "update" : "updates", value: updates },
+		{ label: "anime", value: titles },
+		{ label: activeDays === 1 ? "active day" : "active days", value: activeDays }
 	]
 }
 
@@ -139,37 +140,28 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 
 				<div
 					v-else-if="activities.length && layout === 'vertical'"
-					class="space-y-14 lg:space-y-20"
+					class="space-y-10 lg:space-y-12"
 					aria-label="Anime update feed">
 					<section
 						v-for="{ group, runs } in monthFeeds"
 						:key="group.key"
-						class="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-10"
+						class="space-y-4"
 						:data-timeline-month="group.key">
-						<aside class="self-start text-center lg:sticky lg:top-6 lg:text-center">
-							<p class="text-3xl font-bold tracking-tight text-highlighted">
+						<header class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-default pb-3">
+							<h2 class="text-2xl font-bold tracking-tight text-highlighted">
 								{{ group.month }}
-							</p>
-							<p class="mt-1 text-sm font-medium text-muted">
-								{{ group.year }}
-							</p>
-							<div class="mt-5 grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-3">
-								<UPageCard
-									v-for="stat in monthStats(group)"
-									:key="stat.label"
-									:ui="{ container: 'gap-y-1 p-3', root: 'bg-elevated/60' }"
-									class="text-center lg:text-left">
-									<p class="text-[0.68rem] font-medium tracking-wide text-toned uppercase">
-										{{ stat.label }}
-									</p>
-									<p class="text-2xl font-semibold text-ellipsis text-highlighted">
-										{{ stat.value }}
-									</p>
-								</UPageCard>
-							</div>
-						</aside>
+								<span class="ms-1 text-base font-medium text-muted">{{ group.year }}</span>
+							</h2>
+							<ul class="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm text-muted" data-timeline-month-stats>
+								<li v-for="stat in monthStats(group)" :key="stat.label">
+									<strong class="font-semibold tabular-nums text-highlighted">{{ stat.value }}</strong>
+									{{ stat.label }}
+								</li>
+							</ul>
+						</header>
 
-						<ol class="space-y-3">
+						<!-- Two columns on wide screens: each card carries its own day, so the order stays readable. -->
+						<ol class="grid gap-3 xl:grid-cols-2 xl:gap-x-8">
 							<li
 								v-for="run in runs"
 								:key="run.key"
@@ -178,7 +170,7 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 								<time
 									:datetime="new Date(run.activity.createdAt * 1_000).toISOString()"
 									class="relative flex min-h-16 flex-col items-center border-r border-default pr-3 text-center">
-									<span class="text-[0.65rem] font-semibold tracking-wide text-primary uppercase">
+									<span class="text-xs font-semibold text-primary">
 										{{ formatActivityWeekday(run.activity) }}
 									</span>
 									<span class="mt-0.5 text-lg font-bold text-highlighted">
@@ -226,9 +218,6 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 						class="w-full"/>
 				</div>
 
-				<p v-if="layout === 'vertical'" class="text-center text-xs text-dimmed">
-					Public responses use a short HTTP cache. Signed-in activity is never persisted and is cached only in this browser tab for five minutes.
-				</p>
 			</div>
 
 			<div
@@ -239,9 +228,6 @@ useIntersectionObserver(loadMoreSentinel, ([entry]) => {
 					:has-more="hasMore"
 					:loading-more="loadingMore"
 					@request-more="loadMore" />
-				<p class="text-center text-xs text-dimmed">
-					Public responses use a short HTTP cache. Signed-in activity is never persisted and is cached only in this browser tab for five minutes.
-				</p>
 			</div>
 		</template>
 	</UDashboardPanel>

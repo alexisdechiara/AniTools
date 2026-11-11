@@ -83,3 +83,13 @@ export function pluraliseEpisodeStatus(status: string | null): string {
 	if (!verb) return "episodes"
 	return /\bepisode\b/i.test(verb) ? verb.replace(/\bepisode\b/i, "$&s") : `${verb} episodes`
 }
+
+/**
+ * AniList writes list statuses in lower case ("completed", "plans to watch"); the feed prints
+ * them as the start of a sentence. An empty status reads "Updated".
+ */
+export function sentenceCaseStatus(status: string | null | undefined): string {
+	const text = status?.trim() ?? ""
+	if (!text) return "Updated"
+	return text.charAt(0).toLocaleUpperCase("en") + text.slice(1)
+}

@@ -6,7 +6,8 @@ import {
 	formatRunSpan,
 	formatRunUpdateTime,
 	pluraliseEpisodeStatus,
-	runSpansSeveralDays
+	runSpansSeveralDays,
+	sentenceCaseStatus
 } from "~/utils/timeline-run-format"
 import type { TimelineEpisodeRun } from "~/utils/timeline-runs"
 
@@ -38,10 +39,21 @@ const mediaUrl = computed(() =>
 		? `https://anilist.co/anime/${props.activity.media.id}`
 		: null
 )
+// AniList's mid-size cover (about 230px wide): the image module resizes it to the drawn size
+// (80px in the compact feed, twice that on dense screens) and re-encodes it as WebP.
 const cover = computed(() =>
 	props.activity.kind === "anime"
 		? getMediaCover(props.activity.media, "medium")
 		: null
+)
+const coverSize = computed(() => props.layout === "horizontal"
+	? { width: 148, height: 208 }
+	: props.compact
+		? { width: 80, height: 112 }
+		: { width: 128, height: 180 }
+)
+const status = computed(() =>
+	props.activity.kind === "anime" ? sentenceCaseStatus(props.activity.status) : ""
 )
 const text = computed(() => getActivityText(props.activity))
 const actorName = computed(() =>
@@ -72,7 +84,7 @@ const runSpan = computed(() => mergedRun.value
 	: ""
 )
 const runStatus = computed(() =>
-	mergedRun.value ? pluraliseEpisodeStatus(mergedRun.value.activity.status) : ""
+	mergedRun.value ? sentenceCaseStatus(pluraliseEpisodeStatus(mergedRun.value.activity.status)) : ""
 )
 const runUpdates = computed(() => {
 	const run = mergedRun.value
@@ -83,8 +95,8 @@ const runUpdates = computed(() => {
 	return run.activities.map(update => ({
 		id: update.id,
 		label: update.progress
-			? `${update.status || "updated"} · ${update.progress}`
-			: update.status || "updated",
+			? `${sentenceCaseStatus(update.status)} · ${update.progress}`
+			: sentenceCaseStatus(update.status),
 		datetime: new Date(update.createdAt * 1_000).toISOString(),
 		time: formatRunUpdateTime(update.createdAt, severalDays, undefined, display)
 	}))
@@ -112,17 +124,27 @@ const imageOrderClass = computed(() =>
 				isHorizontal ? 'h-52 w-full' : compact ? 'h-28 w-full sm:h-auto sm:w-20' : 'h-48 w-full sm:h-auto sm:w-32',
 				imageOrderClass
 			]"
-			:aria-label="`Open ${mediaTitle} on AniList`">
+			tabindex="-1"
+			aria-hidden="true">
+			<!-- The title below links to the same page: the cover stays clickable but is one tab stop less. -->
 			<template v-if="cover">
 				<NuxtImg
 					:src="cover"
 					alt=""
-					class="absolute inset-0 size-full scale-110 object-cover opacity-35 blur-xl"
-					aria-hidden="true"/>
+					width="40"
+					height="56"
+					format="webp"
+					loading="lazy"
+					decoding="async"
+					class="absolute inset-0 size-full scale-110 object-cover opacity-35 blur-xl"/>
 				<NuxtImg
 					:src="cover"
-					:alt="`${mediaTitle} cover`"
-					sizes="sm:128px 320px"
+					alt=""
+					:width="coverSize.width"
+					:height="coverSize.height"
+					densities="x1 x2"
+					format="webp"
+					fit="cover"
 					loading="lazy"
 					decoding="async"
 					class="relative mx-auto h-full w-auto max-w-full object-cover"/>
@@ -138,7 +160,7 @@ const imageOrderClass = computed(() =>
 				<time
 					v-if="mergedRun && runStartedAt && showTimestamp"
 					:datetime="runStartedAt.toISOString()"
-					class="text-right text-xs text-dimmed"
+					class="text-right text-xs text-muted"
 					:class="compact ? 'ml-auto' : ''"
 					data-timeline-run-span>
 					{{ runSpan }}
@@ -146,7 +168,7 @@ const imageOrderClass = computed(() =>
 				<time
 					v-else-if="showTimestamp"
 					:datetime="timestamp.toISOString()"
-					class="shrink-0 text-xs text-dimmed"
+					class="shrink-0 text-xs text-muted"
 					:class="compact ? 'ml-auto' : ''">
 					{{ formatLocalDateTime(timestamp, compact ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }) }}
 				</time>
@@ -158,8 +180,8 @@ const imageOrderClass = computed(() =>
 				external
 				target="_blank"
 				rel="noopener noreferrer"
-				class="line-clamp-2 font-semibold text-highlighted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-				:class="compact ? 'mt-1.5 text-sm' : 'mt-3'">
+				class="line-clamp-2 py-0.5 font-semibold text-highlighted hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+				:class="compact ? 'mt-1 text-sm' : 'mt-2.5'">
 				{{ mediaTitle }}
 			</NuxtLink>
 			<p v-else class="font-semibold text-highlighted" :class="compact ? 'mt-1.5 text-sm' : 'mt-3'">
@@ -196,13 +218,13 @@ const imageOrderClass = computed(() =>
 							:key="update.id"
 							class="flex justify-between gap-3 py-2 text-xs last:pb-0">
 							<span class="min-w-0 wrap-break-word text-toned">{{ update.label }}</span>
-							<time :datetime="update.datetime" class="shrink-0 text-dimmed">{{ update.time }}</time>
+							<time :datetime="update.datetime" class="shrink-0 text-muted">{{ update.time }}</time>
 						</li>
 					</ol>
 				</div>
 			</template>
 			<p v-else-if="activity.kind === 'anime'" class="mt-1 text-toned" :class="compact ? 'text-xs' : 'text-sm'">
-				{{ activity.status || "updated" }}
+				{{ status }}
 				<span v-if="activity.progress"> · {{ activity.progress }}</span>
 			</p>
 			<p

@@ -54,7 +54,7 @@ describe("TimelineActivityCard", () => {
 
 		expect(card.text()).toContain("3 anime updates")
 		expect(card.get("[data-timeline-run-range]").text().replace(/\s+/g, " "))
-			.toBe("watched episodes 3 → 5")
+			.toBe("Watched episodes 3 → 5")
 		// The card prints the span with the visitor's zone and clock.
 		expect(card.get("[data-timeline-run-span]").text())
 			.toBe(formatRunSpan(run.startedAt, run.endedAt, {
@@ -93,9 +93,9 @@ describe("TimelineActivityCard", () => {
 		expect(list.attributes("id")).toBe(toggle.attributes("aria-controls"))
 		expect(list.attributes("style") ?? "").not.toContain("display: none")
 		expect(list.findAll("li").map(item => item.get("span").text())).toEqual([
-			"watched episode · 5",
-			"watched episode · 4",
-			"watched episode · 3"
+			"Watched episode · 5",
+			"Watched episode · 4",
+			"Watched episode · 3"
 		])
 		expect(list.findAll("time").map(time => time.attributes("datetime"))).toEqual([
 			new Date((NOON + 49 * MINUTE) * 1_000).toISOString(),
@@ -142,11 +142,40 @@ describe("TimelineActivityCard", () => {
 		expect(card.find("[data-timeline-run-range]").exists()).toBe(false)
 		expect(card.find("[data-timeline-run-span]").exists()).toBe(false)
 		expect(card.text()).toContain("Anime update")
-		expect(card.text().replace(/\s+/g, " ")).toContain("watched episode · 1122")
+		expect(card.text().replace(/\s+/g, " ")).toContain("Watched episode · 1122")
 
 		const plain = await mountSuspended(TimelineActivityCard, {
 			props: { activity: run.activity }
 		})
 		expect(plain.html()).toBe(card.html())
+	})
+
+	it("keeps one tab stop per anime: the cover link is hidden from keyboard and screen readers", async () => {
+		const single = {
+			...activity(1, NOON, "7"),
+			status: "plans to watch",
+			progress: null
+		}
+		single.media = {
+			...single.media!,
+			coverImage: { color: "#123456", large: "/og-default.svg", medium: "/og-default.svg" }
+		}
+		const card = await mountSuspended(TimelineActivityCard, {
+			props: { activity: single, compact: true }
+		})
+
+		const links = card.findAll("a")
+		expect(links).toHaveLength(2)
+		expect(links[0]!.attributes("tabindex")).toBe("-1")
+		expect(links[0]!.attributes("aria-hidden")).toBe("true")
+		expect(links[1]!.attributes("tabindex")).toBeUndefined()
+		expect(links[1]!.text()).toBe("Frieren")
+		expect(links[1]!.attributes("href")).toBe(links[0]!.attributes("href"))
+		for (const image of card.findAll("img")) {
+			expect(image.attributes("width")).toBeTruthy()
+			expect(image.attributes("height")).toBeTruthy()
+			expect(image.attributes("loading")).toBe("lazy")
+		}
+		expect(card.text()).toContain("Plans to watch")
 	})
 })
